@@ -3,10 +3,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
 	// Kotlin 버전은 Boot 4.1.1 BOM 이 관리하는 값(2.3.21)과 맞춘다. 플러그인은 BOM 밖이라 직접 적는다 —
 	// 갈리면 컴파일러와 stdlib 가 다른 판이 되고 증상이 엉뚱한 자리(리플렉션·직렬화)에서 난다.
-	kotlin("jvm") version "2.3.21"
+	kotlin("jvm") version "2.4.20"
 	// @Configuration·@Service 등 Spring 어노테이션이 붙은 클래스를 open 으로 만든다.
 	// Kotlin 은 기본이 final 이라 이 플러그인 없이는 프록시가 안 만들어진다.
-	kotlin("plugin.spring") version "2.3.21"
+	kotlin("plugin.spring") version "2.4.20"
 	jacoco
 	id("org.springframework.boot") version "4.1.1"
 	id("io.spring.dependency-management") version "1.1.7"
