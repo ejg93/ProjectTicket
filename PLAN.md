@@ -44,8 +44,8 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 |---|---|---|---|
 | D1 | `doc/README.md`·`glossary.md` | 문서 트리, 도메인 용어 한↔영 | 완료 |
 | D2 | `domain-model.md` | 엔티티 관계·경계·수명 | 완료(초안) |
-| D3 | `state-machines.md` | 예매·결제·환불·회차·대기열 토큰의 상태와 전이 | 이식됨 → `P6` |
-| D4 | `concurrency-rules.md` | 좌석 선점 방식, 격리 수준, 멱등키, 재시도, 선점 만료 | 이식됨 → `P5` |
+| D3 | `state-machines.md` | 예매·결제·환불·회차·대기열 토큰의 상태와 전이 | 완료(12a) |
+| D4 | `concurrency-rules.md` | 조건부 UPDATE 근거, 잠금 순서, 멱등키, 불변식, 스윕 경합 | 완료(12b) |
 | D5 | `api-guidelines.md` | URL·응답 형식·오류·목록 규약. Zalando 기준 | 이식됨 → `P3` |
 | D6 | `refund-policy.md` | 취소 수수료 구간(관람일 기준), 환불 계산, 반올림 | 미착수. 선행 `16` 이 근거 |
 | D7 | `time-rules.md` | 저장 시간대, 관람일 계산, 선점 만료 기준 시각 | 이식됨 → `P7` |
@@ -53,7 +53,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | D9 | `security-baseline.md` | 세션·시크릿·입력 검증·대기열 토큰 위조 | 이식됨 → `P8` |
 | D10 | `observability-rules.md` | 로그 형식·추적 ID·지표 이름 | 이식됨 → `P8` |
 | D11 | `event-catalog.md` | 아웃박스 이벤트 이름·페이로드·버전 | 미착수. 선행 `21` |
-| D12 | `queue-design.md` | 대기열 자료구조, 입장 속도, 토큰 수명, 새로고침·이탈 처리 | 미착수. 선행 `18` 이 근거 |
+| D12 | `queue-design.md` | 대기열 자료구조, 입장 속도·정원 등식, 토큰, 관문 범위, 이탈 | 완료(12c) |
 | D13 | `performance-goals.md` | 응답 시간·처리량 목표, 측정 방법 | 미착수. 선행 `27` 의 측정값 |
 | D14 | `coding-rules.md` | 계층·예외·트랜잭션·SQL·테스트. **Kotlin 으로** | 이식됨 → `P1` |
 | D15 | `naming-rules.md` | DB·Kotlin 식별자 | 이식됨 → `P2` |
@@ -61,6 +61,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | D17 | `screen-rules.md` | 화면 문구·권한 없는 버튼·오류 표시 | 이식됨 → `P9` |
 | D18 | `quality-gates.md` | 게이트 목록과 문턱, 리뷰 지적 처분 | 이식됨 → `P10` |
 | D19 | `stack.md` | 버전, 공식 문서, 기억으로 쓰면 틀리는 자리 | 이식됨 → `P11` |
+| D20 | `seat-read-model.md` | 좌석 현황 계약, 버전·스냅샷·델타, ETag | 완료(12d) |
 
 ## 청크 분할표
 
@@ -95,19 +96,27 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | 10 | 좌석 현황 조회 | `GET /api/performances/{id}/seats` — 구역별 상태. 응답 계약이 좌석도 UI 의 입력이다. **축**: `D5`(목록·캐시 헤더). **강제 지점**: 스냅샷 테스트(응답 형식). **건드리는 자리**: `event/SeatQuery`·컨트롤러. **닫힘**: `SeatQueryTest` | 9 |
 | 11 | 기획사 API | 공연·회차 등록·오픈 API, 기획사 권한. **축**: `D5`·역할. **강제 지점**: 테스트(다른 기획사 공연 수정 403). **건드리는 자리**: `event/` 컨트롤러. **닫힘**: `OrganizerScopeTest` | 8 |
 | 12 | 시드·데모 | 공연장 1(홀 2, 좌석 2천), 공연 2, 회차 4, 계정 6. `local` 프로필에서만. **축**: 관례. **강제 지점**: 기동 테스트(빈 DB 에서 시드까지 뜬다). **건드리는 자리**: `db/seed/`. **닫힘**: `SeedBootTest` | 9 |
+| 12a | `D3` 예매 상태기계 | 완료 — `state-machines.md` 재작성(P6 흡수). `HELD→PAYING→RESERVED→CANCELLED`, `→EXPIRED`. **`PAYING` 이 스윕과 승인의 경합을 푼다**(ADR 0004). 좌석 상태는 예매의 투영. 회차에 `cancelled` 추가. 자동 전이 셋(스윕·타임아웃·종료) 전부 멱등 | 완료 |
+| 12b | `D4` 동시성 규약 | 완료 — `concurrency-rules.md` 재작성(P5 흡수). Read Committed 로 충분한 근거(§13.2.1 WHERE 재평가), 다중 행은 **id 오름차순 `for update` 먼저**(교착 방지), 문장 순서(예매 행 → 잠금 → 조건부 UPDATE → 행 수 비교), `reservation_seat`=기록·`reservation_id`=포인터, 합계 불변식은 지연 제약 트리거, 멱등키(선점·결제 필수), 재시도는 40P01 만 1회 | 완료 |
+| 12c | `D12` 대기열 설계 | 완료 — `queue-design.md` 신설. 등식(R ≤ 풀/지연), 키 다섯, `ZADD NX` 로 순번 유지, Lua 원자 입장, 무작위 토큰(반납 가능), **관문은 선점만**(ADR 0004), 선점 성공 시 반납, Redis 죽으면 관문 닫힘(503) | 완료 |
+| 12d | `D20` 좌석 읽기 모델 | 완료 — `seat-read-model.md` 신설 + ADR 0005. 커밋 뒤 `INCR` 버전, 버전 키 스냅샷(TTL 10s), STREAM 변경 로그, `ETag`/304, `?since=` 델타·410. DB 는 정하는 일만, Redis 는 보여주는 일만 | 완료 |
+| 12e | 세션 저장소 결정 | 완료 — ADR 0004 에 흡수. Spring Session Redis. JWT(즉시 취소 불가)·sticky(문제를 숨긴다) 버림 | 완료 |
+| 12f | 동시성 테스트 바탕 | 롤백 없는 `ConcurrencyTestBase`(각 스레드가 자기 커넥션·트랜잭션) + 접두 정리. **축**: `D8`. **강제 지점**: 테스트(스레드 100 이 각자 커밋한 행이 100 이다). **건드리는 자리**: 신설 테스트 바탕, `testing-strategy.md` 한 절. **닫힘**: `ConcurrencyTestBase` 위에서 병렬 삽입 100 전부 커밋 | 12b |
 
 ### 2 — 예매 동시성 (핵심)
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 13 | 좌석 선점 (단일 인스턴스) | `POST /api/reservations` — 좌석 N개를 `UPDATE … WHERE status='AVAILABLE'` 조건부로 HELD, 갱신 행 수가 N 이 아니면 롤백. `reservation(HELD, held_until)`. **축**: `D4`(조건부 UPDATE 가 락 대신이다) + 표준(READ COMMITTED 에서 왜 충분한가). **강제 지점**: 제약(`performance_seat` 상태 enum·`held_until` not null when HELD) + 동시성 테스트. **건드리는 자리**: `V7__reservation.sql`, 신설 `reservation/`. **닫힘**: `SeatHoldConcurrencyTest.hundred_threads_one_winner`. **선행이 남긴 것**(마무리 3차 독립 리뷰): ① `performance_seat` 의 상태·부속값 check 때문에 순서가 「예매 행 먼저 → 조건부 UPDATE → 행 수가 다르면 통째 롤백」이고 셋이 한 트랜잭션이어야 진 쪽의 고아 예매가 안 남는다 ② `performance.status = 'open'` 을 같이 봐야 한다 — 닫힌 회차의 좌석도 `available` 로 남아 있다 ③ `performance_seat.reservation_id` 에 외래키를 여기서 건다(인덱스는 `V6` 에 있다) | 10 |
+| 13 | 좌석 선점 (단일 인스턴스) | `POST /api/reservations` — `D4` 문장 순서 그대로: 예매 행(`HELD`) → id 오름차순 `for update` → 조건부 UPDATE(회차 `open` 포함) → 행 수 ≠ N 이면 롤백 → `reservation_seat` 기록. **`Idempotency-Key` 필수**, 응답 재생. `performance_seat.reservation_id` 에 외래키. 합계는 지연 제약 트리거. 관문 자리(`X-Admission-Token`)는 23 이 채우도록 비워 둔다. **축**: `D4`·`D3`. **강제 지점**: 제약(외래키·지연 트리거·멱등키 유일) + 동시성 테스트. **건드리는 자리**: `V7__reservation.sql`, 신설 `reservation/`·`idempotency/`. **닫힘**: `SeatHoldConcurrencyTest.hundred_threads_one_winner` + `ReservationSeatConsistencyTest` | 10·12a·12b·12f |
 | 14 | 선점 만료 스윕 | `held_until` 지난 HELD 를 AVAILABLE 로. 스케줄러 + 멱등. 예매는 EXPIRED. **축**: `D7`(기준 시각) + `D4`(스윕과 결제 확정의 경합). **강제 지점**: 조건부 UPDATE(확정된 것을 안 되돌린다) + 테스트. **건드리는 자리**: `reservation/HoldSweeper`. **닫힘**: `HoldSweeperTest.does_not_release_confirmed` | 13 |
 | 15 | 1인 N매·중복 선점 제한 | 회차당 계정당 최대 매수, 같은 계정의 살아있는 HELD 중복 금지. **축**: `D4`. **강제 지점**: 제약(부분 유일 인덱스 — 살아있는 예매만) 우선, 안 되면 앱 검증 + 테스트. **건드리는 자리**: `V8`, `reservation/`. **닫힘**: `ReservationLimitTest` | 13 |
-| 16 | 결제 포팅 + 확정 | ProjectShop `MockPaymentGateway` 개조. 결제 성공 → HELD→RESERVED, 실패·시간초과 → 해제. 멱등키. **축**: `D3`·`D4`(멱등). **강제 지점**: 제약(멱등키 유일) + 상태 전이 테스트. **건드리는 자리**: 신설 `payment/`, `V9`. **닫힘**: `PaymentConfirmTest.expired_hold_cannot_confirm` | 14 |
-| 17 | 취소·환불 + `D6` | 관람일 기준 수수료 구간표, 환불 계산, 좌석 해제. `refund-policy.md` 를 이 청크가 쓴다(근거가 여기서 생긴다). **축**: `D6`·`D7`. **강제 지점**: 테이블(수수료 구간을 코드가 아니라 행으로) + 테스트. **건드리는 자리**: `V10__refund.sql`, `payment/Refund*`, 신설 `doc/reference/refund-policy.md`. **닫힘**: `RefundPolicyTest` | 16 |
+| 16 | 결제 포팅 + 확정 | ProjectShop `MockPaymentGateway` 개조(카드번호가 결과를 정한다, ADR 0003). **트랜잭션 셋**: `HELD→PAYING`(`paying_until`=+3분) / PG 호출(트랜잭션 밖) / 결과 반영 — 승인은 `where status='PAYING' and paying_until >= now()` 조건부, 0행이면 PG 취소 + `payment_late` 감사. 거절은 `→HELD`. 타임아웃 스케줄러가 `PAYING→EXPIRED`. **축**: `D3`·`D4`. **강제 지점**: 제약(`approved` 예매당 부분 유일·멱등키) + 전이 테스트. **건드리는 자리**: 신설 `payment/`, `V9`. **닫힘**: `PaymentConfirmTest.expired_hold_cannot_confirm`·`sweeper_does_not_touch_paying` | 14·12a |
+| 16a | 판매 마감·자동 종료 | `performance.sales_close_at`(기본 `starts_at - 1h`), check `sales_open_at < sales_close_at < starts_at`. 스케줄러(1분)가 `open→closed`, 남은 `HELD`·`PAYING` 을 `EXPIRED`, 대기열 키 삭제. **축**: `D3`·`D7`. **강제 지점**: check + 조건부 UPDATE + 테스트. **건드리는 자리**: 새 `V`, `event/PerformanceCloser`. **닫힘**: `PerformanceCloseTest.held_seats_expire_on_close` | 14 |
+| 17 | 취소·환불 + `D6` | 관람일 기준 수수료 구간표, 환불 계산, 좌석 해제. `refund-policy.md` 를 이 청크가 쓴다(근거가 여기서 생긴다). **축**: `D6`·`D7`. **강제 지점**: 테이블(수수료 구간을 코드가 아니라 행으로) + 테스트. **건드리는 자리**: `V10__refund.sql`, `payment/Refund*`, 신설 `doc/reference/refund-policy.md`. **닫힘**: `RefundPolicyTest` | 16·P7 |
+| 17a | 회차 취소 | 기획사가 `open` 회차를 `cancelled` 로. 모든 예매 `CANCELLED`, `RESERVED` 는 **전액 환불**(구간 무관), 알림 이벤트 일괄(아웃박스). check·전이 트리거에 `cancelled` 추가. **축**: `D3`·`D6`. **강제 지점**: 한 트랜잭션 + 아웃박스 원자성 테스트. **건드리는 자리**: 새 `V`, `event/PerformanceCancelService`, `payment/Refund*`. **닫힘**: `PerformanceCancelTest.every_reservation_refunded_in_full` | 17·25 |
 | 18 | 발권 | RESERVED 예매에 티켓 번호(외부 노출 식별자, `identifier-rules.md`). 조회 API. **축**: `D5`·식별자 규약. **강제 지점**: 제약(티켓 번호 유일). **건드리는 자리**: `V11__ticket.sql`, `reservation/Ticket*`. **닫힘**: `TicketIssueTest` | 16 |
-| 19 | 동시성 계측 | 100·1000 스레드 선점 테스트를 Testcontainers 에서 돌리고 수치(성공 1·실패 N·소요)를 `doc/notes/` 에 적는다. 낙관락(`version`)·비관락(`FOR UPDATE`)·조건부 UPDATE 셋을 같은 테스트로 비교 → ADR 0003. **축**: 측정. **강제 지점**: 없다 — 기록이다. **건드리는 자리**: `reservation/` 테스트, `doc/notes/lock-comparison.md`, `doc/adr/0003`. **닫힘**: ADR 에 세 수치가 있다 | 13 |
-| 20 | 이식 `P5`·`P6` | `concurrency-rules.md`·`state-machines.md` 를 예매 것으로 다시 쓴다. 13~18 이 근거다. **축**: 규약. **강제 지점**: 전이표를 코드에 선언하고 테스트가 문서와 대조. **건드리는 자리**: 두 문서. **닫힘**: `StateMachineDocTest` | 17 |
+| 19 | 동시성 계측 | 100·1000 스레드 선점 테스트를 Testcontainers 에서 돌리고 수치(성공 1·실패 N·소요)를 `doc/notes/` 에 적는다. 낙관락(`version`)·비관락(`FOR UPDATE`)·조건부 UPDATE 셋을 같은 테스트로 비교 → ADR 0006. **축**: 측정. **강제 지점**: 없다 — 기록이다. **건드리는 자리**: `reservation/` 테스트, `doc/notes/lock-comparison.md`, `doc/adr/0003`. **닫힘**: ADR 에 세 수치가 있다 | 13 |
+| 20 | ~~이식 P5·P6~~ | 12a·12b 가 흡수했다 — 두 문서를 코드보다 먼저 썼다(ADR 0004). `StateMachineDocTest`(전이표와 문서 대조)는 13 이 세운다 | 완료 |
 
 ### 3 — 대기열
 
@@ -117,15 +126,18 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | 22 | 입장 스케줄러·활성 토큰 | N초마다 앞 M명을 활성 집합으로 옮기고 토큰(TTL) 발급. **축**: `D12`. **강제 지점**: TTL + 테스트(만료 토큰 거부). **건드리는 자리**: `queue/AdmissionScheduler`. **닫힘**: `AdmissionTest` | 21 |
 | 23 | 대기열 관문 | 활성 토큰 없이 예매 API 를 부르면 429/403. 필터. **축**: `D9`(토큰 위조·재사용). **강제 지점**: 필터 + 테스트. **건드리는 자리**: `queue/QueueGateFilter`. **닫힘**: `QueueGateTest.no_token_rejected` | 22 |
 | 24 | 이탈·새로고침 | 하트비트 없으면 제거, 새로고침해도 순번 유지. **축**: `D12`. **강제 지점**: TTL. **건드리는 자리**: `queue/`. **닫힘**: `QueueHeartbeatTest` | 22 |
+| 20a | 세션 저장소 Redis | Spring Session Data Redis + `SpringSessionBackedSessionRegistry`. 로그인 코드는 그대로. 정지·탈퇴가 인스턴스를 넘어 세션을 끊는다. **축**: ADR 0004. **강제 지점**: 테스트(컨텍스트 둘이 같은 세션 쿠키를 인정한다). **건드리는 자리**: `SecurityConfig`, `build.gradle.kts`, `application.yml`. **닫힘**: `SharedSessionTest.login_on_one_context_is_seen_by_another` | 21 |
+| 5a | 탈퇴·파기 | `DELETE /api/me`(세션 전부 끊기·`deleted_at`), 30일 뒤 파기 배치(이메일·이름·해시 null, 동의 cascade 는 물리 삭제 때), 감사 3년 파기. **축**: `D9` + 개인정보보호법 제21조. **강제 지점**: 트리거(`deleted_at` 계정 로그인 불가 — 있음) + 배치 테스트. **건드리는 자리**: `account/WithdrawalService`·`AccountPurgeBatch`. **닫힘**: `AccountPurgeTest.pii_nulled_after_grace` | 4·20a |
+| 5b | 관리자 정지·해제 | `admin` 전용 `POST /api/admin/accounts/{id}/suspend`, 정지 즉시 그 계정 세션 전부 만료, 감사. **축**: `D9`. **강제 지점**: 테스트(정지 직후 다른 컨텍스트의 세션이 401). **건드리는 자리**: `account/AdminController`. **닫힘**: `SuspendTest.other_session_cut_immediately` | 20a |
 
 ### 4 — 비동기 분리
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 25 | 아웃박스 | `outbox` 테이블, 예매 확정 트랜잭션에 이벤트 행 커밋, 릴레이가 Spring 이벤트로 발행. `event-catalog.md`(`D11`) 초안. **축**: 표준(Transactional Outbox). **강제 지점**: 트랜잭션 + 테스트(확정 없이 이벤트 없음). **건드리는 자리**: `V12__outbox.sql`, 신설 `outbox/`. **닫힘**: `OutboxAtomicityTest` | 16 |
+| 25 | 아웃박스 | `outbox` 테이블, 예매 확정 트랜잭션에 이벤트 행 커밋, 릴레이가 Spring 이벤트로 발행. 릴레이는 `for update skip locked` 로 가져간다 — 인스턴스 셋이 같은 행을 두 번 안 민다. `event-catalog.md`(`D11`) 초안. **축**: 표준(Transactional Outbox). **강제 지점**: 트랜잭션 + 테스트(확정 없이 이벤트 없음). **건드리는 자리**: `V12__outbox.sql`, 신설 `outbox/`. **닫힘**: `OutboxAtomicityTest` | 16 |
 | 26 | 알림 포팅 (소비자 1) | ProjectShop `notification` 개조 — 예매 확정·취소 메일(모의 발송, 본문 이력). **축**: `D11`. **강제 지점**: 멱등(이벤트 ID 유일) + 테스트. **건드리는 자리**: 신설 `notification/`, `V13`. **닫힘**: `NotificationIdempotencyTest` | 25 |
 | 27 | 정산 집계 (소비자 2) | 회차 종료 후 기획사별 매출·수수료 집계. **둘째 소비자다 — 다음 청크가 Kafka 를 든다.** **축**: `D11`. **강제 지점**: 테스트. **건드리는 자리**: 신설 `settlement/`, `V14`. **닫힘**: `SettlementAggregateTest` | 26 |
-| 28 | Kafka 도입 | compose 에 Kafka, 릴레이가 Kafka 로 발행, 소비자 둘을 Kafka 리스너로. ADR 0004(왜 지금인가). **축**: 관례(토픽 이름·파티션 키) + `D11`. **강제 지점**: Kafka Testcontainers 테스트. **건드리는 자리**: `docker-compose.yml`, `outbox/`, `notification/`, `settlement/`. **닫힘**: `KafkaRelayTest` | 27 |
+| 28 | Kafka 도입 | compose 에 Kafka, 릴레이가 Kafka 로 발행, 소비자 둘을 Kafka 리스너로. ADR 0007(왜 지금인가). 파티션 키 = `reservation_id` — 한 예매의 사건이 순서를 지킨다. **축**: 관례(토픽 이름·파티션 키) + `D11`. **강제 지점**: Kafka Testcontainers 테스트. **건드리는 자리**: `docker-compose.yml`, `outbox/`, `notification/`, `settlement/`. **닫힘**: `KafkaRelayTest` | 27 |
 | 29 | 재시도·DLQ·멱등 소비 | 소비 실패 재시도, 초과 시 DLQ, 중복 전달에 멱등. **축**: 표준(at-least-once). **강제 지점**: 테스트(같은 이벤트 두 번 → 한 번 처리). **건드리는 자리**: `outbox/`·소비자. **닫힘**: `ConsumerIdempotencyTest`·`DlqTest` | 28 |
 
 ### 5 — 관측·부하·다중 인스턴스
@@ -135,9 +147,10 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | 30 | 지표·대시보드 | Micrometer → Prometheus, Grafana 대시보드(선점 성공률·대기열 길이·응답 시간). compose 추가. **축**: `D10`. **강제 지점**: 테스트(지표 이름이 문서와 같다). **건드리는 자리**: `docker-compose.yml`, `observability/`, `docker/grafana/`. **닫힘**: `MetricNamesTest` | 13·21 |
 | 31 | k6 시나리오 | 동시 1만 접속·좌석 1천 경쟁. 결과를 `doc/notes/load-1.md` 에. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: 신설 `load/`. **닫힘**: 리포트에 p95·성공 좌석 수·오류율이 있다 | 23·30 |
 | 32 | `D13` 성능 목표 | 31 의 측정값으로 목표를 정한다. **축**: 측정값. **강제 지점**: 없다 — 문서. `35` 가 검증. **건드리는 자리**: 신설 `performance-goals.md`. **닫힘**: 수치 셋(p95·처리량·오류율) | 31 |
-| 33 | 다중 인스턴스 | `docker compose up --scale app=3` + nginx. 분산 환경에서 13·22 가 깨지나 본다 — 스케줄러 중복 실행이 첫 후보(ShedLock 또는 Redis 락). **축**: `D4`. **강제 지점**: 테스트(스윕·입장 스케줄러가 인스턴스 셋에서 한 번만). **건드리는 자리**: `docker-compose.yml`, `docker/nginx/`, 스케줄러. **닫힘**: `SchedulerSingleRunTest` | 22·30 |
-| 34 | Redisson 분산락 비교 | 조건부 UPDATE vs Redisson 락 을 33 환경에서 재고 ADR 0005. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: `reservation/`, `doc/adr/0005`. **닫힘**: ADR 에 두 수치 | 33 |
+| 33 | 다중 인스턴스 | `docker compose up --scale app=3` + nginx. **첫 검사는 세션이 인스턴스를 넘어가나**(20a). 그다음 스케줄러 셋(스윕·타임아웃·종료·입장)이 Redis 락으로 하나만 도나. **축**: `D4`·ADR 0004. **강제 지점**: 테스트(세션 공유·스케줄러 단일 실행). **건드리는 자리**: `docker-compose.yml`, `docker/nginx/`, 스케줄러. **닫힘**: `SharedSessionTest` + `SchedulerSingleRunTest` | 20a·22·30 |
+| 34 | Redisson 분산락 비교 | 조건부 UPDATE vs Redisson 락 을 33 환경에서 재고 ADR 0008. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: `reservation/`, `doc/adr/0005`. **닫힘**: ADR 에 두 수치 | 33 |
 | 35 | 부하 2차 | 33 환경에서 31 재실행, `D13` 대조. **축**: `D13`. **강제 지점**: 없다. **건드리는 자리**: `doc/notes/load-2.md`. **닫힘**: 목표 대비 표 | 32·33 |
+| 35a | 운영 설정 | `server.shutdown=graceful`(선점 트랜잭션이 잘리지 않게), actuator `readiness`/`liveness` 그룹 + DB·Redis 인디케이터, `spring.threads.virtual.enabled` 켜기 전후를 31 시나리오로 측정. **축**: 관례(k8s 프로브) + 측정. **강제 지점**: 테스트(`/actuator/health/readiness` 가 DB 끊기면 DOWN). **건드리는 자리**: `application.yml`, `doc/notes/virtual-threads.md`. **닫힘**: `ReadinessTest` | 30 |
 
 ### 6 — k8s
 
