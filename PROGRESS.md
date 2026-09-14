@@ -16,7 +16,7 @@
 
 | 날짜 | 청크 | 결과 | 커밋 |
 |---|---|---|---|
-| 2026-09-14 | 0. 저장소 뼈대 | 완료 — `CLAUDE.md`·`PLAN.md`·`PROGRESS.md`·`README.md`·`docker-compose.yml`·`.claude/settings.json`·스킬 4·`scripts/` 3·`.github/` 신설. ADR 0001(스택)·0002(이식 범위). `doc/reference/` 15개를 머리말 달아 원문 이식, `domain-model.md`·`glossary.md` 신설. **왜**: 사용자가 Kotlin+Spring 을 골랐고(국내 공고 60~70% Java+Spring, 주요 IT 가 Kotlin), Kafka 는 소비자 둘째에서, k8s 는 로컬 kind, AWS 는 안 한다. ProjectShop 은 docs 313 대 feat 142 라 문서 비중을 낮추기로 했다(대전제 5). **검증**: `bash scripts/doc-lint.sh` 통과 | |
+| 2026-09-14 | 0. 저장소 뼈대 | 완료 — `CLAUDE.md`·`PLAN.md`·`PROGRESS.md`·`README.md`·`docker-compose.yml`·`.claude/settings.json`·스킬 4·`scripts/` 3·`.github/` 신설. ADR 0001(스택)·0002(이식 범위). `doc/reference/` 15개를 머리말 달아 원문 이식, `domain-model.md`·`glossary.md` 신설. **왜**: 사용자가 Kotlin+Spring 을 골랐고(국내 공고 60~70% Java+Spring, 주요 IT 가 Kotlin), Kafka 는 소비자 둘째에서, k8s 는 로컬 kind, AWS 는 안 한다. ProjectShop 은 docs 313 대 feat 142 라 문서 비중을 낮추기로 했다(대전제 5). **검증**: `bash scripts/doc-lint.sh` 통과 | cb20edf |
 
 ## 기록 규칙
 
