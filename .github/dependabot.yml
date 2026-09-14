@@ -26,8 +26,13 @@ updates:
       backend-minor:
         patterns: ["*"]
         update-types: [minor, patch]
-    # **막아 둔 것이 없다.** Testcontainers 메이저를 막고 있었는데 `2f-2` 가 이관하면서
-    # 풀었다 — `ignore` 는 상류가 못 받는 동안만 두고, 조건이 풀리면 지우는 것이 규칙이다.
+    ignore:
+      # **Kotlin 플러그인은 Boot BOM 이 주는 `kotlin.version` 과 같아야 한다**(`build.gradle.kts`).
+      # 플러그인만 올리면 컴파일러와 stdlib 이 다른 판이 되고, 증상이 엉뚱한 자리(리플렉션·직렬화)에서 난다.
+      #
+      # **Boot 가 BOM 을 올리는 판을 내면 이 줄을 지운다** — `ignore` 는 상류가 못 받는 동안만 두고
+      # 조건이 풀리면 지우는 것이 규칙이다. BOM 값은 `spring-boot-dependencies` 의 `<kotlin.version>` 이 답한다.
+      - dependency-name: "org.jetbrains.kotlin*"
     commit-message:
       prefix: "deps"
 
