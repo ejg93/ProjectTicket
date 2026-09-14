@@ -15,10 +15,10 @@
 | 공연 | event | 작품 단위 | 이벤트(화면에서 안 쓴다) |
 | 회차 | performance | 공연의 특정 일시 | 세션, 스케줄 |
 | 회차 좌석 | performance_seat | 회차별 좌석 상태 행 | |
-| 선점 | hold | 결제 전 좌석을 잠시 잡음. `HELD` | 임시 예약, 락 |
+| 선점 | hold | 결제 전 좌석을 잠시 잡음. `held` | 임시 예약, 락 |
 | 선점 만료 | hold expiry | `held_until` 경과. 스윕이 해제 | 타임아웃 |
 | 예매 | reservation | 관객이 좌석을 잡아 결제까지 가는 단위 | 예약, 주문 |
-| 확정 | confirm | 결제 성공으로 `RESERVED` | 완료 |
+| 확정 | confirm | 결제 성공으로 `reserved` | 완료 |
 | 취소 | cancel | 관객이 확정 예매를 무름 | 환불(돈 쪽 말) |
 | 환불 | refund | 취소에 따른 금액 반환 | |
 | 취소 수수료 | cancellation fee | 관람일 기준 구간별 공제 | 위약금 |

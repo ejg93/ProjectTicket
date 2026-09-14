@@ -18,7 +18,7 @@
 | `seat_grade_map` | 홀 좌석 → 등급. 공연마다 다르다 | event | event 와 함께 |
 | `performance` | 회차. 일시·홀·상태(`draft→open→closed`, `open→cancelled`)·판매 시작·**판매 마감**(`sales_close_at`, 16a) | event | event 와 함께 |
 | `performance_seat` | **회차별 좌석 상태.** OPEN 때 `seat` 를 복제하고 등급·가격을 박제. `status`·`held_until`·`reservation_id`(**포인터** — 지금 이 좌석을 쥔 예매) | performance | performance 와 함께 |
-| `reservation` | 예매. 상태(`HELD→PAYING→RESERVED→CANCELLED`, `→EXPIRED`, `D3`)·계정·회차·합계·`held_until`·`paying_until`·멱등키 | account | 영구(거래 기록) |
+| `reservation` | 예매. 상태(`held→paying→reserved→cancelled`, `→expired`, `D3`)·계정·회차·합계·`held_until`·`paying_until`·멱등키 | account | 영구(거래 기록) |
 | `reservation_seat` | **기록** — 이 예매가 잡은 좌석과 그때 가격. 선점 때 한 번 쓰고 안 고친다(`D4`) | reservation | reservation 과 함께 |
 | `idempotency_key` | 계정별 멱등키와 저장된 응답. 24시간(`D4`) | account | 24시간 뒤 삭제 |
 | `payment` | 모의 결제. 예매 하나에 하나 | reservation | 영구 |
@@ -31,7 +31,7 @@ Redis 에 두는 것 — 대기열 ZSET·활성 토큰(`D12`), 좌석 버전·�
 
 ## 왜 회차마다 좌석을 복제하나
 
-같은 홀이라도 공연마다 등급·가격이 다르고, 상태(AVAILABLE·HELD·RESERVED)는 회차 단위다.
+같은 홀이라도 공연마다 등급·가격이 다르고, 상태(AVAILABLE·held·reserved)는 회차 단위다.
 `seat` 에 상태를 두면 회차 둘이 같은 홀을 쓸 때 부딪친다. 복제 비용은 회차당 좌석 수(수천 행)라 오픈 한 번에 감당된다.
 
 ## 좌석 상태의 단일 진실

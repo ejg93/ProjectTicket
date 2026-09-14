@@ -10,44 +10,44 @@
 ## 예매 `reservation`
 
 ```
-HELD ──결제 시작──> PAYING ──승인──> RESERVED ──취소──> CANCELLED
+held ──결제 시작──> paying ──승인──> reserved ──취소──> cancelled
   │                   │
-  ├─5분 만료(스윕)──> EXPIRED
-  │                   ├─3분 타임아웃────> EXPIRED
-  │                   └─거절·실패──────> HELD   (남은 선점 시간이 있을 때만)
-  └─회차 종료·취소──> EXPIRED / CANCELLED
+  ├─5분 만료(스윕)──> expired
+  │                   ├─3분 타임아웃────> expired
+  │                   └─거절·실패──────> held   (남은 선점 시간이 있을 때만)
+  └─회차 종료·취소──> expired / cancelled
 ```
 
 | 상태 | 뜻 | 좌석은 | 시간 제한 | 누가 옮기나 |
 |---|---|---|---|---|
-| `HELD` | 좌석을 잡았다. 결제 전이다 | `held` | `held_until` = 선점 + 5분(ADR 0003) | 관객이 선점(13) |
-| `PAYING` | 결제를 시작했다. **스윕이 안 건드린다** | `held` | `paying_until` = 시작 + 3분(ADR 0004) | 관객이 결제 시작(16) |
-| `RESERVED` | 결제가 승인됐다. 예매가 성립했다 | `reserved` | 없음 | 결제 승인(16) |
-| `CANCELLED` | 관객이 취소했거나 회차가 취소됐다 | `available` | 없음 | 관객(17)·기획사(17a) |
-| `EXPIRED` | 결제 전에 시간이 지났거나 회차가 닫혔다 | `available` | 없음 | 스윕(14)·타임아웃(16)·회차 종료(16a) |
+| `held` | 좌석을 잡았다. 결제 전이다 | `held` | `held_until` = 선점 + 5분(ADR 0003) | 관객이 선점(13) |
+| `paying` | 결제를 시작했다. **스윕이 안 건드린다** | `held` | `paying_until` = 시작 + 3분(ADR 0004) | 관객이 결제 시작(16) |
+| `reserved` | 결제가 승인됐다. 예매가 성립했다 | `reserved` | 없음 | 결제 승인(16) |
+| `cancelled` | 관객이 취소했거나 회차가 취소됐다 | `available` | 없음 | 관객(17)·기획사(17a) |
+| `expired` | 결제 전에 시간이 지났거나 회차가 닫혔다 | `available` | 없음 | 스윕(14)·타임아웃(16)·회차 종료(16a) |
 
 ### 전이표
 
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
-| — | `HELD` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 활성 토큰이 있다 | 13 |
-| `HELD` | `PAYING` | `held_until` 이 안 지났다 | 16 |
-| `HELD` | `EXPIRED` | `held_until < now()` | 14 스윕 |
-| `PAYING` | `RESERVED` | 결제 승인. `paying_until` 이 안 지났다 | 16 |
-| `PAYING` | `HELD` | 결제 거절·실패. `held_until` 이 안 지났다 | 16 |
-| `PAYING` | `EXPIRED` | `paying_until < now()`, 또는 거절됐는데 `held_until` 도 지났다 | 16 타임아웃 |
-| `RESERVED` | `CANCELLED` | 관람일 당일이 아니다(ADR 0003 수수료 구간) | 17 |
-| `HELD`·`PAYING` | `EXPIRED` | 회차가 `closed` 로 간다 | 16a |
-| `HELD`·`PAYING`·`RESERVED` | `CANCELLED` | 회차가 `cancelled` 로 간다. `RESERVED` 는 전액 환불 | 17a |
+| — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 활성 토큰이 있다 | 13 |
+| `held` | `paying` | `held_until` 이 안 지났다 | 16 |
+| `held` | `expired` | `held_until < now()` | 14 스윕 |
+| `paying` | `reserved` | 결제 승인. `paying_until` 이 안 지났다 | 16 |
+| `paying` | `held` | 결제 거절·실패. `held_until` 이 안 지났다 | 16 |
+| `paying` | `expired` | `paying_until < now()`, 또는 거절됐는데 `held_until` 도 지났다 | 16 타임아웃 |
+| `reserved` | `cancelled` | 관람일 당일이 아니다(ADR 0003 수수료 구간) | 17 |
+| `held`·`paying` | `expired` | 회차가 `closed` 로 간다 | 16a |
+| `held`·`paying`·`reserved` | `cancelled` | 회차가 `cancelled` 로 간다. `reserved` 는 전액 환불 | 17a |
 
-**`PAYING` 이 있는 이유는 스윕과 승인의 경합이다**(ADR 0004). 상태가 `HELD` 하나면 스윕이 T 에 좌석을 풀고
-승인이 T+ε 에 와서 **돈은 받고 좌석은 없는** 예매가 된다. 결제가 시작되면 `PAYING` 으로 옮기고 스윕은 `HELD` 만 훑으므로
-같은 행을 두고 다투는 자리가 사라진다. 대신 `PAYING` 이 영영 남지 않게 자체 타임아웃을 둔다.
+**`paying` 이 있는 이유는 스윕과 승인의 경합이다**(ADR 0004). 상태가 `held` 하나면 스윕이 T 에 좌석을 풀고
+승인이 T+ε 에 와서 **돈은 받고 좌석은 없는** 예매가 된다. 결제가 시작되면 `paying` 으로 옮기고 스윕은 `held` 만 훑으므로
+같은 행을 두고 다투는 자리가 사라진다. 대신 `paying` 이 영영 남지 않게 자체 타임아웃을 둔다.
 
-**`PAYING → HELD` 는 되돌리기가 아니라 재시도 허용이다.** 카드가 거절돼도 선점 시간이 남았으면 다른 카드로 다시 시도한다.
+**`paying → held` 는 되돌리기가 아니라 재시도 허용이다.** 카드가 거절돼도 선점 시간이 남았으면 다른 카드로 다시 시도한다.
 `held_until` 은 그대로다 — 결제 시도가 선점을 연장하지 않는다.
 
-**끝 상태는 `RESERVED`·`CANCELLED`·`EXPIRED` 다.** `EXPIRED`·`CANCELLED` 에서 나가는 전이는 없다.
+**끝 상태는 `reserved`·`cancelled`·`expired` 다.** `expired`·`cancelled` 에서 나가는 전이는 없다.
 다시 사려면 새 예매다.
 
 ### 좌석과의 대응
@@ -56,9 +56,9 @@ HELD ──결제 시작──> PAYING ──승인──> RESERVED ──취소
 
 | 예매 | 좌석 | 좌석의 `reservation_id` |
 |---|---|---|
-| `HELD`·`PAYING` | `held` | 그 예매 |
-| `RESERVED` | `reserved` | 그 예매 |
-| `CANCELLED`·`EXPIRED` | `available` | null |
+| `held`·`paying` | `held` | 그 예매 |
+| `reserved` | `reserved` | 그 예매 |
+| `cancelled`·`expired` | `available` | null |
 
 **둘이 갈리는 것은 `D4` 의 대조 테스트가 막는다.** 갈릴 수 있는 자리는 전이 하나가 두 표를 고치는 자리 전부이고,
 그래서 전이는 반드시 한 트랜잭션이다.
@@ -68,9 +68,9 @@ HELD ──결제 시작──> PAYING ──승인──> RESERVED ──취소
 | 상태 | 뜻 |
 |---|---|
 | `requested` | PG 를 불렀다 |
-| `approved` | 승인됐다. 예매가 `RESERVED` 로 간다 |
-| `declined` | 거절됐다(잔액 부족 등). 예매는 `HELD` 로 돌아간다 |
-| `failed` | 응답이 없거나 깨졌다. 예매는 `HELD` 로 돌아간다 — 재시도할 수 있다 |
+| `approved` | 승인됐다. 예매가 `reserved` 로 간다 |
+| `declined` | 거절됐다(잔액 부족 등). 예매는 `held` 로 돌아간다 |
+| `failed` | 응답이 없거나 깨졌다. 예매는 `held` 로 돌아간다 — 재시도할 수 있다 |
 
 예매 하나에 결제 행이 여럿일 수 있다(재시도). **승인은 하나뿐이다** — `approved` 는 예매당 부분 유일 인덱스로 막는다.
 결제 결과가 무엇인지는 카드번호가 정한다(ADR 0003, 모의 PG).
@@ -96,8 +96,8 @@ draft ──오픈──> open ──판매 마감──> closed
 |---|---|---|
 | `draft` | 만들어졌다. 좌석 복제 전이다. **회차는 이 상태로만 태어난다**(`V5` 삽입 가드) | — |
 | `open` | 좌석이 복제됐고 판다 | 기획사(9·11) |
-| `closed` | `sales_close_at` 이 지났다. 남은 `HELD`·`PAYING` 은 `EXPIRED` 로 | 스케줄러(16a) |
-| `cancelled` | 기획사가 취소했다. 모든 예매가 `CANCELLED`, `RESERVED` 는 전액 환불 | 기획사(17a) |
+| `closed` | `sales_close_at` 이 지났다. 남은 `held`·`paying` 은 `expired` 로 | 스케줄러(16a) |
+| `cancelled` | 기획사가 취소했다. 모든 예매가 `cancelled`, `reserved` 는 전액 환불 | 기획사(17a) |
 
 `sales_close_at` 의 기본은 `starts_at - 1시간` 이고 `sales_open_at < sales_close_at < starts_at` 을 check 가 든다(16a).
 `cancelled` 는 17a 가 check 목록과 전이 트리거에 더한다 — `open` 에서만 간다. `closed` 뒤의 취소는 없다.
@@ -116,9 +116,9 @@ WAITING ──입장──> ADMITTED ──선점 성공──> (토큰 삭제)
 
 | 무엇 | 언제 | 어떻게 |
 |---|---|---|
-| 선점 만료 스윕 | 30초마다(ADR 0003) | `HELD` 이고 `held_until < now()` 인 예매를 `EXPIRED`, 좌석을 `available`. **조건부 UPDATE** 라 그 사이에 `PAYING` 으로 간 것은 안 건드린다 |
-| 결제 타임아웃 | 30초마다, 같은 스케줄러 | `PAYING` 이고 `paying_until < now()` → `EXPIRED` |
-| 회차 종료 | 1분마다(16a) | `open` 이고 `sales_close_at < now()` → `closed`, 남은 `HELD`·`PAYING` → `EXPIRED` |
+| 선점 만료 스윕 | 30초마다(ADR 0003) | `held` 이고 `held_until < now()` 인 예매를 `expired`, 좌석을 `available`. **조건부 UPDATE** 라 그 사이에 `paying` 으로 간 것은 안 건드린다 |
+| 결제 타임아웃 | 30초마다, 같은 스케줄러 | `paying` 이고 `paying_until < now()` → `expired` |
+| 회차 종료 | 1분마다(16a) | `open` 이고 `sales_close_at < now()` → `closed`, 남은 `held`·`paying` → `expired` |
 
 **셋 다 멱등이다.** 두 번 돌아도 둘째는 0행이다. 인스턴스 여럿에서 동시에 돌 때는 Redis 락(33)이 하나만 돌린다 —
 안 돌려도 결과는 같지만 같은 행을 두 번 스캔한다.
@@ -135,7 +135,7 @@ WAITING ──입장──> ADMITTED ──선점 성공──> (토큰 삭제)
 ## 상태 이력
 
 `reservation` 은 상태 이력 표를 따로 두지 않는다. 전이마다 `audit_log` 에 `reservation.<전이>` 사건을 남기고(4),
-`RESERVED`·`CANCELLED`·`EXPIRED` 시각은 예매 행의 열(`reserved_at`·`cancelled_at`·`expired_at`)이 든다.
+`reserved`·`cancelled`·`expired` 시각은 예매 행의 열(`reserved_at`·`cancelled_at`·`expired_at`)이 든다.
 **분쟁에서 묻는 것은 「언제 확정됐나」「언제 취소했나」 둘이라** 열이면 충분하고, 이력 표는 조회 한 번을 더 만든다.
 
 ## 어긋남은 트리거가 막되 상태를 안 옮긴다
