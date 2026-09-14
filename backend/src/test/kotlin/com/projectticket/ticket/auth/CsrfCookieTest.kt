@@ -5,6 +5,7 @@ import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -19,14 +20,19 @@ class CsrfCookieTest : PostgresTestBase() {
 
     @Test
     fun get_issues_cookie_and_header_from_it_passes() {
-        val cookie = mvc.get("/api/health").andReturn().response.getCookie("XSRF-TOKEN")
-        assertThat(cookie).describedAs("첫 GET 이 쿠키를 내려야 SPA 가 다음 POST 에 실을 수 있다").isNotNull
+        // 상태부터 본다. 응답이 다른 이유로 틀어졌는데 쿠키만 단언하면 「쿠키가 없다」로 잘못 보고된다 —
+        // 2026-09-14 에 이 테스트가 한 번 그렇게 깨졌고 무엇이 틀렸는지를 못 읽었다(`stack.md`).
+        val response = mvc.get("/api/health").andExpect { status { isOk() } }.andReturn().response
+        val issued = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertThat(issued).describedAs("첫 GET 이 쿠키를 내려야 SPA 가 다음 POST 에 실을 수 있다").contains("XSRF-TOKEN=")
+
+        val token = checkNotNull(response.getCookie("XSRF-TOKEN")).value
 
         mvc.post("/api/auth/login") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"email":"nobody@test.local","password":"whatever-long-enough"}"""
-            cookie(Cookie("XSRF-TOKEN", cookie!!.value))
-            header("X-XSRF-TOKEN", cookie.value)
+            cookie(Cookie("XSRF-TOKEN", token))
+            header("X-XSRF-TOKEN", token)
         }.andExpect {
             // CSRF 를 지났다는 증거는 403 이 아니라 로그인 판정(401)까지 갔다는 것이다.
             status { isUnauthorized() }

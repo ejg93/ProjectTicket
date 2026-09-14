@@ -14,8 +14,10 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.MvcResult
+import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 가입 → 로그인 → 내 정보 → 로그아웃 관통 흐름과, 로그인이 흘리면 안 되는 것들.
@@ -27,6 +29,7 @@ class LoginFlowTest : PostgresTestBase() {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var sessionRegistry: SessionRegistry
+    @Autowired lateinit var json: ObjectMapper
 
     @Test
     fun signup_login_me_logout() {
@@ -65,8 +68,8 @@ class LoginFlowTest : PostgresTestBase() {
     @Test
     fun wrong_password_and_unknown_email_look_the_same() {
         signUp(EMAIL, PASSWORD)
-        val wrongPassword = logIn(EMAIL, "wrong-but-long-enough-1").andReturn().response.contentAsString
-        val unknownEmail = logIn("nobody@test.local", PASSWORD).andReturn().response.contentAsString
+        val wrongPassword = identityOf(logIn(EMAIL, "wrong-but-long-enough-1"))
+        val unknownEmail = identityOf(logIn("nobody@test.local", PASSWORD))
         // 둘을 가르면 그 이메일이 가입돼 있다는 것을 알려 주는 것이다(`D9`).
         assertThat(wrongPassword).isEqualTo(unknownEmail)
         assertThat(wrongPassword).contains("login-failed")
@@ -168,6 +171,15 @@ class LoginFlowTest : PostgresTestBase() {
     }
 
     private fun MvcResult.sessionOf(): MockHttpSession = request.getSession(false) as MockHttpSession
+
+    /**
+     * 응답이 무엇을 말하는가. 본문을 통째로 비교하면 `trace_id` 가 요청마다 달라서 무조건 갈린다 —
+     * 여기서 볼 것은 「두 실패가 같은 것을 말하나」고 그 답은 `type` 과 `detail` 이다(`D5`).
+     */
+    private fun identityOf(actions: ResultActionsDsl): String {
+        val body = json.readTree(actions.andReturn().response.contentAsString)
+        return "${body["type"].asString()}|${body["detail"].asString()}"
+    }
 
     private companion object {
         const val EMAIL = "login@test.local"

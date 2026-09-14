@@ -19,6 +19,16 @@ spring:
       enabled: true
 
 management:
+  tracing:
+    propagation:
+      # W3C Trace Context(`traceparent`)로 주고받는다(`D10`). Brave 의 기본은 B3 라서 바꾼다 —
+      # 자체 헤더나 남의 형식을 쓰면 관측 도구를 붙일 때(청크 30) 갈아엎게 된다.
+      type: w3c
+    sampling:
+      # 전부 샘플링한다. 내보낼 곳이 없어서 비용은 MDC 에 값을 넣는 것뿐이고,
+      # 1 이 아니면 안 뽑힌 요청의 로그에 추적 ID 가 비어서 그 요청만 못 따라간다.
+      probability: 1.0
+
   endpoints:
     web:
       exposure:

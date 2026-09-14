@@ -1,0 +1,62 @@
+<!--
+  로그 형식을 한 군데서 정한다(`D10`).
+
+  사람이 읽는 텍스트다. JSON 으로 안 찍는 이유는 모을 수집기가 없어서고, 구조화해 봐야 결국 터미널에서 눈으로 읽는다.
+  수집기가 붙으면(청크 30) 로그를 남기는 코드는 그대로 두고 이 파일만 바꾼다.
+
+  프로필별로 가르지 않는다. 안 돌려본 설정은 쓸 때 깨져 있다.
+-->
+<configuration>
+
+    <!--
+      추적 ID 는 일부만 찍는다 — 32자리를 다 찍으면 줄이 길어져서 정작 메시지가 안 보인다.
+      도구에 넣을 때 필요한 전체 값은 MDC 에 그대로 있고, 오류 응답의 `trace_id` 도 전체다.
+
+      **뒷자리를 쓴다.** Brave 의 128비트 ID 는 앞 8자리가 생성 시각(epoch 초)이라 같은 시간대에 온 요청이
+      앞부분에서 전부 똑같이 보인다. 앞자리를 찍으면 요청을 가르라고 넣은 값이 요청을 못 가른다.
+
+      **스팬은 반대로 앞자리다.** 루트 스팬의 ID 가 추적 ID 의 하위 64비트와 같아서, 둘 다 뒷자리를 찍으면
+      `[d6d1cb,d1cb]` 처럼 같은 글자가 두 번 보인다.
+
+      `%.6X{traceId}` 의 `.6` 이 「뒤에서 6자만 남긴다」는 뜻이다. `.-4` 면 앞에서 남긴다.
+      값이 없는 줄(기동·배치)은 하이픈으로 자리를 채워서 열이 안 밀린다.
+    -->
+    <property name="TRACE" value="[%.6X{traceId:-------},%.-4X{spanId:-----}]"/>
+    <!--
+      시각은 UTC 고 Z 를 붙인다(`D7`). 로그·DB·API 가 한 기준이라 장애 때 세 문자열을 그대로 맞춰 본다.
+      시간대를 안 적으면 JVM 기본값을 따라가서 Windows 에서는 KST, 리눅스 CI 에서는 UTC 로 갈린다 —
+      읽는 사람은 어느 쪽인지 알 수 없다.
+    -->
+    <property name="LINE"  value="%d{HH:mm:ss.SSS,UTC}Z %-5level ${TRACE} %logger{30} : %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LINE}</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+      파일로도 남긴다. 터미널을 닫으면 사라지는 것만 있으면 「어제 그 오류」를 되짚을 방법이 없다.
+      감사 로그(청크 4)와 다르다 — 이쪽은 지워도 되는 것이라 7일만 두고 총량도 막는다.
+    -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/ticket.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/ticket.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LINE}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+    <!-- 우리 코드의 DEBUG 는 개발 중에만 본다(`D10`). 기본은 INFO 라 여기 안 켠다. -->
+    <logger name="com.projectticket.ticket" level="INFO"/>
+
+</configuration>
