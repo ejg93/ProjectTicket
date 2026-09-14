@@ -82,7 +82,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | 3b | 비밀번호 블록리스트 | NIST SP 800-63B 의 SHALL — 유출·사전 단어 목록과 대조해 거절. 목록 출처(HIBP 오프라인 상위 N 또는 자체 파일)와 검사 시점(가입·변경)을 정한다. **축**: 표준(NIST 800-63B §3.1.1.2). **강제 지점**: 앱 검증(`Password` 옆 커스텀 제약) + 테스트. DB 로는 못 내린다. **건드리는 자리**: 신설 `auth/PasswordBlocklist`, `Password` 수정, 목록 파일. **닫힘**: `PasswordBlocklistTest.common_password_rejected` | 3 |
 | 4 | 감사·동의 포팅 | 완료 — `V3__audit_consent.sql`(`audit_log`, `consent_item`, `account_consent`, `current_consent` 뷰, 항목 시드 셋). 트리거가 감사 행의 `update` 를 전부 막고 `delete` 는 **보존 3년이 지난 행만** 연다 — 전부 막으면 파기가 못 돌고 전부 열면 은폐가 된다. `AuditLog` 가 `ATTEMPT`(별도 트랜잭션)와 `OUTCOME`(같은 트랜잭션)을 가른다 — 실패한 로그인은 롤백에 쓸리면 안 된다. `ConsentService` 는 담긴 것만 적어 거부(false 행)와 무응답(행 없음)을 가른다. `GET /api/consent-items` 공개 | 완료 |
 | 5 | 관측 포팅 | 완료 — `observability/RequestLogFilter`(요청당 한 줄, `/actuator/` 는 제외, 보안 필터 바깥이라 401·403 도 남는다), `logback-spring.xml`(UTC·`traceId` 뒤 6자리·`spanId` 앞 4자리, 파일 7일·200MB), `application.yml` 에 W3C 전파·샘플링 1.0. `ProblemFactory` 가 `Tracer` 에서 `trace_id` 를 넣는다 — 청크 3 이 비워 둔 자리. `RequestTraceTest` 6개가 응답의 ID 와 로그의 ID 가 같음을 잰다 | 완료 |
-| 6 | 이식 첫 묶음 `P1`·`P2` | `coding-rules.md`·`naming-rules.md` 를 Kotlin 에 맞춘다. 예시를 청크 3~5 의 실제 코드로 바꾼다. **축**: 규약(코드에 성립한 관례를 뽑는다). **강제 지점**: `ArchitectureTest` 가 계층 규칙을 든다. **건드리는 자리**: 두 문서 수정, 머리말 삭제. **닫힘**: `doc-lint.sh` 통과 + `ArchitectureTest` | 3·4·5 |
+| 6 | 이식 첫 묶음 `P1`·`P2` | 완료 — `coding-rules.md`·`naming-rules.md` 를 **실물 기준으로 새로 썼다**(사용자 선택). 49KB+11KB → 17KB+4KB. 예시가 전부 청크 3~5 의 실제 코드고, 여기 없는 기능(정산·반품·다중 셀러)을 규율하던 절과 Java 문법 절을 버렸다. 살린 뼈대: 계층·예외·트랜잭션·값·SQL·마이그레이션·열거값·길이 상한·주석·테스트·패키지·설정·`public`·불변식·**규칙의 우선순위(축 1·2)**·접근성 | 완료 |
 
 ### 1 — 공연·좌석
 
