@@ -51,6 +51,32 @@ class AuditImmutabilityTest : PostgresTestBase() {
         assertThat(deleted).isEqualTo(1)
     }
 
+    @Test
+    fun table_cannot_be_truncated() {
+        insertRow()
+
+        // 행 트리거는 truncate 에 안 걸린다. 한 줄씩 막으면서 통째로 비우는 것을 여는 것은 앞뒤가 안 맞는다.
+        assertThatThrownBy { jdbc.sql("truncate audit_log").update() }
+            .hasStackTraceContaining("truncate 할 수 없다")
+    }
+
+    @Test
+    fun consent_history_cannot_be_updated() {
+        val accountId = jdbc.sql(
+            "insert into account (email, password_hash, display_name) values ('c@test.local', 'x', '이름') returning account_id",
+        ).query(Long::class.java).single()
+        val itemId = jdbc.sql("select consent_item_id from consent_item where code = 'marketing_email'")
+            .query(Long::class.java).single()
+        jdbc.sql(
+            "insert into account_consent (account_id, consent_item_id, granted, source) values (:acc, :item, true, 'signup')",
+        ).param("acc", accountId).param("item", itemId).update()
+
+        // 철회는 행을 더하는 것이다. update 로 갈면 이 설계가 지키려던 이력 그 자체가 사라진다.
+        assertThatThrownBy {
+            jdbc.sql("update account_consent set granted = false where account_id = :acc").param("acc", accountId).update()
+        }.hasStackTraceContaining("동의 이력은 고칠 수 없다")
+    }
+
     private fun insertRow(): Long =
         jdbc.sql(
             """

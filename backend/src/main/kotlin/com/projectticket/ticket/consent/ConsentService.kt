@@ -37,11 +37,17 @@ class ConsentService(private val jdbc: JdbcClient) {
     /**
      * 받은 동의가 항목 목록과 맞는지 본다. 안 맞으면 422 다 — 형식은 맞는데 값이 규칙에 안 맞는 자리다(`D5`).
      */
-    fun verify(given: Map<String, Boolean>, items: List<ConsentItem>) {
+    fun verify(given: Map<String, Boolean?>, items: List<ConsentItem>) {
         val byCode = items.associateBy { it.code }
 
         given.keys.firstOrNull { it !in byCode }?.let {
             throw TicketException(ErrorCode.UNKNOWN_CONSENT_ITEM, "모르는 동의 항목이다: $it")
+        }
+
+        // **값이 null 인 항목을 여기서 잡는다.** JSON 의 `{"marketing_email": null}` 은 타입이 `Boolean` 이어도 들어온다 —
+        // 그대로 두면 `not null` 컬럼에 부딪쳐 500 이 되고, 사용자는 무엇을 고쳐야 하는지 못 듣는다.
+        given.entries.firstOrNull { it.value == null }?.let {
+            throw TicketException(ErrorCode.UNKNOWN_CONSENT_ITEM, "동의 여부가 비어 있다: ${it.key}")
         }
 
         items.filter { it.required }.firstOrNull { given[it.code] != true }?.let {
@@ -52,7 +58,7 @@ class ConsentService(private val jdbc: JdbcClient) {
     /**
      * **담긴 것만** 적는다. 안 담긴 선택 항목은 행이 안 생긴다 — 거부(false 행)와 무응답(행 없음)을 갈라 두려는 것이다.
      */
-    fun record(accountId: Long, given: Map<String, Boolean>, items: List<ConsentItem>, source: String, actorIp: String?) {
+    fun record(accountId: Long, given: Map<String, Boolean?>, items: List<ConsentItem>, source: String, actorIp: String?) {
         val idByCode = items.associate { it.code to it.consentItemId }
 
         given.forEach { (code, granted) ->

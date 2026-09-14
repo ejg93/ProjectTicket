@@ -80,6 +80,16 @@ class ConsentSignupTest : PostgresTestBase() {
     }
 
     @Test
+    fun null_consent_value_is_rejected_not_crashed() {
+        // 타입이 Boolean 이어도 JSON 의 null 은 들어온다. 그대로 두면 not null 컬럼에 부딪쳐 500 이 되고,
+        // 사용자는 무엇을 고쳐야 하는지 못 듣는다.
+        signUpRaw("""{"terms_of_service":true,"privacy_collect":true,"marketing_email":null}""").andExpect {
+            status { isUnprocessableEntity() }
+            jsonPath("$.detail") { value("동의 여부가 비어 있다: marketing_email") }
+        }
+    }
+
+    @Test
     fun signup_records_an_audit_row() {
         signUp(mapOf("terms_of_service" to true, "privacy_collect" to true)).andExpect { status { isCreated() } }
 
@@ -87,6 +97,12 @@ class ConsentSignupTest : PostgresTestBase() {
             jdbc.sql("select count(*) from audit_log where event_type = 'account.signed_up'")
                 .query(Long::class.java).single(),
         ).isEqualTo(1)
+    }
+
+    private fun signUpRaw(consentsJson: String) = mvc.post("/api/auth/signup") {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"email":"consent@test.local","password":"hunter2-and-then-some","display_name":"관객","consents":$consentsJson}"""
+        with(csrf())
     }
 
     private fun signUp(consents: Map<String, Boolean>) = mvc.post("/api/auth/signup") {

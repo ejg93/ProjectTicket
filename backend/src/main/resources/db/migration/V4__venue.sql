@@ -55,11 +55,17 @@ create or replace function organizer_member_requires_role() returns trigger as $
 declare
     member_role text;
 begin
-    select role into member_role from account where account_id = new.account_id;
+    -- **행을 잠근다.** 안 잠그면 「소속을 넣는 트랜잭션」과 「역할을 내리는 트랜잭션」이 서로의 미커밋을 못 봐서
+    -- 둘 다 통과한다 — 이 트리거 쌍이 불가능하다고 말하는 상태가 READ COMMITTED 에서 그대로 만들어진다.
+    select role into member_role
+      from account
+     where account_id = new.account_id
+       for no key update;
 
-    if member_role not in ('organizer', 'admin') then
+    -- **null 을 따로 본다.** `null not in (…)` 의 결과가 null 이라 `if` 가 안 걸리고, 그러면 이 가드가 조용한 무동작이 된다.
+    if member_role is null or member_role not in ('organizer', 'admin') then
         raise exception '기획사에 소속되려면 역할이 organizer 여야 한다: account_id=%, role=%',
-            new.account_id, member_role;
+            new.account_id, coalesce(member_role, '(없는 계정)');
     end if;
 
     return new;
@@ -145,7 +151,31 @@ create table seat (
     constraint seat_number_positive_check check (seat_number between 1 and 999)
 );
 
-comment on table seat is '홀의 물리 좌석. 수정·삭제하지 않는다 — 회차가 이 행을 복제해서 상태를 든다';
+comment on table seat is '홀의 물리 좌석. 자리를 고칠 수 없다 — 회차가 이 행을 복제해서 상태를 든다';
+
+-- 자리를 고치는 것을 막는다.
+--
+-- **글로만 적어 두면 안 지켜진다**(`D14` 축 2). 오픈된 뒤에 `section` 을 고치면 이미 박제된 `performance_seat` 의
+-- 등급·가격이 그 좌석의 구역과 어긋나고, 그 어긋남은 두 표를 나란히 놓기 전에는 안 보인다.
+--
+-- 삭제는 여기서 안 막는다 — `performance_seat` 의 `on delete restrict` 가 **복제된 뒤부터** 막고,
+-- 복제되기 전 좌석은 아직 아무것도 안 가리키므로 지울 수 있는 것이 맞다.
+create or replace function seat_position_is_frozen() returns trigger as $$
+begin
+    if new.hall_id is distinct from old.hall_id
+       or new.section is distinct from old.section
+       or new.row_label is distinct from old.row_label
+       or new.seat_number is distinct from old.seat_number then
+        raise exception '좌석의 자리는 고칠 수 없다: seat_id=%. 배치가 바뀌면 홀을 새로 만든다', old.seat_id;
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger seat_position_frozen
+    before update on seat
+    for each row execute function seat_position_is_frozen();
 comment on column seat.section is '구역 코드. 등급이 이 단위로 붙는다(ADR 0003)';
 
 -- 홀 하나의 좌석을 통째로 읽는 것이 회차 오픈의 첫 단계다(청크 9).

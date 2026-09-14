@@ -126,4 +126,22 @@ class SeatUniquenessTest : PostgresTestBase() {
     private fun join(organizerId: Long, accountId: Long) =
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:org, :acc)")
             .param("org", organizerId).param("acc", accountId).update()
+    @Test
+    fun seat_position_cannot_be_changed() {
+        val seatId = insertSeat("F1-A", "A", 1)
+
+        // 오픈 뒤에 구역을 고치면 박제된 등급·가격이 그 좌석의 구역과 어긋나고, 두 표를 나란히 놓기 전에는 안 보인다.
+        assertThatThrownBy {
+            jdbc.sql("update seat set section = 'F1-B' where seat_id = :id").param("id", seatId).update()
+        }.hasStackTraceContaining("좌석의 자리는 고칠 수 없다")
+    }
+
+    @Test
+    fun membership_of_a_missing_account_is_rejected() {
+        val organizerId = insertOrganizer()
+
+        // 역할이 null 이면 `null not in (…)` 이 null 이라 가드가 조용히 지나간다 — 그 자리를 막았나.
+        assertThatThrownBy { join(organizerId, -1) }
+            .hasStackTraceContaining("기획사에 소속되려면")
+    }
 }

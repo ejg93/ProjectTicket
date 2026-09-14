@@ -32,16 +32,21 @@ class RequestLogFilter : OncePerRequestFilter() {
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val startedAt = System.nanoTime()
+        var thrown: Throwable? = null
         try {
             chain.doFilter(request, response)
+        } catch (e: Throwable) {
+            // 예외로 빠져나가도 그 요청이 무엇이었는지는 남아야 한다 — 정작 실패한 요청의 흔적이 없으면 로그를 왜 남기는지 모르게 된다.
+            thrown = e
+            throw e
         } finally {
-            // finally 다. 예외로 빠져나가도 그 요청이 무엇이었는지는 남아야 한다 —
-            // 정작 실패한 요청의 흔적이 없으면 로그를 왜 남기는지 모르게 된다.
+            // **예외가 여기까지 오면 상태 코드가 아직 안 정해졌다.** 컨테이너가 오류 페이지를 만들면서 그때 500 을 쓰므로
+            // 이 자리에서 읽으면 200 이다. 그래서 상태 대신 예외 이름을 찍는다 — 「200 으로 실패했다」는 줄보다 낫다.
             log.info(
                 "{} {} {} {}ms",
                 request.method,
                 request.requestURI,
-                response.status,
+                thrown?.let { "실패(${it.javaClass.simpleName})" } ?: response.status,
                 (System.nanoTime() - startedAt) / 1_000_000,
             )
         }

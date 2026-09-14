@@ -29,7 +29,7 @@ class SignupService(
         val email: String,
         val password: String,
         val displayName: String,
-        val consents: Map<String, Boolean>,
+        val consents: Map<String, Boolean?>,
         val actorIp: String?,
     )
 

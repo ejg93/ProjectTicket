@@ -81,6 +81,24 @@ create trigger seat_grade_map_event_check
     before insert or update on seat_grade_map
     for each row execute function seat_grade_map_same_event();
 
+-- 등급의 소속 공연은 고칠 수 없다.
+--
+-- **위 트리거는 매핑 행이 들어올 때만 본다.** 그 뒤에 `update seat_grade set event_id = …` 로 등급을 남의 공연으로 옮기면
+-- 이미 검증된 매핑이 조용히 어긋나고, 그 공연의 좌석이 남의 공연 가격으로 팔린다.
+create or replace function seat_grade_event_is_frozen() returns trigger as $$
+begin
+    if new.event_id is distinct from old.event_id then
+        raise exception '등급의 소속 공연은 고칠 수 없다: seat_grade_id=%', old.seat_grade_id;
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger seat_grade_event_frozen
+    before update on seat_grade
+    for each row execute function seat_grade_event_is_frozen();
+
 -- 회차. 상태는 `DRAFT → OPEN → CLOSED` 한 방향이다(`D3`).
 create table performance (
     performance_id bigint generated always as identity primary key,
@@ -137,3 +155,21 @@ $$ language plpgsql;
 create trigger performance_status_check_transition
     before update of status on performance
     for each row execute function performance_status_transition();
+
+-- 회차는 반드시 `draft` 로 태어난다.
+--
+-- **전이 트리거는 `update` 만 본다.** `insert … values (…, 'open')` 으로 넣으면 좌석이 한 행도 없는 열린 회차가 되고,
+-- 그것이 `PerformanceOpenService` 가 막으려고 있는 바로 그 상태다. 삽입 자리를 안 막으면 그 서비스를 지나칠 길이 남는다.
+create or replace function performance_starts_as_draft() returns trigger as $$
+begin
+    if new.status <> 'draft' then
+        raise exception '회차는 draft 로만 만들 수 있다: status=%. 여는 것은 오픈 절차가 한다', new.status;
+    end if;
+
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger performance_insert_is_draft
+    before insert on performance
+    for each row execute function performance_starts_as_draft();

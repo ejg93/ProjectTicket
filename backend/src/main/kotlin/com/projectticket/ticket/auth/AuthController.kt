@@ -72,7 +72,9 @@ class AuthController(
         val user = authentication.principal as TicketUser
         // 정지된 계정도 같은 문구다. 비밀번호 대조 뒤에 보는 이유는 TicketUser.isEnabled 에 있다 — 앞에서 보면 시간 차가 샌다.
         if (!user.active) {
-            recordLoginFailure(http, "suspended")
+            // **여기는 계정이 밝혀졌다.** 아래 「이메일을 안 담는다」는 누구인지 모르는 실패에 걸리는 말이고,
+            // 아는 계정의 실패를 익명으로 남기면 「이 계정에 시도가 몇 번 왔나」에 답할 수 없다.
+            recordLoginFailure(http, "suspended", user.id)
             throw TicketException(ErrorCode.LOGIN_FAILED)
         }
 
@@ -102,11 +104,11 @@ class AuthController(
      * **이메일을 안 담는다**(`D10`). 감사 로그는 파기 예외라 오래 남는데, 가입도 안 한 사람의 이메일이 3년을 남을 이유가 없다.
      * 누가 몇 번 틀렸나는 청크 `3a` 의 카운터가 Redis 에서 센다.
      */
-    private fun recordLoginFailure(http: HttpServletRequest, reason: String) =
+    private fun recordLoginFailure(http: HttpServletRequest, reason: String, accountId: Long? = null) =
         auditLog.record(
             AuditLog.Kind.ATTEMPT,
             "account.login_failed",
-            actorAccountId = null,
+            actorAccountId = accountId,
             detail = mapOf("ip" to http.remoteAddr, "reason" to reason),
         )
 
@@ -120,7 +122,7 @@ class AuthController(
         @field:NotBlank @field:EmailAddress val email: String,
         @field:NotBlank @field:Password val password: String,
         @field:NotBlank @field:Size(max = 50) val displayName: String,
-        @field:NotNull val consents: Map<String, Boolean>,
+        @field:NotNull val consents: Map<String, Boolean?>,
     ) {
         /** 비밀번호를 로그·디버거에 안 찍는다(`D10`). data class 기본 toString 이 평문을 낸다 */
         override fun toString(): String = "SignupRequest[email=$email, displayName=$displayName]"

@@ -47,6 +47,11 @@ create index audit_log_created_at_idx on audit_log (created_at);
 -- **강제 지점을 여기 둔 이유는 앱 밖으로도 들어올 수 있어서다.** 코드에 update 를 안 쓰는 것만으로는
 -- `psql` 로 한 줄 고치는 것을 못 막고, 감사 로그는 바로 그것을 막으려고 있는 테이블이다.
 --
+-- **이 트리거가 막지 못하는 것을 밝혀 둔다.** 테이블 주인은 `alter table … disable trigger` 로 끌 수 있고,
+-- 슈퍼유저는 `session_replication_role = replica` 로 건너뛴다. 그것까지 막으려면 앱이 쓰는 역할에서
+-- `update`·`delete`·`truncate` 권한을 회수하고 파기 배치만 다른 역할로 돌려야 한다 — 역할을 가르는 것이라
+-- 배포 형태가 정해진 뒤에 할 일이고, 청크 `4a` 가 든다.
+--
 -- **삭제는 보존 기간이 지난 행만 연다.** 전부 막으면 파기 배치가 돌 수 없고, 전부 열면 은폐가 된다.
 -- 그 둘을 가르는 것이 나이다 — 3년은 `actor_account_id` 가 개인정보 파기의 예외로 남는 기간이라
 -- 길수록 그 자체가 비용이다.
@@ -71,6 +76,17 @@ create trigger audit_log_no_update
 create trigger audit_log_no_delete
     before delete on audit_log
     for each row execute function audit_log_append_only();
+
+-- **행 트리거는 `truncate` 에 안 걸린다.** 한 줄씩 지우는 것은 막으면서 통째로 비우는 것을 여는 것은 앞뒤가 안 맞는다.
+create or replace function audit_log_no_truncate() returns trigger as $$
+begin
+    raise exception '감사 로그는 truncate 할 수 없다';
+end;
+$$ language plpgsql;
+
+create trigger audit_log_truncate_guard
+    before truncate on audit_log
+    for each statement execute function audit_log_no_truncate();
 
 -- ─────────────────────────────────────────────────────────────
 -- 동의 이력 — 무엇에 언제 동의했고 언제 철회했나
@@ -161,6 +177,22 @@ create table account_consent (
 comment on table account_consent is '동의·철회 사건. append-only. 현재 상태는 current_consent 뷰가 만든다';
 
 create index account_consent_current_idx on account_consent (account_id, consent_item_id, acted_at desc);
+
+-- append-only 를 **글이 아니라 트리거로 든다.**
+--
+-- `audit_log` 와 같은 주장을 하면서 여기만 안 걸면 `update … set granted = false` 한 줄이
+-- **이 설계가 지키려던 이력 그 자체**를 지운다. 철회는 행을 더하는 것이지 고치는 것이 아니다.
+--
+-- 삭제는 파기가 한다(계정 cascade). 그래서 `delete` 는 막지 않고 `update` 만 막는다.
+create or replace function account_consent_append_only() returns trigger as $$
+begin
+    raise exception '동의 이력은 고칠 수 없다: account_consent_id=%. 철회는 행을 더한다', old.account_consent_id;
+end;
+$$ language plpgsql;
+
+create trigger account_consent_no_update
+    before update on account_consent
+    for each row execute function account_consent_append_only();
 
 -- 현재 동의 상태. 항목 코드별로 마지막 사건 하나를 고른다.
 --

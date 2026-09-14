@@ -59,20 +59,33 @@ class PerformanceStateTest : PostgresTestBase() {
     }
 
     /**
-     * 삽입으로 잰다. `update` 는 전이 트리거가 **check 보다 먼저** 걸려서 「할 수 없는 전이」로 막히는데,
-     * 그러면 재려던 것이 값 목록이 아니라 전이표가 된다.
+     * 회차는 `draft` 로만 태어난다.
+     *
+     * **전이 트리거는 `update` 만 본다.** 삽입을 안 막으면 `status = 'open'` 으로 넣어서 좌석이 한 행도 없는 열린 회차가 되고,
+     * 그것이 `PerformanceOpenService` 가 막으려고 있는 바로 그 상태다.
+     *
+     * `performance_status_check` 는 그 아래 그물이다 — 트리거 둘이 `insert`·`update` 를 각각 먼저 잡아서
+     * 평소에는 안 보이고, 트리거가 꺼진 자리에서만 값 목록을 막는다.
      */
     @Test
-    fun unknown_status_is_rejected_on_insert() {
-        assertThatThrownBy {
-            jdbc.sql(
-                """
-                insert into performance (event_id, hall_id, starts_at, sales_open_at, status)
-                values (:event, :hall, now() + interval '1 day', now(), 'paused')
-                """,
-            ).param("event", eventId).param("hall", hallId).update()
-        }.hasStackTraceContaining("performance_status_check")
+    fun performance_can_only_be_created_as_draft() {
+        assertThatThrownBy { insertWithStatus("open") }
+            .hasStackTraceContaining("회차는 draft 로만 만들 수 있다")
     }
+
+    @Test
+    fun unknown_status_is_rejected_on_insert() {
+        assertThatThrownBy { insertWithStatus("paused") }
+            .hasStackTraceContaining("회차는 draft 로만 만들 수 있다")
+    }
+
+    private fun insertWithStatus(status: String) =
+        jdbc.sql(
+            """
+            insert into performance (event_id, hall_id, starts_at, sales_open_at, status)
+            values (:event, :hall, now() + interval '1 day', now(), :status)
+            """,
+        ).param("event", eventId).param("hall", hallId).param("status", status).update()
 
     @Test
     fun sales_cannot_open_after_the_show_starts() {
