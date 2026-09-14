@@ -22,7 +22,7 @@ class HealthControllerTest : PostgresTestBase() {
                 status { isOk() }
                 jsonPath("$.app") { value("ticket-backend") }
                 jsonPath("$.database") { value("test") }
-                jsonPath("$.applied_migrations") { value(4) }
+                jsonPath("$.applied_migrations") { value(6) }
                 jsonPath("$.checked_at") { exists() }
             }
     }

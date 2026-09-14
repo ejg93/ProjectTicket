@@ -89,8 +89,8 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
 | 7 | 기획사·공연장 스키마 | 완료 — `V4__venue.sql`(`organizer`·`organizer_member`·`venue`·`hall`·`seat`). 좌석은 `(hall_id, section, row_label, seat_number)` 유일이고 구역 코드는 `F1-A` 꼴 check 다. **소속에 트리거 둘을 건다** — 역할이 기획사가 아닌 계정의 소속을 막고, 소속된 계정의 역할을 뒤늦게 내리는 것도 막는다(한쪽만 걸면 다른 쪽으로 구멍이 열린다). `seat` 는 수정·삭제하지 않는다 — 회차가 이 행을 복제한다(청크 9) | 완료 |
-| 8 | 공연·회차·등급 | `event`·`performance`·`seat_grade`·`seat_grade_map`(홀 좌석 → 등급). 회차 상태 `DRAFT→OPEN→CLOSED`. **축**: `D3`(회차 상태). **강제 지점**: 제약(가격 ≥ 0, 회차 시각 > 판매 시작). **건드리는 자리**: `V5__event.sql`, 신설 `event/`. **닫힘**: `PerformanceStateTest` | 7 |
-| 9 | 회차 오픈 = 좌석 복제 | 회차를 OPEN 하면 홀 좌석을 `performance_seat` 로 복제(상태 AVAILABLE, 등급·가격 박제). **축**: `D2`(왜 복제인가 — 등급·가격이 회차마다 다르고 상태가 회차 단위다). **강제 지점**: 제약(`performance_id, seat_id` 유일) + 트랜잭션. **건드리는 자리**: `V6__performance_seat.sql`, `event/PerformanceOpenService`. **닫힘**: `PerformanceOpenTest.open_copies_every_seat_once` | 8 |
+| 8 | 공연·회차·등급 | 완료 — `V5__event.sql`(`event`·`seat_grade`·`seat_grade_map`·`performance`). **등급은 공연 단위, 매핑은 구역 단위**(ADR 0003). 가격은 원 단위 정수고 회차 오픈 때 박제된다. 회차 상태 전이를 **트리거가 한 방향으로 묶는다** — `open→draft` 를 열면 복제된 좌석과 팔린 예매가 남은 채로 「아직 안 연 회차」가 된다. `sales_open_at < starts_at` check 가 살 수 없는 회차를 막는다 | 완료 |
+| 9 | 회차 오픈 = 좌석 복제 | 완료 — `V6__performance_seat.sql` + `PerformanceOpenService`. 좌석 복제와 상태 변경이 **한 트랜잭션**이다. `(performance_id, seat_id)` 유일이 두 번 복제를 막고, 상태·부속값 check 가 `held` 인데 만료 시각이 없는 행을 막는다. **등급이 안 붙은 구역과 좌석 없는 홀은 오픈을 거절한다** — 스키마로 못 보는 조건이라 서비스가 막고, 안 막으면 좌석도에 구멍이 뚫린 채 판매가 시작된다 | 완료 |
 | 10 | 좌석 현황 조회 | `GET /api/performances/{id}/seats` — 구역별 상태. 응답 계약이 좌석도 UI 의 입력이다. **축**: `D5`(목록·캐시 헤더). **강제 지점**: 스냅샷 테스트(응답 형식). **건드리는 자리**: `event/SeatQuery`·컨트롤러. **닫힘**: `SeatQueryTest` | 9 |
 | 11 | 기획사 API | 공연·회차 등록·오픈 API, 기획사 권한. **축**: `D5`·역할. **강제 지점**: 테스트(다른 기획사 공연 수정 403). **건드리는 자리**: `event/` 컨트롤러. **닫힘**: `OrganizerScopeTest` | 8 |
 | 12 | 시드·데모 | 공연장 1(홀 2, 좌석 2천), 공연 2, 회차 4, 계정 6. `local` 프로필에서만. **축**: 관례. **강제 지점**: 기동 테스트(빈 DB 에서 시드까지 뜬다). **건드리는 자리**: `db/seed/`. **닫힘**: `SeedBootTest` | 9 |

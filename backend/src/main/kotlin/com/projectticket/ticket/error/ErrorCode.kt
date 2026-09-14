@@ -26,6 +26,12 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     UNKNOWN_CONSENT_ITEM(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-consent-item", "모르는 동의 항목이다"),
     REQUIRED_CONSENT_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "required-consent-missing", "필수 동의 항목이다"),
 
+    // 공연·회차
+    PERFORMANCE_NOT_FOUND(HttpStatus.NOT_FOUND, "performance-not-found", "그런 회차가 없다"),
+
+    // 형식은 맞는데 지금 상태가 못 받는 것이라 422 다. 좌석이 없거나 등급이 안 붙은 구역이 있으면 열 수 없다.
+    PERFORMANCE_NOT_OPENABLE(HttpStatus.UNPROCESSABLE_CONTENT, "performance-not-openable", "지금 열 수 없는 회차다"),
+
     // 요청 형식. 프레임워크가 정한 상태 코드를 우리 type 으로 옮길 때 쓴다 — 하나로 뭉치면
     // 405·415·깨진 JSON 이 같은 type 으로 나가서 상태 코드보다 type 이 더 뭉친다.
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "요청 형식이 맞지 않는다"),
