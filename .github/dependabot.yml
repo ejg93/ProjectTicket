@@ -30,8 +30,15 @@ updates:
       # **Kotlin 플러그인은 Boot BOM 이 주는 `kotlin.version` 과 같아야 한다**(`build.gradle.kts`).
       # 플러그인만 올리면 컴파일러와 stdlib 이 다른 판이 되고, 증상이 엉뚱한 자리(리플렉션·직렬화)에서 난다.
       #
-      # **Boot 가 BOM 을 올리는 판을 내면 이 줄을 지운다** — `ignore` 는 상류가 못 받는 동안만 두고
+      # **Boot 가 BOM 을 올리는 판을 내면 이 줄들을 지운다** — `ignore` 는 상류가 못 받는 동안만 두고
       # 조건이 풀리면 지우는 것이 규칙이다. BOM 값은 `spring-boot-dependencies` 의 `<kotlin.version>` 이 답한다.
+      #
+      # **이름이 `jvm`·`plugin.spring` 인 이유**: `build.gradle.kts` 가 `kotlin("jvm")` 축약을 쓰고, Dependabot 은
+      # 그 축약 안의 문자열을 의존성 이름으로 본다. `org.jetbrains.kotlin*` 패턴은 여기에 안 걸렸다 —
+      # PR #6 이 그 패턴을 넣은 4분 뒤에 열려서 알았다. 축약을 `id("org.jetbrains.kotlin.jvm")` 으로 풀면
+      # 이름도 바뀌지만, 빌드 파일을 건드리는 것이라 여기서 이름을 맞추는 쪽을 골랐다.
+      - dependency-name: "jvm"
+      - dependency-name: "plugin.spring"
       - dependency-name: "org.jetbrains.kotlin*"
     commit-message:
       prefix: "deps"
