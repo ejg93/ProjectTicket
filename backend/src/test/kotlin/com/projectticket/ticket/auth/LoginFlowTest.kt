@@ -160,7 +160,7 @@ class LoginFlowTest : PostgresTestBase() {
 
     private fun signUp(email: String, password: String) = mvc.post("/api/auth/signup") {
         contentType = MediaType.APPLICATION_JSON
-        content = """{"email":"$email","password":"$password","display_name":"관객"}"""
+        content = """{"email":"$email","password":"$password","display_name":"관객","consents":{"terms_of_service":true,"privacy_collect":true}}"""
         with(csrf())
     }
 

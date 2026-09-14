@@ -22,6 +22,10 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 가입
     EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "이미 가입된 이메일이다"),
 
+    // 동의. 형식은 맞는데 값이 규칙에 안 맞는 자리라 422 다(`D5`).
+    UNKNOWN_CONSENT_ITEM(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-consent-item", "모르는 동의 항목이다"),
+    REQUIRED_CONSENT_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "required-consent-missing", "필수 동의 항목이다"),
+
     // 요청 형식. 프레임워크가 정한 상태 코드를 우리 type 으로 옮길 때 쓴다 — 하나로 뭉치면
     // 405·415·깨진 JSON 이 같은 type 으로 나가서 상태 코드보다 type 이 더 뭉친다.
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "요청 형식이 맞지 않는다"),

@@ -177,6 +177,8 @@ class SecurityConfig {
             "/actuator/health/**",
             "/api/auth/signup",
             "/api/auth/login",
+            // 가입 화면이 무엇에 동의를 받아야 하는지 알아야 한다. 로그인 전에 보는 것이라 공개다.
+            "/api/consent-items",
         )
     }
 }
