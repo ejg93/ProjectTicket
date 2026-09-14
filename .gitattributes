@@ -1,0 +1,7 @@
+# 줄 끝은 LF 다(2y). 2026-09-10 에 ci.yml·claude-review.yml 만 CRLF 라 편집 스크립트가 세 번 헛돌았다.
+# 로컬 autocrlf 가 무엇이든 체크아웃도 LF 다 — 스크립트가 파일마다 줄 끝을 안 맞춰도 된다.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

@@ -1,0 +1,53 @@
+---
+name: verify
+description: 청크를 닫기 전에 무엇을 돌리나. `/verify` 또는 「검증」. `bash scripts/verify.sh` 가 레인을 고르고 도장을 찍는다. 실제로 돌려본 것만 됐다고 한다.
+---
+
+# 검증
+
+**무엇을 건드렸는지가 무엇을 돌릴지 정한다.** 청크를 닫기 전에 걸리는 줄을 **전부** 돌린다.
+
+**먼저 `bash scripts/verify.sh`.** `origin/main` 대비 레인 지문(코드·빌드 파일만 — `scripts/verify-fingerprint.sh`)이 다르면 그 레인을 돌리고 초록이면 `.git/verify-stamp` 에 찍는다.
+
+| 단계 | 명령 | 무엇이 도나 | 누가 요구하나 |
+|---|---|---|---|
+| **빠른 도장** | `bash scripts/verify.sh` | backend `gradlew test`(컨테이너 없음) · frontend `tsc`·lint·test | **Stop hook** — 청크를 닫을 때 |
+| **full 도장** | `bash scripts/verify.sh --full` | backend `gradlew build`(Testcontainers 레인 포함) · frontend `next build`·lint·test | **push hook** — 마무리 앞 한 번 |
+
+full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
+
+## 실제로 돌려본 것만 됐다고 한다
+
+**돌리지 못했으면 못 돌렸다고 밝힌다.** 안 돌려보고 「동작한다」「빌드 통과」라고 쓰지 않는다.
+
+**backend 명령은 앞에 `JAVA_HOME="C:/Program Files/Java/jdk-25"` 를 붙인다.** 안 붙이면 훅이 막는다.
+
+| 언제 | 명령 | 통과 기준 |
+|---|---|---|
+| backend 를 건드렸으면, 청크를 닫을 때 | `./gradlew test`(= `verify.sh`) | 실패 0 |
+| backend 를 건드렸으면, push 앞에 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 |
+| 스키마·서비스만 볼 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
+| **좌석·예매를 건드렸으면** | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |
+| **마이그레이션을 더했으면** | 빈 DB 로 `POSTGRES_DB=ticket_check ./gradlew bootRun --args='--spring.profiles.active=local'` 후 `curl localhost:8080/api/health` | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
+| 화면을 건드렸으면, push 앞에 | `cd frontend && npm run build && npm run lint && npm test` | 초록. 청크를 닫을 땐 `tsc --noEmit` 만 |
+| 예매·대기열 화면을 건드렸으면 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과 |
+| 컨테이너 설정을 건드렸으면 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
+| k8s 를 건드렸으면 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
+| **문서를 고쳤으면** | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh` 를 돌린다 | 통과하면 아무 말 없음 |
+| 푸시했으면 | 아래 「CI」 | 초록. 빨가면 다음 청크보다 먼저 친다 |
+
+**새 구역이 생기면 그 명령을 이 표에 더한다.**
+
+## CI
+
+커밋마다 `.github/workflows/ci.yml` 이 같은 명령을 돈다. 푸시해야 돌고 가지를 안 가린다 — PR 이 없어도 청크마다 리눅스 검증을 받는다.
+
+| 무엇 | 명령 |
+|---|---|
+| 최근 결과 | `gh run list --limit 3` |
+| 끝날 때까지 | `gh run watch <id> --exit-status` |
+| **실패한 부분만** | `gh run view <id> --log-failed` |
+
+`gh` 가 `PATH` 에 없으면 `"/c/Program Files/GitHub CLI/gh.exe"`.
+
+CI 는 로컬 Windows 가 못 잡는 것을 잡는다 — 실행 비트, 대소문자 경로, `npm ci` 와 잠금 파일 불일치.

@@ -1,0 +1,93 @@
+# 커밋마다 검증을 돌린다. `/verify` 표가 청크 닫힘 조건으로 정한 명령을 그대로 옮긴 것이다.
+# 하는 일은 「돌렸나」를 사람 기억에서 걷어내는 것 하나다.
+name: CI
+
+on:
+  # 모든 가지에서 돈다. PR 은 마무리 때 한 번만 열어서, 가지 제한을 두면 청크 여럿을 리눅스 검증 없이 치게 된다.
+  # `pull_request:` 는 안 건다 — push 와 둘 다 있으면 같은 커밋을 두 번 검사한다.
+  push:
+  workflow_dispatch:
+
+# 같은 가지에 커밋이 연달아 오면 앞 회차를 접는다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # backend/ 가 생기기 전(청크 1 이전)에는 건너뛴다.
+      - id: has
+        run: test -f backend/build.gradle.kts && echo ok=true >> "$GITHUB_OUTPUT" || echo ok=false >> "$GITHUB_OUTPUT"
+
+      - if: steps.has.outputs.ok == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          # build.gradle.kts 의 툴체인과 같은 값이다.
+          java-version: '25'
+
+      - if: steps.has.outputs.ok == 'true'
+        uses: gradle/actions/setup-gradle@v6
+
+      # Postgres·Redis 를 service 로 안 띄운다. 테스트가 Testcontainers 로 스스로 띄운다.
+      - if: steps.has.outputs.ok == 'true'
+        run: ./gradlew build
+        working-directory: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: has
+        run: test -f frontend/package-lock.json && echo ok=true >> "$GITHUB_OUTPUT" || echo ok=false >> "$GITHUB_OUTPUT"
+
+      - if: steps.has.outputs.ok == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # install 이 아니라 ci 다. 잠금 파일과 어긋나면 실패해야 한다.
+      - if: steps.has.outputs.ok == 'true'
+        run: npm ci
+        working-directory: frontend
+
+      - if: steps.has.outputs.ok == 'true'
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+      - if: steps.has.outputs.ok == 'true'
+        run: npm run build && npm run lint && npm test
+        working-directory: frontend
+
+  # 시크릿이 커밋에 들어갔나. 두 번째 그물이다 — 첫째는 GitHub push protection.
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 이력 전체를 본다. 얕게 받으면 예전 커밋에 박힌 것을 못 찾는다.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 프롬프트 역할 문서가 구조적으로 부서졌나. 로컬 훅과 같은 스크립트다.
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash scripts/doc-lint.sh

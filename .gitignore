@@ -1,0 +1,27 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+target/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# 관측 로그. 지워도 되는 것이라 저장소에 안 넣는다(D10)
+logs/
+
+# .claude/ 는 settings.json 과 skills/ 만 커밋한다 — 훅과 절차는 로컬 취향이 아니라 저장소의 규칙이다.
+# settings.local.json 은 이름대로 로컬이다.
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+
+# IntelliJ 설정. SDK 경로가 기계마다 달라서 공유하면 남의 환경을 덮어쓴다.
+.idea/
+*.iml
+
+# k6 결과·Grafana 데이터 등 측정 산출물은 doc/notes/ 에 요약만 남긴다
+load/results/
