@@ -32,3 +32,13 @@ management:
 server:
   # `PORT` 는 호스팅이 주입하는 이름이다. 둘 다 없으면 로컬 기본값.
   port: ${SERVER_PORT:${PORT:8080}}
+  servlet:
+    session:
+      # 무활동 만료. 절대 만료 12시간은 서블릿에 설정 자리가 없어서 코드로 넣는다(AbsoluteSessionTimeoutFilter).
+      timeout: 30m
+      cookie:
+        name: TICKETSESSION
+        http-only: true
+        same-site: lax
+        # 로컬이 http 라 기본은 끈다. https 로 올리면 `SESSION_COOKIE_SECURE=true` 가 필수다.
+        secure: ${SESSION_COOKIE_SECURE:false}

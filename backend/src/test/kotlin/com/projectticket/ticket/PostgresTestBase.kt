@@ -1,5 +1,6 @@
 package com.projectticket.ticket
 
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -7,6 +8,12 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder
+import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.security.test.context.TestSecurityContextHolder
 import org.springframework.transaction.annotation.Transactional
 import org.testcontainers.postgresql.PostgreSQLContainer
 
@@ -32,6 +39,17 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 @Import(PostgresTestBase.Containers::class)
 abstract class PostgresTestBase {
 
+    /**
+     * 인증을 스레드에서 걷어낸다. `@Transactional` 은 데이터만 되돌린다 — 로그인 컨트롤러가 `SecurityContextHolder` 에 심은 값은
+     * 스레드에 남고, MockMvc 테스트들이 스레드를 나눠 쓰기 때문에 다음 테스트 클래스가 인증된 상태로 시작한다.
+     * 빠뜨렸을 때 깨지는 것이 남의 클래스라 바탕에 둔다. 둘 다 비운다 — 한쪽만 비우면 다른 쪽이 남아 같은 증상이 난다.
+     */
+    @AfterEach
+    fun clearSecurityContext() {
+        SecurityContextHolder.clearContext()
+        TestSecurityContextHolder.clearContext()
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     class Containers {
 
@@ -40,5 +58,14 @@ abstract class PostgresTestBase {
         @ServiceConnection
         fun postgres(): PostgreSQLContainer =
             PostgreSQLContainer("postgres:17-alpine").withReuse(true)
+
+        /**
+         * 테스트에서만 bcrypt 비용을 4 로 낮춘다. 운영은 그대로 10 이다(`SecurityConfig`).
+         * `DelegatingPasswordEncoder` 를 그대로 쓴다 — 저장값에 `{bcrypt}` 접두가 붙어서 접두를 안 읽는 인코더로 바꾸면 시드 계정 로그인이 깨진다.
+         */
+        @Bean
+        @Primary
+        fun testPasswordEncoder(): PasswordEncoder =
+            DelegatingPasswordEncoder("bcrypt", mapOf("bcrypt" to BCryptPasswordEncoder(4)))
     }
 }
