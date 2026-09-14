@@ -1,7 +1,7 @@
 # 도메인 모델
 
 무엇이 무엇을 참조하고, 무엇이 같이 태어나고 죽나. 용어는 `glossary.md`.
-**초안이다** — 청크 7~9 가 스키마를 세우면서 고친다.
+청크 7~9 가 스키마를 세웠고, 설계 점검(ADR 0004)이 예매·회차의 상태와 읽기 모델을 더했다. 13 뒤에 다시 본다.
 
 ## 엔티티
 
@@ -16,17 +16,18 @@
 | `event` | 공연(작품). 제목·기획사·기간 | organizer | 회차가 없으면 삭제 가능 |
 | `seat_grade` | 공연의 등급(VIP·R·S)과 가격 | event | event 와 함께 |
 | `seat_grade_map` | 홀 좌석 → 등급. 공연마다 다르다 | event | event 와 함께 |
-| `performance` | 회차. 일시·홀·상태(`DRAFT→OPEN→CLOSED`)·판매 시작 시각 | event | event 와 함께 |
-| `performance_seat` | **회차별 좌석 상태.** OPEN 때 `seat` 를 복제하고 등급·가격을 박제. `status`·`held_until`·`reservation_id` | performance | performance 와 함께 |
-| `reservation` | 예매. 상태·계정·회차·합계·`held_until`·멱등키 | account | 영구(거래 기록) |
-| `reservation_seat` | 예매 ↔ 회차 좌석. 좌석 하나에 살아있는 예매 하나 | reservation | reservation 과 함께 |
+| `performance` | 회차. 일시·홀·상태(`draft→open→closed`, `open→cancelled`)·판매 시작·**판매 마감**(`sales_close_at`, 16a) | event | event 와 함께 |
+| `performance_seat` | **회차별 좌석 상태.** OPEN 때 `seat` 를 복제하고 등급·가격을 박제. `status`·`held_until`·`reservation_id`(**포인터** — 지금 이 좌석을 쥔 예매) | performance | performance 와 함께 |
+| `reservation` | 예매. 상태(`HELD→PAYING→RESERVED→CANCELLED`, `→EXPIRED`, `D3`)·계정·회차·합계·`held_until`·`paying_until`·멱등키 | account | 영구(거래 기록) |
+| `reservation_seat` | **기록** — 이 예매가 잡은 좌석과 그때 가격. 선점 때 한 번 쓰고 안 고친다(`D4`) | reservation | reservation 과 함께 |
+| `idempotency_key` | 계정별 멱등키와 저장된 응답. 24시간(`D4`) | account | 24시간 뒤 삭제 |
 | `payment` | 모의 결제. 예매 하나에 하나 | reservation | 영구 |
 | `refund` | 환불. 수수료·환불액·사유 | payment | 영구 |
 | `ticket` | 발권. 외부 노출 번호, 예매 좌석 하나에 하나 | reservation_seat | 영구 |
 | `outbox` | 발행 대기 이벤트 | — | 발행 후 보존 기간 뒤 삭제 |
 | `audit_log` | 누가 무엇을 언제 | — | 수정 불가 |
 
-Redis 에 두는 것 — 대기열 ZSET(회차 단위), 활성 토큰(TTL), 좌석 현황 캐시. **날아가도 사고가 아닌 것만** 둔다. 좌석 상태·멱등키는 DB 다.
+Redis 에 두는 것 — 대기열 ZSET·활성 토큰(`D12`), 좌석 버전·스냅샷·변경 로그(`D20`), **세션**(ADR 0004, 20a). **날아가도 사고가 아닌 것만** 둔다 — 세션은 날아가면 다시 로그인이고, 좌석 상태·멱등키는 DB 다.
 
 ## 왜 회차마다 좌석을 복제하나
 
@@ -35,8 +36,10 @@ Redis 에 두는 것 — 대기열 ZSET(회차 단위), 활성 토큰(TTL), 좌�
 
 ## 좌석 상태의 단일 진실
 
-`performance_seat.status` 하나다. 선점은 `UPDATE … SET status='HELD', held_until=…, reservation_id=… WHERE performance_seat_id IN (…) AND status='AVAILABLE'` 의 갱신 행 수로 판정한다.
-Redis 캐시는 조회를 덜어 주는 것이고 판정에 안 쓴다. 상세는 `concurrency-rules.md`(D4).
+`performance_seat.status` 하나다. 선점은 조건부 UPDATE 의 갱신 행 수로 판정한다 — 문장과 잠금 순서는 `concurrency-rules.md`(D4).
+Redis 는 조회를 덜어 주는 것이고(`D20`) 판정에 안 쓴다.
+
+**좌석 상태는 예매 상태의 투영이다.** 예매가 진실이고 좌석은 그것을 좌석 단위로 편 것이다. 둘의 대응표는 `state-machines.md`(D3).
 
 ## 경계
 
@@ -45,5 +48,6 @@ Redis 캐시는 조회를 덜어 주는 것이고 판정에 안 쓴다. 상세�
 | 공연 관리 | organizer·venue·hall·seat·event·seat_grade·performance | 좌석 상태 변경 |
 | 예매 | performance_seat 상태·reservation·reservation_seat·ticket | 결제 승인 |
 | 결제 | payment·refund | 좌석 해제(예매가 이벤트로 받는다) |
-| 대기열 | Redis 만 | DB |
+| 대기열 | Redis 만. 관문은 선점에만 걸린다(ADR 0004) | DB, 결제·취소·조회 |
+| 좌석 읽기 | Redis 버전·스냅샷·델타 | 좌석 상태 결정 |
 | 정산 | 회차 종료 후 집계 | 실시간 |
