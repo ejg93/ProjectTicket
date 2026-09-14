@@ -65,7 +65,7 @@ select performance_seat_id
 `performance_seat_held_fields_check`(`V6`)가 `held` 행에 `reservation_id` 를 요구한다. 그래서 순서는 이렇다:
 
 ```
-1. reservation 행 삽입 (HELD, held_until)        → reservation_id 를 얻는다
+1. reservation 행 삽입 (held, held_until)        → reservation_id 를 얻는다
 2. 좌석 id 오름차순 select … for update
 3. 조건부 update (위 문장)
 4. 갱신 행 수 ≠ 요청 좌석 수 → 롤백 (1의 행도 사라진다)
@@ -85,7 +85,7 @@ select performance_seat_id
 포인터는 좌석이 풀리면 null 이 되고, 기록은 남는다. 만료된 예매가 무엇을 잡았었는지, 확정된 예매의 좌석별 가격이 얼마였는지는 기록이 답한다.
 **같은 것을 두 벌 드는 것이 아니다** — 하나는 현재고 하나는 과거다.
 
-**불변식**: 예매가 `HELD`·`PAYING`·`RESERVED` 면 그 예매의 `reservation_seat` 좌석 집합 = `performance_seat` 에서 `reservation_id` 가 그 예매인 집합.
+**불변식**: 예매가 `held`·`paying`·`reserved` 면 그 예매의 `reservation_seat` 좌석 집합 = `performance_seat` 에서 `reservation_id` 가 그 예매인 집합.
 `ReservationSeatConsistencyTest`(13)가 매 전이 뒤에 대조한다. 트리거로 안 내리는 이유는 두 표를 잇는 조건이라 행 트리거가 볼 자리가 없어서다.
 
 ## 합계 불변식
@@ -133,19 +133,19 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 
 ## 스윕과 확정의 경합 — 상태로 푼다
 
-`D3` 의 `PAYING` 이 답이다. 스윕은 `HELD` 만 훑고, 결제가 시작되면 예매가 `PAYING` 이라 스윕의 조건부 UPDATE 가 0행이다.
+`D3` 의 `paying` 이 답이다. 스윕은 `held` 만 훑고, 결제가 시작되면 예매가 `paying` 이라 스윕의 조건부 UPDATE 가 0행이다.
 
 ```sql
 -- 스윕 (14). 둘 다 조건부라 두 번 돌아도 둘째는 0행이다
-update reservation set status = 'EXPIRED', expired_at = now()
- where status = 'HELD' and held_until < now();
+update reservation set status = 'expired', expired_at = now()
+ where status = 'held' and held_until < now();
 
 update performance_seat set status = 'available', held_until = null, reservation_id = null
  where status = 'held' and held_until < now()
-   and reservation_id in (select reservation_id from reservation where status = 'EXPIRED' …);
+   and reservation_id in (select reservation_id from reservation where status = 'expired' …);
 ```
 
-**결제 승인도 조건부다** — `where status = 'PAYING' and paying_until >= now()`. 0행이면 승인을 받았어도 좌석을 못 주는 것이고,
+**결제 승인도 조건부다** — `where status = 'paying' and paying_until >= now()`. 0행이면 승인을 받았어도 좌석을 못 주는 것이고,
 그때는 모의 PG 에 취소를 보내고 `payment_late` 사건을 감사에 남긴다(16). 실제 PG 라면 여기가 자동 환불 자리다.
 
 ## 스케줄러 — 인스턴스 여럿에서 하나만
@@ -171,7 +171,7 @@ update performance_seat set status = 'available', held_until = null, reservation
 | 규칙 | 왜 |
 |---|---|
 | 바깥 호출(모의 PG)은 트랜잭션 **밖**에서 | 안에서 부르면 응답을 기다리는 동안 좌석 행 잠금이 열려 있고, PG 가 늦으면 그 좌석을 보는 모든 요청이 기다린다 |
-| 그래서 결제는 트랜잭션 셋 | ① `HELD → PAYING`(짧다) ② PG 호출(트랜잭션 없음) ③ 결과 반영(짧다). ②에서 죽으면 ③이 안 돌고 타임아웃이 `EXPIRED` 로 정리한다 |
+| 그래서 결제는 트랜잭션 셋 | ① `held → paying`(짧다) ② PG 호출(트랜잭션 없음) ③ 결과 반영(짧다). ②에서 죽으면 ③이 안 돌고 타임아웃이 `expired` 로 정리한다 |
 | 읽기 모델 갱신은 커밋 **뒤** | `TransactionSynchronization.afterCommit` 에서 Redis 버전을 올린다(`D20`). 커밋 전에 올리면 롤백된 변경을 화면이 본다 |
 
 ## 지금 안 하는 것
