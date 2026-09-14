@@ -1,7 +1,10 @@
 package com.projectticket.ticket
 
+import com.projectticket.ticket.audit.AuditLog
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
@@ -9,12 +12,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.context.TestSecurityContextHolder
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
@@ -48,6 +55,33 @@ abstract class PostgresTestBase {
     fun clearSecurityContext() {
         SecurityContextHolder.clearContext()
         TestSecurityContextHolder.clearContext()
+    }
+
+    @Autowired private lateinit var auditCleanup: JdbcClient
+
+    @Autowired private lateinit var auditTxManager: PlatformTransactionManager
+
+    /**
+     * 앞 테스트가 따로 커밋한 감사 기록을 걷어낸다.
+     *
+     * 시도 기록([AuditLog.Kind.ATTEMPT])은 `REQUIRES_NEW` 라 **테스트 롤백에 안 쓸린다.** 그게 그 구분의 목적이라 고칠 것이 아니고,
+     * 대신 다음 테스트로 넘어간다. **지우는 것도 별도 트랜잭션이어야 한다** — 테스트 트랜잭션 안에서 지우면 삭제까지 같이 롤백된다.
+     *
+     * 뒤가 아니라 앞에서 지운다. 뒤에서 지우려면 아직 커밋 안 된 이 테스트의 행을 다른 트랜잭션이 지우려 드는 모양이 돼서 잠금에 걸린다.
+     * 남으면 깨지는 것이 **남의 테스트**라 원인을 찾을 실마리가 없다. 그래서 각 테스트가 아니라 바탕에 둔다.
+     *
+     * **트리거를 트랜잭션 안에서만 끈다**(`V3` 의 보존 3년 가드). 안 끄면 이 정리가 그 가드에 막혀서 테스트가 전부 빨개진다 —
+     * 실제로 그랬고, 그것이 가드가 제 역할을 한다는 증거다. `set local` 이라 이 트랜잭션이 끝나면 되돌아가고,
+     * **가드 자체는 [com.projectticket.ticket.audit.AuditImmutabilityTest] 가 따로 잰다** — 여기서 끈다고 검증이 비는 자리가 없다.
+     */
+    @BeforeEach
+    fun purgeCommittedAuditLogs() {
+        TransactionTemplate(auditTxManager)
+            .apply { propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW }
+            .executeWithoutResult {
+                auditCleanup.sql("set local session_replication_role = 'replica'").update()
+                auditCleanup.sql("delete from audit_log").update()
+            }
     }
 
     @TestConfiguration(proxyBeanMethods = false)

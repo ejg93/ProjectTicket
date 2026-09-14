@@ -49,6 +49,20 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 "어
 
 ## 기억으로 쓰면 틀리는 자리
 
+### `csrf()` 후처리기가 공유 필터 체인의 저장소를 바꿔 끼운다
+
+`SecurityMockMvcRequestPostProcessors.csrf()` 는 편의 기능처럼 보이지만 **요청 하나에만 걸리는 것이 아니다.**
+공유 `CsrfFilter` 의 저장소를 `TestCsrfTokenRepository` 로 갈아 끼우고, **그 바꿔치기가 스프링 컨텍스트에 남는다.**
+
+그래서 `csrf()` 를 쓰는 테스트 클래스가 먼저 돈 실행에서는 `CookieCsrfTokenRepository` 가 아예 안 돌고,
+평범한 `GET` 이 `XSRF-TOKEN` 쿠키를 안 내린다. **클래스 실행 순서를 타므로 증상이 간헐이다** — 열 번 넘게 돌려 세 번 났다.
+
+잡은 방법이 답을 반이나 줬다. 처음에는 단언이 「쿠키가 없다」 하나뿐이라 무엇이 틀렸는지 못 읽었고,
+**실패 문구에 그 순간 `CsrfFilter` 가 든 저장소 이름을 실어서** 다음 실패에 바로 나왔다.
+
+`CsrfCookieTest` 가 `@BeforeEach` 에서 우리 저장소를 되돌린다. **`csrf()` 를 쓰는 다른 테스트를 고치지 않았다** —
+그쪽은 CSRF 를 재는 것이 아니라 지나가려는 것이고, 재는 자리가 스스로를 지키는 편이 낫다.
+
 ### 테스트가 전부 실패하면 Docker 부터 본다
 
 Docker Desktop 이 꺼져 있으면 **테스트가 하나도 안 통과한다.** `PostgresTestBase` 가

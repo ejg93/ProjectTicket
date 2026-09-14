@@ -50,6 +50,11 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.flywaydb:flyway-database-postgresql")
+	// 추적 ID 를 발급하고 MDC 까지 나르는 것(D10). Boot 4 는 자동설정이 모듈로 쪼개져 있어서 **둘 다** 넣어야 한다 —
+	// 자동설정만 넣으면 Brave 를 optional 로 잡아 조건이 안 맞고, 브리지만 넣으면 자동설정이 없다.
+	// 어느 쪽이 빠져도 증상은 같다: 빈은 뜨는데 그게 `Tracer.NOOP` 이라 추적 ID 가 조용히 안 찍힌다.
+	implementation("org.springframework.boot:spring-boot-micrometer-tracing-brave")
+	implementation("io.micrometer:micrometer-tracing-bridge-brave")
 	// Kotlin data class 를 Jackson 이 읽고 쓰게 한다. 없으면 기본 생성자가 없다고 죽는다.
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
