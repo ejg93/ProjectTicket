@@ -24,6 +24,10 @@ docker compose ps        # db·redis 가 healthy
 
 내리기는 `docker compose down`, 데이터까지 지우려면 `down -v`.
 
+**ProjectShop 컨테이너(`shop-db`·`shop-redis`)가 같은 기계에서 5432·6379 를 쥐고 있다.** 둘을 같이 띄우려면
+`.env` 에서 `POSTGRES_PORT=5433`·`REDIS_PORT=6380` 으로 바꾼다. 백엔드도 같은 변수를 읽으므로
+`bootRun` 앞에 `POSTGRES_PORT=5433` 을 붙인다.
+
 ## 백엔드 띄우기
 
 청크 1 이 닫힌 뒤부터. 자세한 건 `backend/README.md`.

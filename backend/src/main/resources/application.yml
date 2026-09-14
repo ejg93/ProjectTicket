@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: ticket-backend
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ticket}
+    username: ${POSTGRES_USER:ticket}
+    password: ${POSTGRES_PASSWORD:ticket}
+  flyway:
+    locations: classpath:db/migration
+  # JSON 속성을 snake_case 로 내린다(D5). Kotlin 필드는 camelCase 로 두고 직렬화할 때만 바뀐다.
+  # DB 컬럼명과 JSON 필드명이 같아져서 로그·쿼리·응답을 같은 단어로 검색할 수 있다.
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    # 응답 시각은 UTC 의 Z 다(D7).
+    time-zone: UTC
+  mvc:
+    # 오류 본문을 RFC 9457 Problem Details 로 내린다(D5). 세부는 청크 3 이 정한다.
+    problemdetails:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # 인증된 요청에만 상세를 준다. always 면 아무나 DB 연결 상태·컴포넌트 목록을 본다(OWASP A05).
+      # 살아 있나만 보는 것은 상세 없이도 되고, 자세히 볼 때는 /api/health 가 있다.
+      show-details: when-authorized
+
+server:
+  # `PORT` 는 호스팅이 주입하는 이름이다. 둘 다 없으면 로컬 기본값.
+  port: ${SERVER_PORT:${PORT:8080}}

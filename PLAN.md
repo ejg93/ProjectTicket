@@ -75,7 +75,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
 | 0 | 저장소 뼈대 | `CLAUDE.md`·`PLAN.md`·`PROGRESS.md`·훅·스킬·스크립트·CI·compose·ADR 0001·0002·기준 문서 이식 | 완료 |
-| 1 | backend 골격 | Kotlin + Spring Boot 4 + Gradle KTS, Flyway `V1__baseline.sql`, `GET /api/health`. **축**: 관례(Spring Initializr 기본값 — 따르든 버리든 근거). **강제 지점**: 빌드 — `gradlew build` 가 Kotlin 컴파일·테스트를 돈다. **건드리는 자리**: 신설 `backend/`. **닫힘**: `HealthControllerTest.health_returns_applied_migrations` | 0 |
+| 1 | backend 골격 | 완료 — Kotlin 2.3.21 + Boot 4.1.1 + Gradle 9.7.1, JDK 25 툴체인. `V1__baseline.sql`(DB 시간대 UTC), `GET /api/health`(앱·DB·적용 마이그레이션 수). 테스트 두 레인(`test` 는 `db` 태그 제외, `integrationTest` 는 포함, `build` 가 둘 다). `PostgresTestBase`(Testcontainers postgres:17, `@ServiceConnection`). `HealthControllerTest` 가 마이그레이션 수를 1 로 고정 — 새 `V*` 마다 올린다 | 완료 |
 | 2 | CI 첫 초록 | `ci.yml` backend 잡이 실제로 돈다. gitleaks·docs 잡. **축**: 관례(GitHub Actions). **강제 지점**: CI — 빨가면 머지 불가. **건드리는 자리**: `.github/workflows/ci.yml` 수정, GitHub 저장소 생성·가지 보호. **닫힘**: `gh run list` 첫 실행 초록 | 1 |
 | 3 | 계정·인증 포팅 | ProjectShop `account`·`auth`(세션·로그인 실패 카운터·비밀번호)·`error`(RFC 9457) 를 Kotlin 으로. 권한은 **역할 셋**(관객·기획사·관리자)만 — 스코프 엔진은 안 가져온다. **축**: 표준(RFC 9457, OWASP 세션) + `D9`. **강제 지점**: 제약(이메일 유일·상태 enum) + `ArchitectureTest`. **건드리는 자리**: 신설 `account/`·`auth/`·`error/`, `V2__account.sql`. **닫힘**: `LoginFlowTest`·`ProblemDetailTest` | 1 |
 | 4 | 감사·동의 포팅 | `audit`(누가 무엇을 언제)·`consent`(약관 동의 이력) Kotlin 포팅. **축**: `D9`·개인정보 최소수집. **강제 지점**: 트리거(감사 행 수정 금지). **건드리는 자리**: 신설 `audit/`·`consent/`, `V3`. **닫힘**: `AuditImmutabilityTest` | 3 |
