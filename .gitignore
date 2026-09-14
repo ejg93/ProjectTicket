@@ -25,3 +25,6 @@ logs/
 
 # k6 결과·Grafana 데이터 등 측정 산출물은 doc/notes/ 에 요약만 남긴다
 load/results/
+
+# Gradle 작업 캐시. 기계마다 다르고 빌드 산출물이다
+.gradle/
