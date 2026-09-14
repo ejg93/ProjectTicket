@@ -21,6 +21,7 @@ class ProblemFactory {
         ProblemDetail.forStatusAndDetail(code.status, detail ?: code.title).apply {
             type = URI.create(code.type)
             title = code.title
-            instance = URI.create(request.requestURI)
+            // 요청 경로가 URI 문법에 안 맞으면 instance 를 비운다. 오류 처리기 안에서 던지면 마지막 그물까지 무너진다.
+            instance = runCatching { URI(null, null, request.requestURI, null) }.getOrNull()
         }
 }

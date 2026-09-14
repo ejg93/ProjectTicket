@@ -70,6 +70,8 @@ class LoginFlowTest : PostgresTestBase() {
         // 둘을 가르면 그 이메일이 가입돼 있다는 것을 알려 주는 것이다(`D9`).
         assertThat(wrongPassword).isEqualTo(unknownEmail)
         assertThat(wrongPassword).contains("login-failed")
+        // 핸들러가 내는 401 도 챌린지를 단다(RFC 9110 §15.5.2) — 진입점만 달면 절반만 지키는 것이다.
+        logIn(EMAIL, "wrong-but-long-enough-1").andExpect { header { string("WWW-Authenticate", "Session") } }
     }
 
     @Test
@@ -93,7 +95,7 @@ class LoginFlowTest : PostgresTestBase() {
         val principal = checkNotNull(context.authentication).principal as TicketUser
         // 세션이 사는 내내 해시가 메모리에 남으면 안 된다.
         assertThat(principal.password).isNull()
-        // 탈퇴·정지가 레지스트리를 보고 세션을 끊는다. 등록이 빠지면 대상 세션을 못 찾는다.
+        // 레지스트리 등록. 탈퇴 청크가 여기서 세션을 찾아 만료시킨다 — 지금 부르는 곳은 없고 자리만 있다(SecurityConfig).
         assertThat(sessionRegistry.allPrincipals.filterIsInstance<TicketUser>().any { it.id == principal.id }).isTrue()
     }
 
@@ -103,8 +105,36 @@ class LoginFlowTest : PostgresTestBase() {
         val logged = logIn(EMAIL, PASSWORD).andReturn().sessionOf()
         jdbc.sql("update account set status = 'suspended' where email = :email").param("email", EMAIL).update()
 
-        // 로그인 때만 보면 이미 로그인한 기기가 안 막힌다. 요청마다 생존을 본다.
-        mvc.get("/api/me") { session = logged }.andExpect { status { isUnauthorized() } }
+        // 로그인 때만 보면 이미 로그인한 기기가 안 막힌다. 요청마다 생존을 본다. 필터가 끊는 401 도 챌린지·본문을 단다.
+        mvc.get("/api/me") { session = logged }.andExpect {
+            status { isUnauthorized() }
+            header { string("WWW-Authenticate", "Session") }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:unauthenticated") }
+        }
+        // 정지된 계정의 새 로그인도 일반 실패와 같은 문구다.
+        logIn(EMAIL, PASSWORD).andExpect {
+            status { isUnauthorized() }
+            header { string("WWW-Authenticate", "Session") }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:login-failed") }
+        }
+    }
+
+    @Test
+    fun login_resets_session_creation_time() {
+        signUp(EMAIL, PASSWORD)
+        val planted = MockHttpSession()
+        val plantedCreation = planted.creationTime
+        Thread.sleep(5)
+
+        val after = mvc.post("/api/auth/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$EMAIL","password":"$PASSWORD"}"""
+            session = planted
+            with(csrf())
+        }.andReturn().sessionOf()
+
+        // 절대 만료 12시간은 로그인 시점부터다. changeSessionId 만으로는 생성 시각이 안 바뀐다.
+        assertThat(after.creationTime).isGreaterThan(plantedCreation)
     }
 
     @Test

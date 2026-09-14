@@ -47,9 +47,10 @@ create table account (
         or (email is not null and password_hash is not null and display_name is not null)
     ),
 
-    -- RFC 5321 이 주소를 254 옥텟으로 제한한다. 앱 검증(EmailAddress)과 같은 값이다 —
-    -- 앱 검증은 배치·시드·psql 로 들어오는 것을 못 막아서 여기가 더 낮은 강제 지점이다.
-    constraint account_email_length_check check (email is null or length(email) <= 254),
+    -- RFC 5321 이 주소를 254 옥텟으로 제한한다. length() 는 글자 수라 비ASCII 주소에서 옥텟보다 작다 —
+    -- 표준이 말하는 단위 그대로 octet_length 로 잰다. 앱 검증(EmailAddress)은 글자 수 근사고
+    -- 배치·시드·psql 로 들어오는 것을 못 막아서 여기가 더 낮은 강제 지점이다.
+    constraint account_email_length_check check (email is null or octet_length(email) <= 254),
     constraint account_display_name_length_check check (display_name is null or length(display_name) <= 50)
 );
 

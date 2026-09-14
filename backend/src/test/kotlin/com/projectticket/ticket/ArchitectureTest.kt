@@ -34,12 +34,22 @@ class ArchitectureTest {
         .should().haveSimpleNameEndingWith("Controller")
 
     /**
-     * 상태 코드는 `error` 패키지만 정한다(D14 「예외」). 서비스·컨트롤러가 `HttpStatus` 로 분기하면
-     * `D5` 규약과 대조할 대상이 흩어진다. 컨트롤러의 `ResponseEntity.status(CREATED)` 처럼 성공 코드는 예외다 —
-     * 여기서 막는 것은 `error` 밖에서 `ProblemDetail` 을 만드는 것이다.
+     * 오류 본문은 `error` 패키지만 만든다(D14 「예외」). 다른 자리에서 `ProblemDetail` 을 조립하면 같은 오류가 형태만 다르게 두 벌 나간다.
+     * 잡는 것은 `ProblemDetail` 타입 의존뿐이다 — 상태 코드 결정은 아래 규칙이 본다.
      */
     @ArchTest
     val problemDetailsOnlyInErrorPackage: ArchRule = noClasses()
         .that().resideOutsideOfPackage("..error..")
         .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.http.ProblemDetail")
+
+    /**
+     * 오류 상태 코드는 `error` 패키지만 정한다. 필터·서비스가 `HttpStatus` 로 응답 상태를 박으면
+     * 본문 없는 401·403 이 나가고(RFC 9110·9457 위반) `D5` 표와 대조할 자리가 흩어진다.
+     * 컨트롤러는 예외다 — 성공 코드(201·204)를 `ResponseEntity.status` 로 정하는 것이 그 자리라서다.
+     */
+    @ArchTest
+    val statusCodesOnlyInErrorPackageOrControllers: ArchRule = noClasses()
+        .that().resideOutsideOfPackage("..error..")
+        .and().haveSimpleNameNotEndingWith("Controller")
+        .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.http.HttpStatus")
 }

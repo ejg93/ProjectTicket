@@ -34,7 +34,7 @@ class ProblemEntryPoint(
         objectMapper.writeValue(response.writer, problem)
     }
 
-    private companion object {
+    companion object {
         /**
          * 401 에 반드시 붙어야 하는 챌린지(RFC 9110 §15.5.2 — MUST send a WWW-Authenticate header field).
          *

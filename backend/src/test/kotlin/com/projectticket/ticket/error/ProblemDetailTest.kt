@@ -42,9 +42,12 @@ class ProblemDetailTest : PostgresTestBase() {
         }
     }
 
+    /**
+     * 없는 경로는 404 가 아니라 401 이다. 인가 필터가 MVC 보다 앞이라 로그인 없이는 경로의 존재를 못 알아낸다 —
+     * 404 를 주면 어떤 경로가 있는지를 비로그인에게 알려 주는 것이다(`D9`). `ENDPOINT_NOT_FOUND` 는 로그인한 뒤에만 나간다.
+     */
     @Test
-    fun unknown_public_endpoint_is_endpoint_not_found() {
-        // 공개 경로 아래의 없는 자원이라 인증 필터가 아니라 MVC 가 답한다.
+    fun unknown_path_is_unauthenticated_not_found() {
         mvc.get("/api/health/nope").andExpect {
             status { isUnauthorized() }
         }
