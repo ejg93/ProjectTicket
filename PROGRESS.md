@@ -7,8 +7,8 @@
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
 | 진행중 청크 | 없음 | |
-| 다음 첫 손 | **`16` 결제 포팅 + 확정** — 트랜잭션 셋, `paying` 조건부 승인, 타임아웃. 그다음 `17`(취소·환불) → `18`(발권) | `PLAN.md` 의 `16` 행 |
-| PR | `#10` 머지됨. `12f`·`10`·`13`·`14`·`15` 는 `work/2026-09-15-d` | 마무리 |
+| 다음 첫 손 | **`17` 취소·환불** — `D6` 대로 구간표 행·박제·지연 트리거. 그다음 `18`(발권) | `PLAN.md` 의 `17` 행 |
+| PR | `#10` 머지됨. `12f`·`10`·`13`·`14`·`15`·`16` 은 `work/2026-09-15-d` | 마무리 |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
 | GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(네 잡 필수). 그 뒤로는 `work/<날짜>` + PR | |
@@ -56,6 +56,7 @@
 | 2026-09-15 | 13. 좌석 선점 | 완료 — 위 분할표. **왜**: 갈리는 결정이 없었다 — `D4`·`D3`·`D5` 가 문장 순서·전이·`type` 까지 정해 뒀다. 재시도는 트랜잭션 밖(`ReservationService`)에 두고 트랜잭션은 `IdempotencyService.run` 이 연다 — 키·선점·응답이 한 트랜잭션이라야 반쪽 상태가 없다. 상한 4석은 `@Size` 가 아니라 서비스가 422 `over-limit` 으로 — `D5` 표와 맞추려고. `HoldRequest` 의 세 문장 검증(회차 상태 선읽기)은 친절한 오류용이고 강제는 조건부 UPDATE 의 `exists`. **드러난 것**: `@Transactional` 테스트 안에서는 서비스의 롤백이 안 보인다(rollback-only 표시만) → 정보(`stack.md`), 「아무것도 안 남는다」 단언은 커밋 레인으로. `EventFixture.hold` 는 예매·기록·좌석을 CTE 한 문장으로 넣는다 — 자동 커밋 바탕에서 셋을 나누면 첫 커밋에 합계 트리거가 터진다. `D4` 의 선점 경로 표기를 `D5` 대로 고쳤다. 파일 20 — 표 셋·서비스 셋·테스트 셋이 한 청크였다(분할표가 그렇게 잘랐다). 커밋 도중 perl 구분자 사고로 `D4` 가 깨진 채 커밋돼 amend 로 바로잡았다. **검증**: `test`·`integrationTest` 전부 초록(90), `verify.sh` fast 도장 | 89f79cc |
 | 2026-09-15 | 14. 선점 만료 스윕 | 완료 — `HoldSweeper`·`SchedulingConfig`·`HoldSweeperTest`. **왜**: 좌석을 `performance_seat.held_until` 이 아니라 만료된 예매 id 로 고른다 — 시각으로 고르면 `paying` 예매의 좌석(여전히 `held`, 시각은 지남)까지 풀린다. 스케줄러 스위치를 기동 클래스에 안 붙이고 따로 뒀다(ProjectShop 과 같은 이유 — 프로필로 끌 자리). 테스트 컨텍스트에서도 돌지만 조건부 UPDATE 라 살아있는 선점을 안 건드린다. 지표(`seat.sweep.expired`)는 30 이 든다 — 지금은 로그 한 줄. **검증**: `verify.sh` fast 도장, `integrationTest` 전부 초록 | f159fdd |
 | 2026-09-15 | 15. 1인 N매·중복 선점 제한 | 완료 — `V8`·`SeatHoldService` 수정·`ReservationLimitTest`. **왜**: 분할표대로 부분 유일 인덱스가 먼저다. 4매 합산은 인덱스로 못 걸어 앱 검증인데, **인덱스가 같은 계정의 선점을 직렬화해서** 그 검증이 경합에 안전하다 — `V8` 주석에 적었다. 중복은 예외가 아니라 `on conflict do nothing` 으로 받는다 — 예외로 받으면 트랜잭션이 어보트돼 기존 예매 id 를 못 읽는다. `on conflict` 의 상태는 리터럴이다(바인딩하면 플래너가 부분 인덱스와 못 맞춘다) — `D14` 「SQL」의 예외로 주석. **드러난 것**: 같은 계정으로 좌석 둘을 잡던 테스트 둘(`SeatQueryTest`·`HoldSweeperTest`)이 인덱스에 걸려 계정을 갈랐다. **검증**: `verify.sh` fast 도장, `integrationTest` 99 초록 | 31d7144 |
+| 2026-09-15 | 16. 결제 포팅 + 확정 | 완료 — 위 분할표. **왜**: 트랜잭션 둘을 `PaymentTransitionService` 로 뺐다 — 같은 클래스 안의 자기 호출은 프록시를 안 지나 `@Transactional` 이 안 걸린다(`D14`). 멱등을 컨트롤러가 아니라 `PaymentService` 가 감싼다 — PG 호출이 트랜잭션 밖이어야 하고 그 순서를 아는 쪽이라서(ProjectShop 과 같은 판단). **무응답에 재시도하지 않는다** — `D4` 「재시도」가 이중 결제라고 했다. 대신 같은 키로 PG 에 상태를 묻고(`inquire`), 승인은 났는데 응답만 잃은 것(지연 카드 `0002`)을 그것이 살린다. `D3` 의 `requested` 결제 상태를 지웠다(문서 먼저) — PG 호출 전엔 적을 트랜잭션이 없다. 승인이 늦은 결제(`payment_late`)는 결제 행을 `approved` 로 남기고 감사 + PG 취소 — 환불 행은 17 이 만든다. **드러난 것**: 「승인이 늦었다」는 HTTP 층에서 못 만든다(`now()` 가 트랜잭션 시작 시각) → 전이 서비스 층에서 잰다. ProjectShop 결제를 옮기며 수단을 카드 하나로 줄이고(ADR 0003) 계좌이체·환불을 뺐다. **검증**: `test`·`integrationTest` 전부 초록, `verify.sh` fast 도장 | 5f647ad |
 
 ## 기록 규칙
 
