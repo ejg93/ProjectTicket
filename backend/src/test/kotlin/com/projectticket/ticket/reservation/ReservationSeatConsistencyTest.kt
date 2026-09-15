@@ -130,6 +130,15 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun one_seat_is_recorded_once_per_reservation() {
+        val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(1)))
+
+        // 기록이 두 줄이면 합계 트리거가 같은 좌석 값을 두 번 센다. `reservation_seat_key` 가 막는다.
+        assertThatThrownBy { insertSeatRecord(reservationId, seatIds[0], 154_000) }
+            .hasStackTraceContaining("reservation_seat_key")
+    }
+
+    @Test
     fun seat_record_cannot_be_updated() {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(1)))
 
