@@ -62,6 +62,8 @@ abstract class ConcurrencyTestBase {
             """
             jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_id in ($performances)")
                 .param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from notification where account_id in (select account_id from account where email like :prefix)")
+                .param("prefix", "$PREFIX%").update()
             // 사건은 외래키가 없다 — 집합체 id 로 가리킨다. 예매를 지우기 전에 같이 걷는다.
             jdbc.sql("delete from outbox where aggregate_type = 'reservation' and aggregate_id in ($reservations)")
                 .param("prefix", "$PREFIX%").update()
