@@ -33,7 +33,7 @@
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
 | `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 40 |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
-| `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10 |
+| `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |
 | `POST /api/queue/{performanceId}` · `GET` · `DELETE` | 대기열 진입·순번·이탈(`D12`) | 세션 | 21·24 |
 | **`POST /api/performances/{id}/reservations`** | 좌석 선점 | 세션 + 관문 | 13 |
 | `GET /api/reservations/{id}` | 예매 하나 | 세션(본인) | 13 |
@@ -140,7 +140,7 @@
 | **`admission-mismatch`** | 403 | 토큰이 다른 계정·회차 것 | | 23 |
 | **`queue-closed`** | 410 | 회차가 닫혀 대기열이 없다 | | 21 |
 | **`queue-unavailable`** | 503 | Redis 가 죽어 관문이 닫혔다 | `Retry-After` 헤더 | 23 |
-| **`seat-changes-expired`** | 410 | `since` 가 변경 로그 밖이다. 전체를 다시 받아라 | `version` | 10 |
+| **`seat-changes-expired`** | 410 | `since` 가 변경 로그 밖이다. 전체를 다시 받아라 | `version` | 10a |
 | **`idempotency-in-progress`** | 409 | 같은 키가 처리 중 | | 13 |
 | **`idempotency-key-reused`** | 422 | 같은 키인데 본문이 다르다 | | 13 |
 | **`organizer-forbidden`** | 403 | 기획사 역할이 아니다 | | 11 |

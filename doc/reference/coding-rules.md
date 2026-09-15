@@ -182,7 +182,9 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 
 **자원 단위로 판다.** 관객·기획사 같은 사람 단위로 안 판다 — 같은 자원을 두 사람이 다루면 코드가 두 벌이 된다.
 
-지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `health` · `observability`.
+지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `observability` · `payment` · `reservation`.
+
+**의존 방향은 `payment → reservation → event`, 그리고 셋 다 `idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있는 이유다 — 취소는 환불을 부르고 환불은 예매를 부른다.
 
 ### 의존
 
