@@ -139,6 +139,21 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun seat_of_another_performance_cannot_be_recorded() {
+        val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(1)))
+        val otherHall = fixture.hall(name = "2관", venueName = "${PREFIX}홀2")
+        fixture.seats(otherHall, "F1-A", 1)
+        val otherEvent = fixture.event(fixture.organizer("${PREFIX}org2"))
+        fixture.mapSection(otherEvent, "F1-A", fixture.grade(otherEvent, "VIP", 154_000))
+        val otherPerformance = fixture.performance(otherEvent, otherHall).also { openService.open(it, actorAccountId = null) }
+        val otherSeat = fixture.performanceSeatIds(otherPerformance).single()
+
+        // 어긋나면 정산(27)이 남의 회차 매출을 센다. 앱(`lockInIdOrder`)이 이미 막지만 그것은 3위다.
+        assertThatThrownBy { insertSeatRecord(reservationId, otherSeat, 154_000) }
+            .hasStackTraceContaining("다른 회차의 좌석이다")
+    }
+
+    @Test
     fun seat_record_cannot_be_updated() {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(1)))
 
