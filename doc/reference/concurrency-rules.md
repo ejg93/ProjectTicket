@@ -178,7 +178,7 @@ update performance_seat set status = 'available', held_until = null, reservation
 
 | 항목 | 왜 |
 |---|---|
-| 낙관락 `version` 컬럼 | 조건부 UPDATE 가 같은 일을 한다. 19 가 셋을 재서 ADR 0006 에 남긴다 |
+| 낙관락 `version` 컬럼 | 조건부 UPDATE 가 같은 일을 한다. **19 가 셋을 쟀다** — 1000 스레드에서 조건부 1 : 낙관 1.4 : 비관 4.3(p95 는 1 : 1.5 : 7.5)(ADR 0006, `doc/notes/lock-comparison.md`) |
 | Redisson 좌석 락 | 34 가 33 환경에서 재서 ADR 0008 에 남긴다. 지금은 DB 가 락이다 |
 | 좌석 단위 대기열 | 대기열은 회차 단위다(`D12`). 좌석마다 줄을 세우면 줄이 2천 개다 |
 

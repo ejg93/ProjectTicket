@@ -28,6 +28,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
 | backend 를 건드렸으면, push 앞에 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 |
 | 스키마·서비스만 볼 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
 | **좌석·예매를 건드렸으면** | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |
+| **수치를 남길 때**(락 비교·부하) | `./gradlew measure` | `build` 밖이다(`D8`). 표를 `doc/notes/` 에 기계 사양과 같이 적고 ADR 이 읽는다. 늘 다시 돈다 — 건너뛰면 지난 숫자를 이번 것으로 읽는다 |
 | **마이그레이션을 더했으면** | 빈 DB 로 `POSTGRES_DB=ticket_check ./gradlew bootRun --args='--spring.profiles.active=local'` 후 `curl localhost:8080/api/health` | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
 | 화면을 건드렸으면, push 앞에 | `cd frontend && npm run build && npm run lint && npm test` | 초록. 청크를 닫을 땐 `tsc --noEmit` 만 |
 | 예매·대기열 화면을 건드렸으면 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과 |

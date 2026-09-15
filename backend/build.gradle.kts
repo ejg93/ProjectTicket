@@ -85,8 +85,22 @@ val integrationTest = tasks.register<Test>("integrationTest") {
 	group = "verification"
 	testClassesDirs = sourceSets.test.get().output.classesDirs
 	classpath = sourceSets.test.get().runtimeClasspath
-	useJUnitPlatform { includeTags("db") }
+	useJUnitPlatform { includeTags("db"); excludeTags("measure") }
 	shouldRunAfter(tasks.test)
+}
+
+// 측정 레인(D8). 결과가 초록·빨강이 아니라 숫자라 `build` 밖이다 — 손으로 돌리고 `doc/notes/` 에 기계 사양과 같이 적는다.
+// 측정 클래스는 `ConcurrencyTestBase` 를 상속해 `db` 태그도 들므로 느린 레인이 `measure` 를 빼야 두 번 안 돈다.
+val measure = tasks.register<Test>("measure") {
+	description = "수치를 남기는 측정만 돌린다. build 밖이다."
+	group = "verification"
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	useJUnitPlatform { includeTags("measure") }
+	// 측정은 늘 다시 돈다. 입력이 같다고 건너뛰면 지난 숫자를 이번 것으로 읽는다.
+	outputs.upToDateWhen { false }
+	// 표를 그대로 본다. 실패한 것만 내는 공통 설정 위에 표준 출력을 더한다.
+	testLogging { showStandardStreams = true }
 }
 
 tasks.test {
