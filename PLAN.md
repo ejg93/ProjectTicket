@@ -60,7 +60,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | D16 | `frontend-rules.md` | 서버·클라이언트 경계, `api.ts` | 이식됨 → `P9` |
 | D17 | `screen-rules.md` | 화면 문구·권한 없는 버튼·오류 표시 | 이식됨 → `P9` |
 | D18 | `quality-gates.md` | 게이트 목록과 문턱, 리뷰 지적 처분 | 이식됨 → `P10` |
-| D19 | `stack.md` | 버전, 공식 문서, 기억으로 쓰면 틀리는 자리 | 이식됨 → `P11` |
+| D19 | `stack.md` | 버전, 공식 문서, 기억으로 쓰면 틀리는 자리 | 완료(P11) |
 | D20 | `seat-read-model.md` | 좌석 현황 계약, 버전·스냅샷·델타, ETag | 완료(12d) |
 | D21 | `settlement-rules.md` | **정책 표 + 명세 항목.** 회차당 정산서 하나, 종료 뒤 D+7, 불변식 셋 | 완료 |
 
@@ -187,7 +187,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | P8 | `security-baseline.md`·`observability-rules.md` 이식 | 완료 — 실물 기준 재작성. 선행을 23 으로 뒀었지만 근거(3·4·5·D12)가 이미 있었다. 보안: 정지 계정 타이밍, 세션 재생성, 프록시 IP 미설정(33 이 켠다), 트리거 한계(4a). 관측: 지표 이름 표 10개 | 완료 |
 | P9 | `frontend-rules.md`·`screen-rules.md` 이식 | 예매·좌석도 화면 규약. **축**: 규약 + WCAG. **강제 지점**: lint 접근성 규칙. **건드리는 자리**: 두 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 41 |
 | P10 | `quality-gates.md` 이식 | detekt·CodeQL Kotlin. **축**: 규약. **강제 지점**: CI 잡 목록이 문서와 같다. **건드리는 자리**: 그 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 46·47 |
-| P11 | `stack.md`·`identifier-rules.md`·`external-references.md` 이식 | 버전표 재작성, 쇼핑 참조 삭제. **축**: 규약. **강제 지점**: `StackVersionConsistencyTest`(버전표와 빌드 파일 대조). **건드리는 자리**: 세 문서. **닫힘**: 그 테스트 초록 + 머리말 없음 | 1 |
+| P11 | `stack.md`·`identifier-rules.md`·`external-references.md` 이식 | 완료 — 셋 다 머리말 없이 재작성. `stack.md`: 버전표를 실물(Boot 4.1.1·Kotlin 2.3.21·JDK 25·Gradle 9.7.1·PG 17·Redis 7·Testcontainers 2.0.5·ArchUnit 1.5.0·Node 22)로, 쇼핑 전용 절(카트·셀러·SpotBugs·find-sec-bugs·claude-code-action·support)을 지우고 이 저장소가 밟은 사실(on conflict·부분 유일 인덱스·query 별칭·measure up-to-date)을 더했다. `identifier-rules.md`: 노출 번호는 티켓만, 나머지는 내부 id + 404. `external-references.md`: D 번호를 이 저장소 것으로. 닫힘: `StackVersionConsistencyTest`(빠른 레인, 표 ↔ 빌드·wrapper·compose·CI) 초록 | 완료 |
 | 48 | Railway 배포(선택) | 사용자가 켜면. **축**: 관례. **강제 지점**: 없다. **건드리는 자리**: `Dockerfile`·env. **닫힘**: 공개 URL 의 `/api/health` 200 | 38 |
 
 ## 이 계획을 고칠 때
