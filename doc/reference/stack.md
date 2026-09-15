@@ -127,6 +127,16 @@ RFC 9110 이 422 를 「Unprocessable Content」로 고쳤다. `HttpStatus.UNPRO
 
 **커밋·롤백 자체를 재는 단언은 커밋 레인(`ConcurrencyTestBase`)에 둔다.** 아래 지연 트리거와 같은 부류다.
 
+### `REQUIRES_NEW` 를 쓰는 코드는 롤백 레인에서 못 잰다
+
+새 트랜잭션은 **테스트 트랜잭션의 미커밋 데이터를 못 본다.** 그 안에서 남의 표를 읽으면 0행이고, 그 코드가 예외를 삼키면 **아무 일도 안 일어난 것처럼 보인다.**
+
+알림 소비자(26)가 그 자리다 — `NotificationStore.record` 가 `REQUIRES_NEW`(릴레이를 안 멈추려고) 인데 본문을 채우려고 예매·좌석·티켓을 읽어서,
+롤백 레인에서는 알림이 통째로 안 생겼다. `NotificationIdempotencyTest` 를 커밋 레인으로 옮겼다.
+
+**`AuditLogWriter.detached` 는 같은 `REQUIRES_NEW` 인데 안 걸린다** — 감사 행을 넣기만 하고 남의 표를 안 읽어서다.
+**가르는 것은 전파가 아니라 「그 트랜잭션이 밖의 데이터를 읽나」다.**
+
 ### 지연 제약 트리거는 롤백하는 테스트에서 한 번도 안 돈다
 
 `deferrable initially deferred` 는 **커밋 시점에** 검사한다. 롤백 테스트에는 그 시점이 없어서 **검사가 한 번도 안 돈 채 전부 초록**이다 — 트리거를 아무리 틀리게 짜도 안 잡힌다.

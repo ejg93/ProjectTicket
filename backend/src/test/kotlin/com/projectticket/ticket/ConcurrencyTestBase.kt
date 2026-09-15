@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit
  * 재는 것은 스레드 수가 아니라 **같은 행을 두 트랜잭션이 동시에 건드릴 때 DB 가 어떻게 하나**라서 10 으로 족하다.
  * 풀을 키우려면 속성이 붙어 컨텍스트가 갈린다 — 그 값을 치를 이유가 생길 때 한다.
  */
-@SpringBootTest
+@SpringBootTest(properties = ["ticket.scheduling.enabled=false"])
 @AutoConfigureMockMvc
 @Tag("db")
 @Import(PostgresTestBase.Containers::class)
@@ -61,6 +61,16 @@ abstract class ConcurrencyTestBase {
                     or account_id in (select account_id from account where email like :prefix)
             """
             jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_id in ($performances)")
+                .param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from settlement_line where settlement_id in (select settlement_id from settlement where performance_id in ($performances))")
+                .param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from settlement where performance_id in ($performances)").param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from notification where account_id in (select account_id from account where email like :prefix)")
+                .param("prefix", "$PREFIX%").update()
+            // 사건은 외래키가 없다 — 집합체 id 로 가리킨다. 예매를 지우기 전에 같이 걷는다.
+            jdbc.sql("delete from outbox where aggregate_type = 'reservation' and aggregate_id in ($reservations)")
+                .param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from outbox where aggregate_type = 'performance' and aggregate_id in ($performances)")
                 .param("prefix", "$PREFIX%").update()
             // 티켓 → 환불 → 결제 → 예매. 전부 `restrict` 라 자식부터다.
             jdbc.sql("delete from ticket where reservation_seat_id in (select reservation_seat_id from reservation_seat where reservation_id in ($reservations))")

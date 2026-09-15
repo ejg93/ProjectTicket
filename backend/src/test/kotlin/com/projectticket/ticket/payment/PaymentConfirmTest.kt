@@ -162,14 +162,30 @@ class PaymentConfirmTest : PostgresTestBase() {
         transitions.settle(accountId, paying, approved())
 
         // 멱등키가 앞에서 막고 이 인덱스가 끝에서 한 번 더 막는다(`V9`).
+        // 금액은 예매 합계와 맞춘다 — 안 맞추면 `V12` 의 금액 트리거가 먼저 걸려서 재려던 인덱스를 못 본다.
         assertThatThrownBy {
             jdbc.sql(
                 """
                 insert into payment (reservation_id, status, amount, approval_number, card_last4)
-                values (:id, 'approved', 1, 'M-second', '1111')
+                values (:id, 'approved', :amount, 'M-second', '1111')
+                """,
+            ).param("id", paying.reservationId).param("amount", paying.amount).update()
+        }.isInstanceOf(DuplicateKeyException::class.java).hasStackTraceContaining("payment_approved_idx")
+    }
+
+    @Test
+    fun payment_amount_must_equal_the_reservation_total() {
+        val paying = transitions.startPaying(accountId, hold(1))
+
+        // 금액을 요청에서 받는 입구가 생기는 날 그 검사를 빠뜨리면 원하는 금액으로 결제된다(`D9`).
+        assertThatThrownBy {
+            jdbc.sql(
+                """
+                insert into payment (reservation_id, status, amount, approval_number, card_last4)
+                values (:id, 'approved', 1, 'M-cheap', '4242')
                 """,
             ).param("id", paying.reservationId).update()
-        }.isInstanceOf(DuplicateKeyException::class.java).hasStackTraceContaining("payment_approved_idx")
+        }.hasStackTraceContaining("결제 금액이 예매 합계와 다르다")
     }
 
     @Test

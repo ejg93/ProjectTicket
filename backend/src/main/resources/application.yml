@@ -1,3 +1,8 @@
+# 스케줄러(스윕·릴레이·자동 종료)를 켠다. 테스트는 false 로 끄고 회차를 손으로 부른다(`SchedulingConfig`).
+ticket:
+  scheduling:
+    enabled: true
+
 spring:
   application:
     name: ticket-backend

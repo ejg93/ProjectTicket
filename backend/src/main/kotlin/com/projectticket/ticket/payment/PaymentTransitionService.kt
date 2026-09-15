@@ -4,6 +4,8 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.outbox.EventType
+import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.ReservationStatus
 import com.projectticket.ticket.reservation.TicketService
 import org.slf4j.LoggerFactory
@@ -23,6 +25,7 @@ class PaymentTransitionService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val tickets: TicketService,
+    private val outbox: OutboxWriter,
 ) {
 
     private val log = LoggerFactory.getLogger(PaymentTransitionService::class.java)
@@ -32,6 +35,9 @@ class PaymentTransitionService(
 
     /** ③ 의 결과. [late] 면 승인은 났는데 좌석을 못 줬다 — 감사 `payment.late` 가 남고 환불 행(17b)이 되돌린다 */
     data class Settled(val paymentId: Long, val reservationStatus: String, val late: Boolean)
+
+    /** 사건 페이로드에 드는 것 — 회차와 좌석 수(`D11` 카탈로그) */
+    data class ReservedShape(val performanceId: Long, val seatCount: Int)
 
     /**
      * ① `held → paying`. `paying_until` 을 박제한다(`D7`). **`held_until` 은 안 늘린다** — 결제 시도가 선점을 연장하지 않는다(`D3`).
@@ -107,6 +113,27 @@ class PaymentTransitionService(
         }
 
         val late = status == PaymentStatus.APPROVED && reservationStatus != ReservationStatus.RESERVED.code
+        if (status == PaymentStatus.APPROVED && !late) {
+            // 확정과 **같은 트랜잭션**에서 사건을 커밋한다(`D11`). 좌석을 못 준 승인(late)은 예매가 성립 안 했으니 사건도 없다 — 되돌리는 것은 환불(17b)이다.
+            val shape = jdbc.sql(
+                """
+                select r.performance_id, (select count(*) from reservation_seat rs where rs.reservation_id = r.reservation_id) as seat_count
+                  from reservation r where r.reservation_id = :id
+                """,
+            ).param("id", paying.reservationId).query(ReservedShape::class.java).single()
+            outbox.append(
+                EventType.RESERVATION_RESERVED,
+                paying.reservationId,
+                mapOf(
+                    "reservation_id" to paying.reservationId,
+                    "account_id" to accountId,
+                    "performance_id" to shape.performanceId,
+                    "payment_id" to paymentId,
+                    "total_amount" to paying.amount,
+                    "seat_count" to shape.seatCount,
+                ),
+            )
+        }
         if (late) {
             // 스윕·타임아웃이 먼저 갔다. 돈은 받았고 좌석은 없다 — 사람이 볼 것이라 WARN 이고, 되돌리는 것은 환불 행(17b)이다.
             log.warn("승인이 늦어 좌석을 못 줬다 reservation_id={} payment_id={}", paying.reservationId, paymentId)

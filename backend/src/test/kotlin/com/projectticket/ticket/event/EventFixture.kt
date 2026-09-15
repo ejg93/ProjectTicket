@@ -45,12 +45,16 @@ class EventFixture(private val jdbc: JdbcClient) {
         jdbc.sql("insert into seat_grade_map (event_id, section, seat_grade_id) values (:event, :section, :grade)")
             .param("event", eventId).param("section", section).param("grade", gradeId).update()
 
-    /** 판매 시작은 하루 전, 관람은 내일이 기본이다 */
+    /**
+     * 판매 시작은 하루 전, 관람은 내일이 기본이다. 마감(`sales_close_at`)은 트리거가 `starts_at - 1h` 로 채운다(`V14`).
+     *
+     * 판매 시작을 하루 전으로 둔 이유는 당일 회차(`startsInDays = 0`) 때문이다 — 한 시간 전이면 마감과 같아져 `performance_sales_window_check` 에 걸린다.
+     */
     fun performance(eventId: Long, hallId: Long, startsInDays: Long = 1): Long =
         jdbc.sql(
             """
             insert into performance (event_id, hall_id, starts_at, sales_open_at)
-            values (:event, :hall, now() + make_interval(days => :days), now() - interval '1 hour')
+            values (:event, :hall, now() + make_interval(days => :days), now() - interval '1 day')
             returning performance_id
             """,
         ).param("event", eventId).param("hall", hallId).param("days", startsInDays.toInt())

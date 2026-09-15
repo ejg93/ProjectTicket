@@ -138,9 +138,21 @@ class PerformanceStateTest : PostgresTestBase() {
             .hasStackTraceContaining("seat_grade_map_pkey")
     }
 
+    /**
+     * 전이 트리거를 재려고 상태를 직접 민다 — 여는 것은 `PerformanceOpenService` 의 일이라 여기서는 서비스를 안 거친다.
+     *
+     * 정책도 같이 넣는다. `performance_open_has_policy_check`(`V16`)가 **정책 없이 열린 회차**를 막는데,
+     * 그것은 정산이 조용히 비는 것을 막는 제약이지 이 테스트가 재려는 전이가 아니다(`D8` 「재려는 것을 먼저 만나는 문장을 고른다」).
+     */
     private fun setStatus(performanceId: Long, status: String) =
-        jdbc.sql("update performance set status = :status where performance_id = :id")
-            .param("status", status).param("id", performanceId).update()
+        jdbc.sql(
+            """
+            update performance
+               set status = :status,
+                   settlement_policy_id = coalesce(settlement_policy_id, (select min(settlement_policy_id) from settlement_policy))
+             where performance_id = :id
+            """,
+        ).param("status", status).param("id", performanceId).update()
 
     private fun statusOf(performanceId: Long): String =
         jdbc.sql("select status from performance where performance_id = :id")

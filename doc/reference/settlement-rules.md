@@ -37,7 +37,8 @@
 | `performance_id` | **유일.** 회차당 정산서는 하나다 |
 | `settlement_policy_id` | 회차에 박제된 것을 그대로 |
 | `amount` | 기획사 지급액 = Σ 항목. **0 이상**(check) |
-| `status` | `pending → confirmed → paid` |
+| `status` | `scheduled → pending → confirmed → paid`. **`scheduled` 는 사건을 받은 순간 예약된 것**이고 금액은 0 이다 — 집계는 `settle_at` 뒤에 돈다 |
+| `settle_at` | 집계 예정 시각 = 종료 + `payout_delay_days`. **박제** — 정책을 고쳐도 예약된 정산이 안 흔들린다 |
 | `settled_at` | 만든 시각 |
 
 ### 항목 `settlement_line`
@@ -71,8 +72,9 @@ amount         45,584,000
 ## 언제 만드나
 
 ```
-회차 closed ──(payout_delay_days)──> 정산서 생성 (pending)
-                                      └ 관리자 확인 ──> confirmed ──> paid (모의 지급)
+회차 closed ──사건──> 정산서 scheduled (금액 0, settle_at 박제)
+                       └─(settle_at 도래)──> 집계 ──> pending
+                                                      └ 관리자 확인 ──> confirmed ──> paid (모의 지급)
 ```
 
 **회차 단위·종료 뒤 D+7 인 이유**: 취소는 관람일 당일에 못 한다(ADR 0003). 회차가 끝난 뒤에는 취소도 회차 취소(17a)도 없으므로,
@@ -80,8 +82,10 @@ amount         45,584,000
 
 월 정산이 필요해지면 **그 달 회차 정산서의 합**이다 — 위에 얹을 수 있고 반대는 안 된다.
 
-만드는 것은 아웃박스 소비자(27)다 — `performance.closed` 사건을 받아 `payout_delay_days` 뒤에 만든다.
-두 번 받아도 유일 제약이 둘째를 막는다(멱등).
+**사건을 받는 것과 집계하는 것이 갈려 있다**(27, 사용자 선택). 소비자는 `performance.closed` 를 받아 `scheduled` 정산서를 만들고 `settle_at` 을 박제한다 —
+두 번 받아도 회차당 유일 제약이 둘째를 막는다(멱등). 스케줄러가 `settle_at` 지난 것을 집계해 항목을 넣고 `pending` 으로 옮긴다.
+
+예약 표를 따로 안 둔 이유는 **멱등이 두 벌이 되기 때문**이다 — 정산서의 유일 제약이 그 일을 이미 한다.
 
 ## 회차 취소
 
@@ -92,8 +96,8 @@ amount         45,584,000
 
 | 누가 | 무엇 | 청크 |
 |---|---|---|
-| 기획사 | 자기 정산서 목록·항목 | 27·45 |
-| 관리자 | `confirmed`·`paid` 전이 | 27 |
+| 기획사 | 자기 정산서 목록·항목 | 45 |
+| 관리자 | `confirmed`·`paid` 전이 | 45 와 같이 — 부르는 화면이 설 때 만든다 |
 | 관객 | 못 본다 | |
 
 ## 지금 안 하는 것
