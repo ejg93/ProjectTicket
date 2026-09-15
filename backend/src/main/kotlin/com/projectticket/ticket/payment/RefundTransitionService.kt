@@ -4,6 +4,8 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.outbox.EventType
+import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.ReservationStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
@@ -18,7 +20,11 @@ import java.time.OffsetDateTime
  * 수수료 계산은 **① 안에서, DB 의 `now()` 로** 한다(`D7` 「시계는 DB 다」). 구간은 행에서 고르고(`refund_fee_tier`) 산수는 [RefundPolicy] 가 한다.
  */
 @Service
-class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog: AuditLog) {
+class RefundTransitionService(
+    private val jdbc: JdbcClient,
+    private val auditLog: AuditLog,
+    private val outbox: OutboxWriter,
+) {
 
     /** ① 이 끝난 환불. [refundAmount] 만 PG 로 간다 */
     data class Requested(
@@ -45,7 +51,7 @@ class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog
               from performance p
              where p.performance_id = r.performance_id
                and r.reservation_id = :id and r.account_id = :account and r.status = :reserved
-            returning p.starts_at, now() as cancelled_at
+            returning p.performance_id, p.starts_at, now() as cancelled_at
             """,
         )
             .param("cancelled", ReservationStatus.CANCELLED.code)
@@ -75,6 +81,21 @@ class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog
             .param("reserved", PerformanceSeatStatus.RESERVED.code)
             .param("id", reservationId)
             .update()
+
+        // 취소 트랜잭션이 사건을 같이 커밋한다(`D11`). 감사와 이름이 같지만 목적이 다르다 — 이쪽은 소비자가 반응하려고 있는 계약이다.
+        outbox.append(
+            EventType.RESERVATION_CANCELLED,
+            reservationId,
+            mapOf(
+                "reservation_id" to reservationId,
+                "account_id" to accountId,
+                "performance_id" to cancelled.performanceId,
+                "refund_id" to refundId,
+                "reason" to REASON_AUDIENCE,
+                "fee_amount" to fee,
+                "refund_amount" to payment.amount - fee,
+            ),
+        )
 
         auditLog.record(
             AuditLog.Kind.OUTCOME,
@@ -154,7 +175,7 @@ class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog
             .query(Long::class.java)
             .single()
 
-    data class Cancelled(val startsAt: OffsetDateTime, val cancelledAt: OffsetDateTime)
+    data class Cancelled(val performanceId: Long, val startsAt: OffsetDateTime, val cancelledAt: OffsetDateTime)
 
     data class ApprovedPayment(val paymentId: Long, val amount: Int)
 
