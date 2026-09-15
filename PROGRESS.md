@@ -7,8 +7,8 @@
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
 | 진행중 청크 | 없음 | |
-| 다음 첫 손 | **`13` 좌석 선점** — `D4` 문장 순서대로, `ConcurrencyTestBase` 위에 `SeatHoldConcurrencyTest`. 그다음 `14`(스윕) → `15`(N매 제한) | `PLAN.md` 의 `13` 행 |
-| PR | `#10` 머지됨. `12f`·`10` 은 `work/2026-09-15-d` | 마무리 |
+| 다음 첫 손 | **`14` 선점 만료 스윕** — `held_until` 지난 것을 조건부 UPDATE 로. 그다음 `15`(N매 제한) → `16`(결제) | `PLAN.md` 의 `14` 행 |
+| PR | `#10` 머지됨. `12f`·`10`·`13` 은 `work/2026-09-15-d` | 마무리 |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
 | GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(네 잡 필수). 그 뒤로는 `work/<날짜>` + PR | |
@@ -53,6 +53,7 @@
 | 2026-09-15 | P8. `D9`·`D10` 보안·관측 | 완료 — `security-baseline.md`·`observability-rules.md` 재작성(머리말 삭제). **왜**: 선행을 23 으로 뒀었지만 근거가 이미 있었다 — 세션·CSRF·비밀번호는 3, 감사는 4, 추적은 5, 토큰은 `D12`. OWASP 2025 대응표를 이 저장소 청크로 다시 채웠다. **드러난 것**: `forward-headers-strategy` 가 미설정이다 — nginx 뒤에서 `acted_ip` 가 프록시 IP 가 된다. 33 행에 흡수했다. 관측에 **지표 이름 표 10개**를 미리 정했다 — 30 의 `MetricNamesTest` 가 이 표와 대조한다. `performance_id` 는 태그가 아니다(회차마다 시계열이 는다). **검증**: `doc-lint.sh` 통과 | 3220e31 |
 | 2026-09-15 | 12f. 동시성 테스트 바탕 | 완료 — `ConcurrencyTestBase`·`ConcurrencyTestBaseTest`·`D8` 한 절. **왜**: `D8` 초안엔 `@AutoConfigureMockMvc` 가 없었는데 컨텍스트 캐시 키가 애너테이션으로 갈려서 붙였다 — 안 붙이면 컨테이너가 둘 뜬다. `D8` 스니펫을 실물에 맞췄다. **드러난 것**: 커넥션 풀 기본 10 이라 스레드 100 을 놓아도 DB 는 열 10 씩 — 재는 것은 같은 행의 두 트랜잭션이라 족하다. 풀을 키우면 속성 때문에 컨텍스트가 갈리므로 안 키운다(정보 → `D8`·바탕 KDoc). Docker Desktop 이 꺼져 있으면 컨테이너 레인이 컨텍스트 로드에서 죽는다 — 켜고 다시 돌렸다. **검증**: `integrationTest --tests ConcurrencyTestBaseTest` 2/2, `verify.sh` fast 도장 | 3b51e26 |
 | 2026-09-15 | 10. 좌석 현황 조회 | 완료 — `SeatQuery`·`SeatController`·`PerformanceSeatStatus`·`Snapshot`(테스트 바탕)·`SeatQueryTest`·`SeatVersionTest`, 공개 경로 한 줄, gradle `snapshot.update` 속성. **왜**: 구역 이름 `name` 의 출처가 스키마에 없어 물었다 — **사용자가 백엔드 파생(D20 그대로)을 골랐다.** 버전은 `D20` 이 정한 대체값(`max(updated_at)` epoch 마이크로초)으로 시작한다. 재검증은 손으로 한다 — `checkNotModified` 와 `ResponseEntity` 가 `ETag` 를 둘 쓴다. **드러난 것**: `now()` 가 트랜잭션 시작 시각이라 롤백 테스트에서 버전이 안 움직인다 → 정보(`stack.md`), 그 테스트는 `ConcurrencyTestBase` 로 옮겼다. `EventFixture.hall` 에 `venueName` 을 더했다(접두 정리용). 파일 수가 상한(3)을 넘었다 — 스냅샷 바탕이 이 청크에서 처음 필요했다. **검증**: `integrationTest --tests event.* ConcurrencyTestBaseTest` 초록, `verify.sh` fast 도장 | 1f71478 |
+| 2026-09-15 | 13. 좌석 선점 | 완료 — 위 분할표. **왜**: 갈리는 결정이 없었다 — `D4`·`D3`·`D5` 가 문장 순서·전이·`type` 까지 정해 뒀다. 재시도는 트랜잭션 밖(`ReservationService`)에 두고 트랜잭션은 `IdempotencyService.run` 이 연다 — 키·선점·응답이 한 트랜잭션이라야 반쪽 상태가 없다. 상한 4석은 `@Size` 가 아니라 서비스가 422 `over-limit` 으로 — `D5` 표와 맞추려고. `HoldRequest` 의 세 문장 검증(회차 상태 선읽기)은 친절한 오류용이고 강제는 조건부 UPDATE 의 `exists`. **드러난 것**: `@Transactional` 테스트 안에서는 서비스의 롤백이 안 보인다(rollback-only 표시만) → 정보(`stack.md`), 「아무것도 안 남는다」 단언은 커밋 레인으로. `EventFixture.hold` 는 예매·기록·좌석을 CTE 한 문장으로 넣는다 — 자동 커밋 바탕에서 셋을 나누면 첫 커밋에 합계 트리거가 터진다. `D4` 의 선점 경로 표기를 `D5` 대로 고쳤다. 파일 20 — 표 셋·서비스 셋·테스트 셋이 한 청크였다(분할표가 그렇게 잘랐다). 커밋 도중 perl 구분자 사고로 `D4` 가 깨진 채 커밋돼 amend 로 바로잡았다. **검증**: `test`·`integrationTest` 전부 초록(90), `verify.sh` fast 도장 | 89f79cc |
 
 ## 기록 규칙
 
