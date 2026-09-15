@@ -7,8 +7,8 @@
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
 | 진행중 청크 | 없음 | |
-| 다음 첫 손 | **`17` 취소·환불** — `D6` 대로 구간표 행·박제·지연 트리거. 그다음 `18`(발권) | `PLAN.md` 의 `17` 행 |
-| PR | `#10` 머지됨. `12f`·`10`·`13`·`14`·`15`·`16` 은 `work/2026-09-15-d` | 마무리 |
+| 다음 첫 손 | **`18` 발권** — 확정 시 티켓 번호(외부 노출), 조회 API. 그다음 코드 청크 끝 — 마무리 | `PLAN.md` 의 `18` 행 |
+| PR | `#10` 머지됨. `12f`·`10`·`13`~`17` 은 `work/2026-09-15-d` | 마무리 |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
 | GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(네 잡 필수). 그 뒤로는 `work/<날짜>` + PR | |
@@ -57,6 +57,7 @@
 | 2026-09-15 | 14. 선점 만료 스윕 | 완료 — `HoldSweeper`·`SchedulingConfig`·`HoldSweeperTest`. **왜**: 좌석을 `performance_seat.held_until` 이 아니라 만료된 예매 id 로 고른다 — 시각으로 고르면 `paying` 예매의 좌석(여전히 `held`, 시각은 지남)까지 풀린다. 스케줄러 스위치를 기동 클래스에 안 붙이고 따로 뒀다(ProjectShop 과 같은 이유 — 프로필로 끌 자리). 테스트 컨텍스트에서도 돌지만 조건부 UPDATE 라 살아있는 선점을 안 건드린다. 지표(`seat.sweep.expired`)는 30 이 든다 — 지금은 로그 한 줄. **검증**: `verify.sh` fast 도장, `integrationTest` 전부 초록 | f159fdd |
 | 2026-09-15 | 15. 1인 N매·중복 선점 제한 | 완료 — `V8`·`SeatHoldService` 수정·`ReservationLimitTest`. **왜**: 분할표대로 부분 유일 인덱스가 먼저다. 4매 합산은 인덱스로 못 걸어 앱 검증인데, **인덱스가 같은 계정의 선점을 직렬화해서** 그 검증이 경합에 안전하다 — `V8` 주석에 적었다. 중복은 예외가 아니라 `on conflict do nothing` 으로 받는다 — 예외로 받으면 트랜잭션이 어보트돼 기존 예매 id 를 못 읽는다. `on conflict` 의 상태는 리터럴이다(바인딩하면 플래너가 부분 인덱스와 못 맞춘다) — `D14` 「SQL」의 예외로 주석. **드러난 것**: 같은 계정으로 좌석 둘을 잡던 테스트 둘(`SeatQueryTest`·`HoldSweeperTest`)이 인덱스에 걸려 계정을 갈랐다. **검증**: `verify.sh` fast 도장, `integrationTest` 99 초록 | 31d7144 |
 | 2026-09-15 | 16. 결제 포팅 + 확정 | 완료 — 위 분할표. **왜**: 트랜잭션 둘을 `PaymentTransitionService` 로 뺐다 — 같은 클래스 안의 자기 호출은 프록시를 안 지나 `@Transactional` 이 안 걸린다(`D14`). 멱등을 컨트롤러가 아니라 `PaymentService` 가 감싼다 — PG 호출이 트랜잭션 밖이어야 하고 그 순서를 아는 쪽이라서(ProjectShop 과 같은 판단). **무응답에 재시도하지 않는다** — `D4` 「재시도」가 이중 결제라고 했다. 대신 같은 키로 PG 에 상태를 묻고(`inquire`), 승인은 났는데 응답만 잃은 것(지연 카드 `0002`)을 그것이 살린다. `D3` 의 `requested` 결제 상태를 지웠다(문서 먼저) — PG 호출 전엔 적을 트랜잭션이 없다. 승인이 늦은 결제(`payment_late`)는 결제 행을 `approved` 로 남기고 감사 + PG 취소 — 환불 행은 17 이 만든다. **드러난 것**: 「승인이 늦었다」는 HTTP 층에서 못 만든다(`now()` 가 트랜잭션 시작 시각) → 전이 서비스 층에서 잰다. ProjectShop 결제를 옮기며 수단을 카드 하나로 줄이고(ADR 0003) 계좌이체·환불을 뺐다. **검증**: `test`·`integrationTest` 전부 초록, `verify.sh` fast 도장 | 5f647ad |
+| 2026-09-15 | 17. 취소·환불 | 완료 — 위 분할표. **왜**: 판정 시각은 DB `now()`(`D7`), 산수는 순수 함수(`D8`) — 둘을 가르니 자정 경계를 빠른 레인에서 잰다. 취소 입구를 `payment` 패키지에 뒀다 — 취소가 환불을 부르고 환불이 예매를 부르므로 반대면 순환. 예매 행을 `for update` 로 잠근다 — 동시 취소 둘이 환불 행을 둘 만들려다 `refund_payment_id_key` 로 500 이 되는 것을 막는다. 멱등키는 안 받는다(`D4`) — 둘째 취소는 `invalid-transition`. **드러난 것**: PG 환불 뒤 `done` 전에 죽으면 `requested` 가 남는다 → 신규 `17b`(환불 되살리기 스윕). 커밋 레인 정리가 `payment`·`refund` 를 몰라 `restrict` 에 걸렸다 — 남은 행이 재사용 컨테이너에 쌓여 뒤 테스트 18개가 연쇄로 빨개졌다. 자식부터 지우게 고쳤다. **검증**: `test`·`integrationTest` 129 초록, `verify.sh` fast 도장 | 75866db |
 
 ## 기록 규칙
 
