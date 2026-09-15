@@ -1,0 +1,41 @@
+{
+  "version" : "<version>",
+  "grades" : [ {
+    "code" : "VIP",
+    "name" : "VIP",
+    "price" : 154000
+  }, {
+    "code" : "R",
+    "name" : "R",
+    "price" : 121000
+  } ],
+  "sections" : [ {
+    "code" : "F1-A",
+    "name" : "1층 A구역",
+    "grade" : "VIP",
+    "rows" : [ {
+      "label" : "A",
+      "seats" : [ {
+        "id" : "<id>",
+        "n" : 1,
+        "s" : "A"
+      }, {
+        "id" : "<id>",
+        "n" : 2,
+        "s" : "H"
+      } ]
+    } ]
+  }, {
+    "code" : "F1-B",
+    "name" : "1층 B구역",
+    "grade" : "R",
+    "rows" : [ {
+      "label" : "A",
+      "seats" : [ {
+        "id" : "<id>",
+        "n" : 1,
+        "s" : "R"
+      } ]
+    } ]
+  } ]
+}

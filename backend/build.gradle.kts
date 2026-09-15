@@ -99,6 +99,8 @@ tasks.check {
 }
 
 tasks.withType<Test> {
+	// 스냅샷 갱신은 계약 변경이라 손으로 켠다(D8): `gradlew integrationTest -Psnapshot.update=true`
+	systemProperty("snapshot.update", providers.gradleProperty("snapshot.update").orElse("false").get())
 	// 실패한 테스트의 이름과 원인만 콘솔에 낸다. 통과한 것을 나열하면 실패가 묻힌다.
 	testLogging {
 		events("failed")

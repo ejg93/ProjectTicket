@@ -13,9 +13,9 @@ class EventFixture(private val jdbc: JdbcClient) {
         jdbc.sql("insert into organizer (code, name) values (:code, '테스트기획') returning organizer_id")
             .param("code", code).query(Long::class.java).single()
 
-    fun hall(name: String = "1관"): Long {
-        val venueId = jdbc.sql("insert into venue (name, address) values ('테스트홀', '서울') returning venue_id")
-            .query(Long::class.java).single()
+    fun hall(name: String = "1관", venueName: String = "테스트홀"): Long {
+        val venueId = jdbc.sql("insert into venue (name, address) values (:venue, '서울') returning venue_id")
+            .param("venue", venueName).query(Long::class.java).single()
         return jdbc.sql("insert into hall (venue_id, name) values (:venue, :name) returning hall_id")
             .param("venue", venueId).param("name", name).query(Long::class.java).single()
     }
