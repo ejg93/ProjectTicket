@@ -50,14 +50,20 @@ class EventFixture(private val jdbc: JdbcClient) {
      *
      * 판매 시작을 하루 전으로 둔 이유는 당일 회차(`startsInDays = 0`) 때문이다 — 한 시간 전이면 마감과 같아져 `performance_sales_window_check` 에 걸린다.
      */
+    /**
+     * `starts_at` 에 **호출마다 다른 초를 더한다.** 같은 홀의 같은 시각은 `performance_hall_slot_key`(`V18`)가 막고,
+     * `now()` 는 트랜잭션 시작 시각이라(`stack.md`) 한 테스트가 같은 `startsInDays` 로 둘을 만들면 값이 똑같아진다.
+     * 초 단위라 달력일 차(`D7`)는 안 움직인다 — `days_before` 를 재는 테스트가 그대로 산다.
+     */
     fun performance(eventId: Long, hallId: Long, startsInDays: Long = 1): Long =
         jdbc.sql(
             """
             insert into performance (event_id, hall_id, starts_at, sales_open_at)
-            values (:event, :hall, now() + make_interval(days => :days), now() - interval '1 day')
+            values (:event, :hall, now() + make_interval(days => :days, secs => :nudge), now() - interval '1 day')
             returning performance_id
             """,
         ).param("event", eventId).param("hall", hallId).param("days", startsInDays.toInt())
+            .param("nudge", slotNudge.getAndIncrement())
             .query(Long::class.java).single()
 
     fun account(email: String): Long =
@@ -115,5 +121,10 @@ class EventFixture(private val jdbc: JdbcClient) {
             .param("id", reservationId).update()
         jdbc.sql("update performance_seat set status = 'reserved', held_until = null where reservation_id = :id")
             .param("id", reservationId).update()
+    }
+
+    companion object {
+        /** 회차마다 다른 `starts_at` 을 주는 초. 클래스가 아니라 여기 있는 것은 **한 테스트가 픽스처를 둘 만들어도 안 겹치게** 하기 위해서다 */
+        private val slotNudge = java.util.concurrent.atomic.AtomicInteger(0)
     }
 }

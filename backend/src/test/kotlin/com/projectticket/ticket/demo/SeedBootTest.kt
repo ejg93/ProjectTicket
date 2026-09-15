@@ -38,12 +38,12 @@ class SeedBootTest {
     @Test
     fun one_performance_per_event_is_open_and_its_seats_are_copied() {
         // 연 회차 둘(공연마다 하나) + 안 연 회차 둘 — 여는 절차를 화면에서 밟아 볼 자리가 남아 있어야 한다.
-        assertThat(count("performance where status = 'open'")).isEqualTo(2)
-        assertThat(count("performance where status = 'draft'")).isEqualTo(2)
+        assertThat(count("$DEMO_PERFORMANCES and p.status = 'open'")).isEqualTo(2)
+        assertThat(count("$DEMO_PERFORMANCES and p.status = 'draft'")).isEqualTo(2)
         // 좌석 복제가 기동 경로에서 실제로 돌았다 — 구역 넷 중 둘씩, 홀당 1천석.
-        assertThat(count("performance_seat")).isEqualTo(2_000)
+        assertThat(count("performance_seat ps, $DEMO_PERFORMANCES and p.performance_id = ps.performance_id")).isEqualTo(2_000)
         // 정책이 오픈 때 박제됐다(`D21`).
-        assertThat(count("performance where status = 'open' and settlement_policy_id is not null")).isEqualTo(2)
+        assertThat(count("$DEMO_PERFORMANCES and p.status = 'open' and p.settlement_policy_id is not null")).isEqualTo(2)
     }
 
     @Test
@@ -59,4 +59,14 @@ class SeedBootTest {
 
     private fun count(fromWhere: String): Long =
         jdbc.sql("select count(*) from $fromWhere").query(Long::class.java).single()
+
+    companion object {
+        /**
+         * **셈을 데모 기획사로 좁히는 조각.** 이 테스트는 롤백 레인이 아니라 재사용 컨테이너에 커밋하므로,
+         * `performance` · `performance_seat` 를 통째로 세면 커밋 레인의 다른 테스트가 남긴 회차에 빨개진다.
+         */
+        private const val DEMO_PERFORMANCES =
+            "performance p, event e, organizer o " +
+                "where e.event_id = p.event_id and o.organizer_id = e.organizer_id and o.code = '${DemoSeeder.ORGANIZER_CODE}'"
+    }
 }

@@ -14,13 +14,16 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
 
 /**
- * 손으로 밟아 볼 데모 데이터(12). **`local` 프로필에서만 돈다**(`ticket.demo.enabled`).
+ * 손으로 밟아 볼 데모 데이터(12). **관문은 프로필이 아니라 속성이다** — `ticket.demo.enabled=true` 일 때만 빈이 뜬다.
+ * 그 값을 켜는 것은 `application-local.yml` 이고, 테스트가 프로필 없이 켜서 쓴다([SeedBootTest]).
  *
  * **마이그레이션이 아니라 기동 러너다**(사용자 선택). 시드를 `V900` 대로 넣으면 그 번호가 적용 이력의 최고가 돼서
  * 다음 마이그레이션이 막힌다(`stack.md`). 여기서는 Flyway 이력이 안 더럽혀지고, **시드가 실제 서비스를 밟아서** 그 경로가 도는지도 같이 확인된다 —
  * 좌석 복제(9)·정책 박제(27)·등급 매핑(11)이 한 번씩 돈다.
  *
  * 대신 **멱등을 스스로 든다.** Flyway 가 공짜로 주던 「한 번만」이 없어서, 표식 기획사가 이미 있으면 통째로 건너뛴다.
+ * 그 검사는 삽입과 같은 트랜잭션이라 **순차 실행에서만 성립한다** — 둘이 같이 뜨면 둘 다 「없다」를 본다.
+ * 데모가 두 벌 들어가지는 않는다(`organizer.code` 가 유일이라 진 쪽 기동이 실패한다). `local` 한 대짜리라 여기까지만 든다.
  *
  * 공연장·홀·좌석은 SQL 로 넣는다 — 그것을 만드는 입구가 아직 없다(관리자 몫). 2천 석을 `generate_series` 한 문장으로 넣는 이유는
  * 행마다 왕복하면 2천 번이고 그 사이 트랜잭션이 열려 있어서다(`PerformanceOpenService.copySeats` 와 같은 판단).

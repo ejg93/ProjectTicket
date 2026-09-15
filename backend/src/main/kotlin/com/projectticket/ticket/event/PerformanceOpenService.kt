@@ -19,8 +19,6 @@ class PerformanceOpenService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val policies: SettlementPolicyQuery,
-    /** 입구(11)가 소속을 볼 때 쓴다. 이 서비스가 직접 안 쓰는 것은 여는 일 자체에 권한 판단이 없어서다 */
-    val membership: OrganizerMembership,
 ) {
 
     @Transactional

@@ -42,24 +42,44 @@ class PerformanceCancelService(
         if (cancelled == 0) throw cannotCancel(performanceId)
 
         // 살아있는 예매 전부 — `held`·`paying` 은 돈이 안 움직였고 `reserved` 는 환불이 따라온다.
-        val affected = jdbc.sql(
+        // **id 오름차순으로 먼저 잠근다**(`D4` 「다중 행」) — 선점·결제가 예매 하나씩 잡는 사이에 이쪽이 임의 순서로 잡으면 교착이다.
+        val locked = jdbc.sql(
             """
-            update reservation
-               set status = :cancelled, cancelled_at = now(), paying_until = null
+            select reservation_id
+              from reservation
              where performance_id = :id and status in (:live)
-            returning reservation_id, status
+             order by reservation_id
+               for update
             """,
         )
-            .param("cancelled", ReservationStatus.CANCELLED.code)
             .param("id", performanceId)
             .param("live", LIVE_STATUSES)
-            .query { rs, _ -> rs.getLong("reservation_id") }
+            .query(Long::class.java)
             .list()
             .filterNotNull()
 
+        val affected = if (locked.isEmpty()) {
+            emptyList()
+        } else {
+            jdbc.sql(
+                """
+                update reservation
+                   set status = :cancelled, cancelled_at = now(), paying_until = null
+                 where reservation_id in (:ids) and status in (:live)
+                returning reservation_id
+                """,
+            )
+                .param("cancelled", ReservationStatus.CANCELLED.code)
+                .param("ids", locked)
+                .param("live", LIVE_STATUSES)
+                .query(Long::class.java)
+                .list()
+                .filterNotNull()
+        }
+
         if (affected.isNotEmpty()) {
             releaseSeats(performanceId)
-            refundInFull(performanceId)
+            refundInFull(affected)
             affected.forEach {
                 auditLog.record(AuditLog.Kind.OUTCOME, "reservation.cancelled", actorAccountId, AuditLog.Target.of("reservation", it))
             }
@@ -107,25 +127,34 @@ class PerformanceCancelService(
             .update()
 
     /**
-     * 확정된 예매의 승인 결제에 **전액 환불 행**을 만든다(`D6` 「사유별」 — 구간과 무관하게 0%).
+     * **이번에 무른 예매**의 승인 결제에 전액 환불 행을 만든다(`D6` 「사유별」 — 구간과 무관하게 0%).
      *
-     * `days_before` 는 0 을 넣는다 — 관객이 고른 시점이 아니라 회차가 사라진 것이라 구간을 안 탄다.
-     * `refund_full_for_non_audience_check`(`V10`)가 `reason <> 'audience'` 면 율·수수료가 0 이어야 한다고 이미 막는다.
+     * **회차가 아니라 예매 id 로 좁힌다.** 회차로 좁히면 `expired` 인데 승인 결제만 남은 건(16 의 `payment_late` — 환불 행은 `17b` ⓑ 몫)도
+     * 걸려 들어, 같은 승인에 PG 취소와 환불이 두 번 나간다.
+     *
+     * `days_before` 는 **취소 시점의 KST 달력일 차**를 넣는다(`D6` 「환불 행」 — 박제). 회차 취소는 구간을 안 타지만
+     * 그 열의 뜻은 「언제 무른 것인가」라, 0 을 박으면 구간표에서 0 이 가진 뜻(당일 — 취소 불가)과 섞인다.
+     * 율·수수료가 0 이어야 하는 것은 `refund_full_for_non_audience_check`(`V10`)가 이미 든다.
      *
      * 이미 환불된 결제(관객이 먼저 취소)는 `on conflict do nothing` 으로 건너뛴다 — 결제당 환불은 하나다.
      */
-    private fun refundInFull(performanceId: Long) =
+    private fun refundInFull(reservationIds: List<Long>) =
         jdbc.sql(
             """
             insert into refund (payment_id, reason, days_before, tier_rate, fee_amount, refund_amount)
-            select pm.payment_id, :reason, 0, 0, 0, pm.amount
-              from payment pm join reservation r on r.reservation_id = pm.reservation_id
-             where r.performance_id = :id and pm.status = :approved
+            select pm.payment_id,
+                   :reason,
+                   greatest(0, (p.starts_at at time zone 'Asia/Seoul')::date - (now() at time zone 'Asia/Seoul')::date),
+                   0, 0, pm.amount
+              from payment pm
+              join reservation r on r.reservation_id = pm.reservation_id
+              join performance p on p.performance_id = r.performance_id
+             where r.reservation_id in (:ids) and pm.status = :approved
             on conflict (payment_id) do nothing
             """,
         )
             .param("reason", REASON_PERFORMANCE_CANCELLED)
-            .param("id", performanceId)
+            .param("ids", reservationIds)
             .param("approved", PaymentStatus.APPROVED.code)
             .update()
 

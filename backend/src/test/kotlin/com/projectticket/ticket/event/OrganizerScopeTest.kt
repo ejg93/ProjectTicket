@@ -98,7 +98,8 @@ class OrganizerScopeTest : PostgresTestBase() {
         // 403 이면 「그 기획사가 있다」가 샌다. 남의 것은 없는 것이다(`D5` 「403 이냐 404 냐」).
         createEvent(stranger, myOrganizer).andExpect {
             status { isNotFound() }
-            jsonPath("$.type") { value("tag:projectticket.example,2026:event-not-found") }
+            // 공연이 아직 없는 입구라 이름도 기획사다 — `event-not-found` 는 「없거나 남의 공연」이 가진 이름이다.
+            jsonPath("$.type") { value("tag:projectticket.example,2026:organizer-not-found") }
         }
     }
 
@@ -119,10 +120,33 @@ class OrganizerScopeTest : PostgresTestBase() {
             json.readTree(it.contentAsString)["performance_id"].asLong()
         }
 
-        mvc.post("/api/organizer/performances/$performanceId/open") { with(user(stranger)); with(csrf()) }
-            .andExpect { status { isNotFound() } }
-        mvc.post("/api/organizer/performances/$performanceId/cancel") { with(user(stranger)); with(csrf()) }
-            .andExpect { status { isNotFound() } }
+        // **없는 회차와 이름이 같아야 한다.** 404 를 줘도 `type` 이 갈리면 번호를 훑어 「그 회차는 있다」를 알아낸다.
+        val missing = performanceId + 1_000_000
+        listOf("open", "cancel").forEach { action ->
+            mvc.post("/api/organizer/performances/$performanceId/$action") { with(user(stranger)); with(csrf()) }
+                .andExpect {
+                    status { isNotFound() }
+                    jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-found") }
+                }
+            mvc.post("/api/organizer/performances/$missing/$action") { with(user(stranger)); with(csrf()) }
+                .andExpect {
+                    status { isNotFound() }
+                    jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-found") }
+                }
+        }
+    }
+
+    @Test
+    fun the_same_hall_at_the_same_time_is_a_conflict() {
+        val eventId = createdEvent(mine, myOrganizer)
+        val startsAt = OffsetDateTime.now().plusDays(30)
+        createPerformance(mine, eventId, startsAt).andExpect { status { isCreated() } }
+
+        // 형식은 맞는데 그 자리가 이미 찼다 — 409 다(`D5`). `validation-failed` 는 `errors[]` 를 약속하는 이름이라 여기 안 쓴다.
+        createPerformance(mine, eventId, startsAt).andExpect {
+            status { isConflict() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:performance-slot-taken") }
+        }
     }
 
     @Test
@@ -161,14 +185,18 @@ class OrganizerScopeTest : PostgresTestBase() {
             )
         }
 
-    private fun createPerformance(as_: TicketUser, eventId: Long): ResultActionsDsl =
+    private fun createPerformance(
+        as_: TicketUser,
+        eventId: Long,
+        startsAt: OffsetDateTime = OffsetDateTime.now().plusDays(8),
+    ): ResultActionsDsl =
         mvc.post("/api/organizer/events/$eventId/performances") {
             with(user(as_)); with(csrf())
             contentType = MediaType.APPLICATION_JSON
             content = json.writeValueAsString(
                 mapOf(
                     "hall_id" to hallId,
-                    "starts_at" to OffsetDateTime.now().plusDays(8).toString(),
+                    "starts_at" to startsAt.toString(),
                     "sales_open_at" to OffsetDateTime.now().minusDays(1).toString(),
                 ),
             )

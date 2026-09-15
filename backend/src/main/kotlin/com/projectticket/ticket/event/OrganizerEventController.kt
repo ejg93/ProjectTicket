@@ -32,6 +32,7 @@ import java.time.OffsetDateTime
 class OrganizerEventController(
     private val eventService: OrganizerEventService,
     private val openService: PerformanceOpenService,
+    private val membership: OrganizerMembership,
 ) {
 
     @PostMapping("/events")
@@ -64,7 +65,6 @@ class OrganizerEventController(
     /** 좌석 복제가 여기서 일어난다(9). 200 인 이유는 자원을 만드는 것이 아니라 **상태를 옮기는 것**이라서다(`D5` 「메서드와 동작」) */
     @PostMapping("/performances/{performanceId}/open")
     fun open(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): OpenedPerformance {
-        val membership = openService.membership
         membership.requirePerformance(user.id, performanceId)
         return OpenedPerformance(performanceId, openService.open(performanceId, user.id))
     }

@@ -13,6 +13,8 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * 기획사가 회차를 취소하면 **판 것까지 무른다**(17a, `D3`·`D6`). 자동 종료(16a)가 `reserved` 를 안 건드리는 것과 반대 자리다.
@@ -29,6 +31,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
     @Autowired lateinit var openService: PerformanceOpenService
+    @Autowired lateinit var txManager: PlatformTransactionManager
 
     private lateinit var fixture: EventFixture
     private var eventId: Long = 0
@@ -56,7 +59,9 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         assertThat(reservationStatus(reservationId)).isEqualTo("cancelled")
         // 구간과 무관하게 전액이다(`D6` 「사유별」) — 관객이 고른 시점이 아니라 회차가 사라진 것이다.
         val refund = refundOf(reservationId)
-        assertThat(refund).isEqualTo(Refund("performance_cancelled", 0, 0, 308_000, "requested"))
+        // `days_before` 는 **무른 시점의 달력일 차**다(`D6` 「환불 행」). 구간을 안 타는 것과 「언제 물렀나」를 안 적는 것은 다른 얘기고,
+        // 0 은 구간표에서 「당일 — 취소 불가」가 가진 값이라 거기에 섞으면 안 된다.
+        assertThat(refund).isEqualTo(Refund("performance_cancelled", 8, 0, 308_000, "requested"))
         assertThat(freeSeatCount()).isEqualTo(4)
     }
 
@@ -135,6 +140,27 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
                 assertThat(e.code).isEqualTo(ErrorCode.INVALID_TRANSITION)
                 assertThat(e.properties).containsEntry("from", "closed")
             })
+    }
+
+    /**
+     * **한 트랜잭션이라는 것을 직접 잰다**(17a 의 강제 지점). 바깥 트랜잭션에 얹어 되돌리면 `cancel` 이 `REQUIRED` 라 같은 트랜잭션이고,
+     * 하나라도 살아남으면 그 자리가 갈라져 있다는 뜻이다.
+     */
+    @Test
+    fun a_rollback_takes_the_event_with_it() {
+        val buyer = fixture.account("${PREFIX}rollback@test.local")
+        val reservationId = reserve(buyer, seats = 1)
+
+        TransactionTemplate(txManager).execute { status ->
+            cancelService.cancel(performanceId, actorAccountId = null)
+            status.setRollbackOnly()
+        }
+
+        assertThat(statusOf()).isEqualTo("open")
+        assertThat(reservationStatus(reservationId)).isEqualTo("reserved")
+        assertThat(refundCount()).isZero()
+        // 사건만 남으면 안 무른 예매에 취소 메일이 가고 정산이 취소를 예약한다.
+        assertThat(eventCount()).isZero()
     }
 
     @Test

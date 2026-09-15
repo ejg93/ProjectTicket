@@ -84,7 +84,9 @@ class OrganizerEventService(
                 .query(Long::class.java)
                 .single()
         } catch (e: DuplicateKeyException) {
-            throw TicketException(ErrorCode.VALIDATION_FAILED, "같은 홀에 같은 시각의 회차가 이미 있다")
+            // `performance_hall_slot_key`(`V18`)가 막은 것이다. 형식은 맞는데 그 홀의 그 시각이 이미 찼으므로 409 다(`D5` 상태 코드 표) —
+            // `validation-failed` 는 Bean Validation 몫이고 그 계약이 `errors[{field, message}]` 라, 여기 쓰면 화면이 못 찾는 칸을 약속한다.
+            throw TicketException(ErrorCode.PERFORMANCE_SLOT_TAKEN)
         }
 
         auditLog.record(

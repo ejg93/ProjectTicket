@@ -86,19 +86,26 @@ class NotificationStore(private val jdbc: JdbcClient) {
 
     /**
      * **수신자가 여럿인 유일한 사건**(`D11`). 사건은 회차 id 만 나르고 예매자는 여기서 표를 읽는다 —
-     * 그래서 `(event_id, account_id)` 가 멱등의 키다. 한 계정이 예매를 둘 했으면 메일도 둘이다(각 예매의 좌석·금액이 다르다).
+     * 그래서 `(event_id, account_id)` 가 멱등의 키다.
+     *
+     * **계정마다 한 통이라 금액을 계정 단위로 합친다.** 한 계정이 이 회차에 예매를 둘 했어도 키가 계정이라 둘째 `insert` 는
+     * `do nothing` 이다 — 예매마다 한 행을 내면 둘째 예매의 환불액이 소리 없이 사라진다.
+     *
+     * **관객이 먼저 취소한 예매도 `cancelled` 라 여기 섞인다**(24a). 그쪽은 수수료를 뗀 부분 환불인데 문구가 「전액」이라 틀린다 —
+     * 예매에 「무엇이 물렀나」가 없어서 지금은 못 가른다.
      */
     private fun recordPerformanceCancelled(envelope: OutboxRelay.Envelope) {
         val performanceId = envelope.aggregateId
         val performance = performanceLineOf(performanceId)
         jdbc.sql(
             """
-            select r.reservation_id, r.account_id, coalesce(rf.refund_amount, 0) as refund_amount
+            select r.account_id, coalesce(sum(rf.refund_amount), 0)::int as refund_amount
               from reservation r
               left join payment pm on pm.reservation_id = r.reservation_id and pm.status = 'approved'
               left join refund rf on rf.payment_id = pm.payment_id
              where r.performance_id = :id and r.status = 'cancelled'
-             order by r.reservation_id
+             group by r.account_id
+             order by r.account_id
             """,
         ).param("id", performanceId).query(CancelledLine::class.java).list().filterNotNull()
             .forEach {
@@ -114,7 +121,7 @@ class NotificationStore(private val jdbc: JdbcClient) {
             NotificationTemplates.PerformanceLine(it.title, it.startsAt)
         }
 
-    data class CancelledLine(val reservationId: Long, val accountId: Long, val refundAmount: Int)
+    data class CancelledLine(val accountId: Long, val refundAmount: Int)
 
     private fun accountId(envelope: OutboxRelay.Envelope): Long = (envelope.payload["account_id"] as Number).toLong()
 

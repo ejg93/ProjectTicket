@@ -34,7 +34,7 @@ refund_amount = payment.amount − fee_amount
 |---|---|
 | `payment_id` | 어느 결제를 되돌리나. **결제당 환불은 하나**(유일) |
 | `reason` | `audience`(관객 취소) · `performance_cancelled`(회차 취소, 17a) · `payment_late`(승인이 늦어 좌석을 못 준 것, 16) |
-| `days_before` | 취소 시점의 달력일 차. **박제** |
+| `days_before` | 취소 시점의 달력일 차. **박제**. 구간을 안 타는 사유(회차 취소·승인 지연)도 실값을 적는다 — 이 열은 「언제 물렀나」고 0 은 구간표에서 「당일」이 쓰는 값이라 섞이면 안 된다 |
 | `tier_rate` | 적용한 율. **박제** — 구간표를 개정해도 지난 환불이 안 바뀐다 |
 | `fee_amount` · `refund_amount` | 계산 결과. 박제 |
 | `status` | `requested → done`. 모의 PG 라 즉시 |
