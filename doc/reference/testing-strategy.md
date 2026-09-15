@@ -92,6 +92,7 @@ HTTP 층으로 올리는 것과 다르다 — 서블릿이 필요한 게 아니�
 
 ```
 @SpringBootTest        (@Transactional 없음)
+@AutoConfigureMockMvc  (안 쓰지만 컨텍스트 캐시 키를 PostgresTestBase 와 맞춘다)
 @Tag("db")
 @Import(PostgresTestBase.Containers::class)
 abstract class ConcurrencyTestBase
@@ -101,7 +102,8 @@ abstract class ConcurrencyTestBase
 |---|---|
 | 각 스레드가 **서비스를 직접** 부른다. 서비스의 `@Transactional` 이 스레드마다 자기 트랜잭션을 연다 | MockMvc 는 스레드 안전이 보장되지 않고 필요하지도 않다 — 재는 것은 SQL 의 경합이다 |
 | **출발선을 맞춘다** — `CountDownLatch` 로 다 모아 두고 한 번에 놓는다 | 스레드를 만드는 시간이 선점 하나보다 길어서, 그냥 띄우면 먼저 만들어진 스레드가 혼자 끝낸다 |
-| **만든 것을 직접 지운다.** 계정 이메일에 접두사(`concurrency-`)를 붙이고 그것만 지운다 | 남의 층이 만든 것을 지우면 그쪽이 조용히 깨진다 |
+| `runConcurrently(n)` 이 그 일을 하고 스레드별 `Result` 를 돌려준다. 커넥션 풀은 기본 10 이라 DB 에는 열이 10 씩 들어간다 | 재는 것은 스레드 수가 아니라 같은 행을 두 트랜잭션이 동시에 건드릴 때 DB 가 어떻게 하나다. 풀을 키우면 속성 때문에 컨텍스트가 갈린다 |
+| **만든 것을 직접 지운다.** 계정 이메일·기획사 코드·공연장 이름에 접두사(`concurrency-`)를 붙이고 그것만 지운다. `ConcurrencyTestBaseTest` 가 바탕 자체를 잰다 | 남의 층이 만든 것을 지우면 그쪽이 조용히 깨진다 |
 | 정리를 **한 트랜잭션**으로, **시작할 때도 한 번** | 합계 등식이 지연 트리거라 자식만 지운 채 커밋되면 터진다. 앞선 실행이 죽으면 재사용 컨테이너에 데이터가 남는다 |
 | 회차·좌석은 테스트가 만든다. 시드를 안 쓴다 | 시드 좌석을 잡으면 정리가 시드를 지운다 |
 
