@@ -55,15 +55,18 @@ abstract class ConcurrencyTestBase {
                     select event_id from event where organizer_id in (
                         select organizer_id from organizer where code like :prefix))
             """
-            jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_id in ($performances)")
-                .param("prefix", "$PREFIX%").update()
-            jdbc.sql(
-                """
-                delete from reservation
+            val reservations = """
+                select reservation_id from reservation
                  where performance_id in ($performances)
                     or account_id in (select account_id from account where email like :prefix)
-                """,
-            ).param("prefix", "$PREFIX%").update()
+            """
+            jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_id in ($performances)")
+                .param("prefix", "$PREFIX%").update()
+            // 환불 → 결제 → 예매. 셋 다 `restrict` 라 자식부터다.
+            jdbc.sql("delete from refund where payment_id in (select payment_id from payment where reservation_id in ($reservations))")
+                .param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from payment where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from reservation where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from performance where performance_id in ($performances)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from event where organizer_id in (select organizer_id from organizer where code like :prefix)")
                 .param("prefix", "$PREFIX%").update()

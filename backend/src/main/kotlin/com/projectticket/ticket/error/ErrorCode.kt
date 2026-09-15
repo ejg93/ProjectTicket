@@ -43,6 +43,7 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 전이(`D3`). `hold-expired` 는 `invalid-transition` 의 특수형 — 화면이 「다시 고르세요」로 가른다(`D5`).
     INVALID_TRANSITION(HttpStatus.CONFLICT, "invalid-transition", "지금 상태에서 할 수 없다"),
     HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
+    CANCEL_WINDOW_CLOSED(HttpStatus.CONFLICT, "cancel-window-closed", "관람일 당일이라 취소할 수 없다"),
 
     // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),

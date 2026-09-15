@@ -79,6 +79,23 @@ class MockPaymentGateway {
 
     fun isCancelled(approvalNumber: String): Boolean = approvalNumber in cancelledApprovals
 
+    /** @param refundNumber PG 가 채번한 환불 거래번호 */
+    data class RefundResult(val refundNumber: String)
+
+    /** 이미 돌려준 환불. 키는 우리 환불 id 다 */
+    private val refundsByKey = ConcurrentHashMap<String, RefundResult>()
+
+    /**
+     * 승인된 결제의 전부 또는 일부를 돌려준다. **거절이 없다** — 승인은 카드 한도 판정이라 거절이 정상 결과지만, 환불은 이미 받은 돈을
+     * 돌려주는 것이라 결제사가 거부할 사유가 없다. 상한 검사는 우리 쪽(`refund_amounts_check_trigger`)이다.
+     *
+     * 멱등키는 우리 환불 id 다. 승인과 같은 이유로 필요하다 — 호출이 트랜잭션 밖이라 재시도가 두 번 환불할 구간이 열리고, PG 가 같은 키에 같은 답을 줘서 닫는다.
+     */
+    fun refund(refundKey: String, amount: Int): RefundResult {
+        require(amount >= 0) { "환불 금액이 음수다" }
+        return refundsByKey.computeIfAbsent(refundKey) { RefundResult("MR%d%04d".format(System.currentTimeMillis(), random.nextInt(10_000))) }
+    }
+
     private fun approved(last4: String) = Result(issueApprovalNumber(), last4, null)
 
     /** 시각을 앞에 둬서 재기동해도 안 겹친다 — 일련번호만 쓰면 다시 뜬 뒤 1번부터라 `payment_approval_number_key` 에 걸린다 */
