@@ -38,6 +38,7 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     SEAT_NOT_IN_PERFORMANCE(HttpStatus.UNPROCESSABLE_CONTENT, "seat-not-in-performance", "이 회차의 좌석이 아니다"),
     OVER_LIMIT(HttpStatus.UNPROCESSABLE_CONTENT, "over-limit", "한 번에 잡을 수 있는 좌석 수를 넘었다"),
     RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "reservation-not-found", "그런 예매가 없다"),
+    DUPLICATE_HOLD(HttpStatus.CONFLICT, "duplicate-hold", "이 회차에 살아있는 선점이 이미 있다"),
 
     // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),

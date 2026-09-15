@@ -55,7 +55,23 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             )
         }
 
+        // 회차당 매수(ADR 0003). 살아있는 예매(held·paying·reserved)의 좌석 수에 이번 요청을 더해 본다.
+        // 앱 검증인데 경합에 안전한 이유는 `reservation_live_hold_idx`(`V8`) — 같은 계정의 둘째 선점은 첫째가 끝날 때까지 insert 에서 기다린다.
+        val alreadyHeld = seatsHeldBy(accountId, command.performanceId)
+        if (alreadyHeld + seatIds.size > MAX_SEATS_PER_PERFORMANCE) {
+            throw TicketException(
+                ErrorCode.OVER_LIMIT,
+                "회차당 ${MAX_SEATS_PER_PERFORMANCE}매까지다: 이미 ${alreadyHeld}매, 요청 ${seatIds.size}매",
+                mapOf("limit" to MAX_SEATS_PER_PERFORMANCE, "requested" to alreadyHeld + seatIds.size),
+            )
+        }
+
         val reservationId = insertReservation(accountId, command.performanceId, seatIds)
+            ?: throw TicketException(
+                ErrorCode.DUPLICATE_HOLD,
+                "이 회차에 살아있는 선점이 이미 있다",
+                mapOf("reservation_id" to liveReservationOf(accountId, command.performanceId)),
+            )
 
         val locked = lockInIdOrder(command.performanceId, seatIds)
         if (locked.size != seatIds.size) {
@@ -101,17 +117,52 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             .optional()
             .orElseThrow { TicketException(ErrorCode.PERFORMANCE_NOT_FOUND) }
 
+    /** 이 계정이 이 회차에 살아있는 예매로 쥔 좌석 수. `expired`·`cancelled` 는 안 센다 — 좌석이 돌아갔다 */
+    private fun seatsHeldBy(accountId: Long, performanceId: Long): Int =
+        jdbc.sql(
+            """
+            select count(*)
+              from reservation_seat rs
+              join reservation r on r.reservation_id = rs.reservation_id
+             where r.account_id = :account and r.performance_id = :performance
+               and r.status in (:live)
+            """,
+        )
+            .param("account", accountId)
+            .param("performance", performanceId)
+            .param("live", LIVE_STATUSES)
+            .query(Int::class.java)
+            .single()
+
+    private fun liveReservationOf(accountId: Long, performanceId: Long): Long? =
+        jdbc.sql(
+            "select reservation_id from reservation where account_id = :account and performance_id = :performance and status in (:live)",
+        )
+            .param("account", accountId)
+            .param("performance", performanceId)
+            .param("live", listOf(ReservationStatus.HELD.code, ReservationStatus.PAYING.code))
+            .query(Long::class.java)
+            .optional()
+            .orElse(null)
+
     /**
      * 합계는 요청한 좌석의 박제 가격 합이다. 다른 회차의 id 가 섞이면 합이 작게 나오지만 그 요청은 아래 잠금 단계에서 죽고,
      * 그래도 어긋난 채 커밋되려 하면 `reservation_total_check` 가 막는다.
+     *
+     * @return 살아있는 선점이 이미 있으면 null. `on conflict … do nothing` 이라 트랜잭션이 어보트되지 않고, 그래서 뒤이어 그 예매 id 를 읽을 수 있다 —
+     *   예외로 받으면 `25P02` 라 다음 문장이 못 돈다.
+     *
+     * `on conflict` 의 `where` 에 상태를 **리터럴로** 쓴다(`D14` 「SQL」의 예외). 바인딩하면 플래너가 부분 인덱스의 조건과 같다는 것을 못 증명해서
+     * 「matching constraint 가 없다」로 죽는다. 인덱스 조건(`V8`)과 글자까지 같아야 한다.
      */
-    private fun insertReservation(accountId: Long, performanceId: Long, seatIds: List<Long>): Long =
+    private fun insertReservation(accountId: Long, performanceId: Long, seatIds: List<Long>): Long? =
         jdbc.sql(
             """
             insert into reservation (account_id, performance_id, total_amount, held_until)
             select :account, :performance, coalesce(sum(price), 0), now() + make_interval(mins => :minutes)
               from performance_seat
              where performance_id = :performance and performance_seat_id in (:seatIds)
+            on conflict (account_id, performance_id) where status in ('held', 'paying') do nothing
             returning reservation_id
             """,
         )
@@ -120,7 +171,8 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             .param("seatIds", seatIds)
             .param("minutes", HOLD_MINUTES)
             .query(Long::class.java)
-            .single()
+            .optional()
+            .orElse(null)
 
     /**
      * **id 오름차순으로 먼저 잠근다.** 한 문장 `update … where id in (…)` 은 잠그는 순서를 보장하지 않아서,
@@ -182,8 +234,13 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             .update()
 
     companion object {
-        /** ADR 0003 — 한 번에 고르는 좌석은 4석. 회차당 4매 상한은 15 가 따로 건다 */
+        /** ADR 0003 — 한 번에 고르는 좌석은 4석 */
         const val MAX_SEATS_PER_HOLD = 4
+
+        /** ADR 0003 — 회차당 계정당 4매. 살아있는 예매(held·paying·reserved)의 좌석을 센다 */
+        const val MAX_SEATS_PER_PERFORMANCE = 4
+
+        private val LIVE_STATUSES = listOf(ReservationStatus.HELD.code, ReservationStatus.PAYING.code, ReservationStatus.RESERVED.code)
 
         /** ADR 0003 — 선점 5분. 만료 시각은 DB 가 계산한다(`D7`) */
         const val HOLD_MINUTES = 5
