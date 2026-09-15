@@ -117,6 +117,17 @@ class PerformanceStateTest : PostgresTestBase() {
     }
 
     @Test
+    fun grade_cannot_move_to_another_event() {
+        val grade = fixture.grade(eventId, "VIP", 154_000)
+        val otherEvent = fixture.event(fixture.organizer("other-org"), "다른 공연")
+
+        // 등급이 공연을 옮기면 그 등급을 가리키는 구역 매핑과 박제된 좌석이 남의 공연 값이 된다.
+        assertThatThrownBy {
+            jdbc.sql("update seat_grade set event_id = :other where seat_grade_id = :id").param("other", otherEvent).param("id", grade).update()
+        }.hasStackTraceContaining("등급의 소속 공연은 고칠 수 없다")
+    }
+
+    @Test
     fun section_can_be_mapped_once_per_event() {
         val vip = fixture.grade(eventId, "VIP", 154_000)
         val r = fixture.grade(eventId, "R", 121_000)

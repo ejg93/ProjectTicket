@@ -127,6 +127,23 @@ class ReservationCancelTest : PostgresTestBase() {
     }
 
     @Test
+    fun one_payment_gets_one_refund() {
+        val reservationId = reserved(startsInDays = 8)
+        cancel(reservationId).andExpect { status { isOk() } }
+        val paymentId = jdbc.sql("select payment_id from payment where reservation_id = :id").param("id", reservationId).query(Long::class.java).single()
+
+        // 결제당 환불은 하나다(`D6`). 둘이면 같은 돈이 두 번 나간다 — `refund_payment_id_key`.
+        assertThatThrownBy {
+            jdbc.sql(
+                """
+                insert into refund (payment_id, reason, days_before, tier_rate, fee_amount, refund_amount)
+                values (:payment, 'audience', 8, 0.10, 30800, 277200)
+                """,
+            ).param("payment", paymentId).update()
+        }.hasStackTraceContaining("refund_payment_id_key")
+    }
+
+    @Test
     fun non_audience_reason_must_be_full_refund() {
         val reservationId = reserved(startsInDays = 8)
         val paymentId = jdbc.sql("select payment_id from payment where reservation_id = :id").param("id", reservationId).query(Long::class.java).single()
