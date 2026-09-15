@@ -32,54 +32,41 @@ class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog
     )
 
     /**
-     * ① 예매 행을 잠그고 읽는다 — 안 잠그면 동시에 두 번 취소할 때 둘 다 `reserved` 를 보고 환불 행을 둘 만들려다 진 쪽이 `refund_payment_id_key` 로 500 이 된다.
-     * 잠근 뒤의 상태 갱신은 그래도 조건부다(`D14` 「좌석 상태를 바꾸는 것은 조건부 UPDATE」).
+     * ① 조건부 UPDATE 가 먼저다(`D4` — `select` 로 먼저 확인하지 않는다). `reserved` 인 행만 `cancelled` 로 옮기고 관람일과 지금 시각을 같이 받는다.
+     * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 그 밖의 상태 → 409 `invalid-transition`.
+     * 당일이면 그 뒤에 던진다 — 예외가 이 트랜잭션을 통째로 되돌리므로 옮긴 상태도 사라진다.
      */
     @Transactional
     fun request(accountId: Long, reservationId: Long): Requested {
-        val target = jdbc.sql(
+        val cancelled = jdbc.sql(
             """
-            select r.reservation_id, r.status, p.starts_at, now() as cancelled_at
-              from reservation r
-              join performance p on p.performance_id = r.performance_id
-             where r.reservation_id = :id and r.account_id = :account
-               for update of r
+            update reservation r
+               set status = :cancelled, cancelled_at = now()
+              from performance p
+             where p.performance_id = r.performance_id
+               and r.reservation_id = :id and r.account_id = :account and r.status = :reserved
+            returning p.starts_at, now() as cancelled_at
             """,
         )
+            .param("cancelled", ReservationStatus.CANCELLED.code)
+            .param("reserved", ReservationStatus.RESERVED.code)
             .param("id", reservationId)
             .param("account", accountId)
-            .query(Target::class.java)
+            .query(Cancelled::class.java)
             .optional()
-            .orElseThrow { TicketException(ErrorCode.RESERVATION_NOT_FOUND) }
+            .orElseThrow { cannotCancel(accountId, reservationId) }
 
-        if (target.status != ReservationStatus.RESERVED.code) {
-            throw TicketException(
-                ErrorCode.INVALID_TRANSITION,
-                "취소할 수 없는 상태다: ${target.status}",
-                mapOf("from" to target.status, "action" to "cancel"),
-            )
-        }
-
-        val daysBefore = RefundPolicy.daysBefore(target.startsAt, target.cancelledAt)
+        val daysBefore = RefundPolicy.daysBefore(cancelled.startsAt, cancelled.cancelledAt)
         val rate = tierRateFor(daysBefore)
             ?: throw TicketException(
                 ErrorCode.CANCEL_WINDOW_CLOSED,
-                "관람일 당일이라 취소할 수 없다: starts_at=${target.startsAt}",
-                mapOf("starts_at" to target.startsAt),
+                "관람일 당일이라 취소할 수 없다: starts_at=${cancelled.startsAt}",
+                mapOf("starts_at" to cancelled.startsAt),
             )
 
         val payment = approvedPaymentOf(reservationId)
         val fee = RefundPolicy.fee(payment.amount, rate)
         val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, payment.amount - fee)
-
-        val cancelled = jdbc.sql(
-            "update reservation set status = :cancelled, cancelled_at = now() where reservation_id = :id and status = :reserved",
-        )
-            .param("cancelled", ReservationStatus.CANCELLED.code)
-            .param("reserved", ReservationStatus.RESERVED.code)
-            .param("id", reservationId)
-            .update()
-        check(cancelled == 1) { "잠근 예매가 사이에 바뀌었다: reservation_id=$reservationId" }
 
         jdbc.sql(
             "update performance_seat set status = :available, held_until = null, reservation_id = null where reservation_id = :id and status = :reserved",
@@ -97,6 +84,16 @@ class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog
             mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to payment.amount - fee),
         )
         return Requested(refundId, reservationId, payment.paymentId, daysBefore, rate, fee, payment.amount - fee)
+    }
+
+    private fun cannotCancel(accountId: Long, reservationId: Long): TicketException {
+        val status = jdbc.sql("select status from reservation where reservation_id = :id and account_id = :account")
+            .param("id", reservationId)
+            .param("account", accountId)
+            .query(String::class.java)
+            .optional()
+            .orElse(null) ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
+        return TicketException(ErrorCode.INVALID_TRANSITION, "취소할 수 없는 상태다: $status", mapOf("from" to status, "action" to "cancel"))
     }
 
     /** ③ 환불이 나갔다. 조건부라 두 번 와도 둘째는 0행이다 */
@@ -157,12 +154,12 @@ class RefundTransitionService(private val jdbc: JdbcClient, private val auditLog
             .query(Long::class.java)
             .single()
 
-    data class Target(val reservationId: Long, val status: String, val startsAt: OffsetDateTime, val cancelledAt: OffsetDateTime)
+    data class Cancelled(val startsAt: OffsetDateTime, val cancelledAt: OffsetDateTime)
 
     data class ApprovedPayment(val paymentId: Long, val amount: Int)
 
     companion object {
-        /** `refund.reason` — 관객 취소. 회차 취소(17a)·승인 지연은 그 청크가 자기 값을 든다 */
+        /** `refund.reason` — 관객 취소. `performance_cancelled` 는 17a, `payment_late` 는 17b 가 든다 */
         const val REASON_AUDIENCE = "audience"
     }
 }

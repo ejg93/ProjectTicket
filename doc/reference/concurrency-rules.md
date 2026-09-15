@@ -103,7 +103,7 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 | 항목 | 값 |
 |---|---|
 | 만드는 쪽 | 클라이언트 |
-| 형식 | UUIDv4 |
+| 형식 | UUIDv4. 아니면 400 `validation-failed`(`IdempotencyKeys`) |
 | 전달 | `Idempotency-Key` 요청 헤더 |
 | 범위 | 계정별로 유일. 남의 키와 겹쳐도 상관없다 |
 | 보관 | 24시간 |
@@ -111,8 +111,8 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 | 어디에 | 요구 |
 |---|---|
 | `POST /api/performances/{id}/reservations`(선점, 13) | **필수.** 없으면 400 `validation-failed` |
-| `POST /api/reservations/{id}/payments`(결제, 16) | **필수** |
-| `POST /api/reservations/{id}/cancel`(취소, 17) | **안 받는다** — 이미 있는 자원의 상태를 옮기는 것이라 조건부 UPDATE 가 둘째 요청을 0행으로 끝낸다 |
+| `POST /api/reservations/{id}/payments`(결제, 16) | **필수.** 키 선점이 PG 호출 **뒤**(③)라 앞 요청이 PG 를 기다리는 동안 온 재전송은 `idempotency-in-progress` 가 아니라 ① 의 0행 → 409 `invalid-transition`(from=`paying`) 이다 |
+| `POST /api/reservations/{id}/cancel`(취소, 17) | **안 받는다** — 이미 있는 자원의 상태를 옮기는 것이라 조건부 UPDATE(`reserved → cancelled`)가 둘째 요청을 0행으로 끝내고, 0행은 409 `invalid-transition` 이다 |
 | 그 밖 | 안 받는다 |
 
 돈이나 좌석이 움직이는 `POST` 에만 건다. 전부에 걸면 클라이언트가 의미 없는 키를 만든다.
@@ -121,7 +121,7 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 
 ```
 키가 처음이다         → 선점하고 처리한다. 끝나면 응답 본문을 저장한다
-같은 키가 또 왔다     → 저장된 본문을 그대로 돌려준다 (상태 코드까지)
+같은 키가 또 왔다     → 저장된 본문을 그대로 돌려준다. 상태 코드는 안 저장한다 — 성공만 저장하고 입구마다 성공 코드가 하나라 입구가 안다
 같은 키가 처리 중이다 → 앞 요청이 끝날 때까지 기다린다. lock_timeout(2초)을 넘기면 409 `idempotency-in-progress`
 같은 키인데 본문이 다르다 → 422 `idempotency-key-reused`
 ```
@@ -133,7 +133,7 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 
 ## 스윕과 확정의 경합 — 상태로 푼다
 
-`D3` 의 `paying` 이 답이다. 스윕은 `held` 만 훑고, 결제가 시작되면 예매가 `paying` 이라 스윕의 조건부 UPDATE 가 0행이다.
+`D3` 의 `paying` 이 답이다. 스윕은 `held` 를 `held_until` 로, `paying` 을 `paying_until` 로 훑는다 — 결제가 시작되면 예매가 `paying` 이라 선점 만료 문장에 안 걸리고, 결제 타임아웃(3분)만 걸린다. 둘은 같은 스케줄러의 한 문장이다(14·16).
 
 ```sql
 -- 스윕 (14). 둘 다 조건부라 두 번 돌아도 둘째는 0행이다
@@ -146,7 +146,7 @@ update performance_seat set status = 'available', held_until = null, reservation
 ```
 
 **결제 승인도 조건부다** — `where status = 'paying' and paying_until >= now()`. 0행이면 승인을 받았어도 좌석을 못 주는 것이고,
-그때는 모의 PG 에 취소를 보내고 `payment_late` 사건을 감사에 남긴다(16). 실제 PG 라면 여기가 자동 환불 자리다.
+그때는 `payment_late` 사건을 감사에 남기고(16) **되돌리는 것은 환불 행이다**(17b, `D6` 「사유별」) — PG 취소를 트랜잭션 안에서 부르지 않으려는 것이고, 되돌리는 통로가 둘이면 이중 반환이다.
 
 ## 스케줄러 — 인스턴스 여럿에서 하나만
 

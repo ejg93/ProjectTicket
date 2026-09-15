@@ -3,6 +3,9 @@ package com.projectticket.ticket.reservation
 import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
+import com.projectticket.ticket.payment.MockPaymentGateway
+import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.RefundTransitionService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -20,6 +23,9 @@ import org.springframework.transaction.support.TransactionTemplate
 class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
 
     @Autowired lateinit var seatHold: SeatHoldService
+    @Autowired lateinit var payments: PaymentTransitionService
+    @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var sweeper: HoldSweeper
     @Autowired lateinit var openService: PerformanceOpenService
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
@@ -36,7 +42,8 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         val hallId = fixture.hall(venueName = "${PREFIX}홀")
         fixture.seats(hallId, "F1-A", 3)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
-        performanceId = fixture.performance(eventId, hallId)
+        // 관람일이 넉넉해야 취소가 구간표에 걸린다(당일이면 409).
+        performanceId = fixture.performance(eventId, hallId, startsInDays = 8)
         openService.open(performanceId, actorAccountId = null)
         seatIds = fixture.performanceSeatIds(performanceId)
     }
@@ -54,6 +61,38 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         assertThat(recorded).isEqualTo(seatIds.take(2).toSet())
         assertThat(pointed).isEqualTo(recorded)
         assertThat(totalOf(reservationId)).isEqualTo(154_000 * 2)
+    }
+
+    /**
+     * `D4` 「두 표의 역할」 — 살아있는 예매(`held`·`paying`·`reserved`)에서 기록 집합 = 포인터 집합이고, 끝난 예매에서 포인터는 비고 기록은 남는다.
+     * **매 전이 뒤에** 본다. 전이 하나가 두 표를 고치는 자리 전부가 갈릴 수 있는 자리다.
+     */
+    @Test
+    fun record_and_pointer_sets_agree_after_every_transition() {
+        val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(2)))
+        val expected = seatIds.take(2).toSet()
+        assertThat(pointerSet(reservationId)).describedAs("held").isEqualTo(expected)
+
+        val paying = payments.startPaying(accountId, reservationId)
+        assertThat(pointerSet(reservationId)).describedAs("paying").isEqualTo(expected)
+
+        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        assertThat(pointerSet(reservationId)).describedAs("reserved").isEqualTo(expected)
+
+        refunds.request(accountId, reservationId)
+        assertThat(pointerSet(reservationId)).describedAs("cancelled — 포인터는 풀린다").isEmpty()
+        assertThat(recordSet(reservationId)).describedAs("cancelled — 기록은 남는다").isEqualTo(expected)
+    }
+
+    @Test
+    fun expired_reservation_keeps_its_record_but_no_pointer() {
+        val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(1)))
+        jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
+
+        sweeper.sweep()
+
+        assertThat(pointerSet(reservationId)).isEmpty()
+        assertThat(recordSet(reservationId)).isEqualTo(seatIds.take(1).toSet())
     }
 
     /**
@@ -131,6 +170,14 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
             }
         }.hasStackTraceContaining("멱등키에 응답이 안 붙었다")
     }
+
+    private fun pointerSet(reservationId: Long): Set<Long> =
+        jdbc.sql("select performance_seat_id from performance_seat where reservation_id = :id").param("id", reservationId)
+            .query(Long::class.java).list().filterNotNull().toSet()
+
+    private fun recordSet(reservationId: Long): Set<Long> =
+        jdbc.sql("select performance_seat_id from reservation_seat where reservation_id = :id").param("id", reservationId)
+            .query(Long::class.java).list().filterNotNull().toSet()
 
     private fun inTransaction(work: () -> Unit) = TransactionTemplate(transactionManager).executeWithoutResult { work() }
 

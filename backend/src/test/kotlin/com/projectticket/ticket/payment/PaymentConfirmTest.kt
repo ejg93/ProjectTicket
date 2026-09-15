@@ -108,7 +108,7 @@ class PaymentConfirmTest : PostgresTestBase() {
     fun no_response_is_recorded_as_failed_and_returns_to_held() {
         val paying = transitions.startPaying(accountId, hold(1))
 
-        val settled = transitions.settle(accountId, paying, verdict = null)
+        val settled = transitions.settle(accountId, paying, verdict = null, cardLast4 = "0001")
 
         assertThat(paymentRow(settled.paymentId)).isEqualTo("failed" to 154_000)
         assertThat(settled.reservationStatus).isEqualTo("held")

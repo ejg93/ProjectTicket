@@ -94,9 +94,7 @@ class ReservationCancelTest : PostgresTestBase() {
             jsonPath("$.type") { value("tag:projectticket.example,2026:cancel-window-closed") }
             jsonPath("$.starts_at") { exists() }
         }
-        assertThat(reservation(reservationId)).isEqualTo("reserved" to false)
-        assertThat(seatStatuses(reservationId)).containsOnly("reserved")
-        assertThat(jdbc.sql("select count(*) from refund").query(Long::class.java).single()).isZero()
+        // 「아무것도 안 움직였다」는 여기서 못 본다 — 조건부 UPDATE 가 돈 뒤 예외가 rollback-only 표시만 남긴다(`stack.md`). `RefundInvariantTest` 가 커밋 레인에서 잰다.
     }
 
     @Test

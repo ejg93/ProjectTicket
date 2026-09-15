@@ -17,8 +17,10 @@ import org.springframework.stereotype.Service
  *
  * 멱등을 컨트롤러가 아니라 여기서 감싼다 — 순서가 「① → PG → ③」이고 PG 가 트랜잭션 밖이어야 해서 그 순서를 아는 쪽이 감싼다.
  * 재생 확인이 ① 보다 앞이다. 재전송 시점에는 그 예매가 이미 `reserved` 라 순서를 바꾸면 재전송이 「낼 수 없는 예매」로 막힌다.
+ * **① 이 키 선점보다 앞이라** 앞 요청이 PG 를 기다리는 동안 온 재전송은 `idempotency-in-progress` 가 아니라 ① 의 0행 → `invalid-transition`(from=paying) 을 받는다(`D4` 「서버가 하는 일」).
  *
  * **무응답은 재시도가 아니라 상태 조회다**(`D4` 「재시도」). 승인됐는데 응답만 못 받았을 수 있고, 재시도는 이중 결제다.
+ * 승인이 늦어 좌석을 못 준 것(`payment_late`)은 여기서 되돌리지 않는다 — 환불 행(17b)이 되돌린다. PG 호출을 트랜잭션 안에 넣지 않으려는 것이다.
  */
 @Service
 class PaymentService(
@@ -58,9 +60,11 @@ class PaymentService(
 
         val paying = transitions.startPaying(accountId, command.reservationId)
         val verdict = askGateway(idempotencyKey, paying, command.cardNumber)
+        // 응답이 없어도 카드는 안다 — 요청이 들고 있다. 실패 행에도 뒷 4자리를 적는다.
+        val cardLast4 = verdict?.cardLast4 ?: command.cardNumber.filter { it.isDigit() }.takeLast(4)
 
         return idempotency.run(accountId, idempotencyKey, fingerprint, Result::class.java) {
-            val settled = transitions.settle(accountId, paying, verdict)
+            val settled = transitions.settle(accountId, paying, verdict, cardLast4)
             Result(
                 paymentId = settled.paymentId,
                 reservationId = paying.reservationId,
@@ -68,9 +72,9 @@ class PaymentService(
                 amount = paying.amount,
                 approvalNumber = verdict?.approvalNumber,
                 declineReason = if (verdict == null) PaymentTransitionService.NO_RESPONSE else verdict.declineReason,
-                cardLast4 = verdict?.cardLast4 ?: PaymentTransitionService.UNKNOWN_LAST4,
+                cardLast4 = cardLast4,
                 reservationStatus = settled.reservationStatus,
-            ).also { if (settled.late) cancelLateApproval(verdict) }
+            )
         }
     }
 
@@ -94,14 +98,5 @@ class PaymentService(
             verdict?.let { if (it.approved) "approved" else "declined" } ?: "no_response",
         )
         return verdict
-    }
-
-    /**
-     * 승인이 늦어 좌석을 못 줬다 — PG 에 취소를 보낸다. 실물 PG 라면 자동 환불 자리다(`D4`).
-     * 멱등 트랜잭션 안에서 부르는 것은 PG 호출을 트랜잭션에 넣는 일이지만, 취소는 드물고 짧으며 실패해도 감사 `payment.late` 와 환불(17)이 받는다.
-     */
-    private fun cancelLateApproval(verdict: MockPaymentGateway.Result?) {
-        // 승인번호 없이 late 일 수 없다 — late 는 승인일 때만 계산된다(`PaymentTransitionService.settle`).
-        gateway.cancel(verdict!!.approvalNumber!!)
     }
 }

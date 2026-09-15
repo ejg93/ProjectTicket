@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.ObjectMapper
+import java.util.UUID
 
 /**
  * 선점 입구의 계약(`D5`) — 상태 코드·`type`·추가 필드·멱등 재생. 경합은 `SeatHoldConcurrencyTest`, 불변식은 `ReservationSeatConsistencyTest` 가 잰다.
@@ -80,8 +81,9 @@ class ReservationHoldTest : PostgresTestBase() {
 
     @Test
     fun same_key_replays_the_same_reservation() {
-        val first = hold(seatIds.take(1), key = "same").andExpect { status { isCreated() } }.andReturn().response.contentAsString
-        val second = hold(seatIds.take(1), key = "same").andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val key = UUID.randomUUID().toString()
+        val first = hold(seatIds.take(1), key = key).andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val second = hold(seatIds.take(1), key = key).andExpect { status { isCreated() } }.andReturn().response.contentAsString
 
         // 재전송이 둘째 예매를 만들면 같은 사람이 좌석을 두 벌 쥔다(`D4`).
         assertThat(json.readTree(second)["reservation_id"]).isEqualTo(json.readTree(first)["reservation_id"])
@@ -90,9 +92,10 @@ class ReservationHoldTest : PostgresTestBase() {
 
     @Test
     fun same_key_with_a_different_body_is_rejected() {
-        hold(seatIds.take(1), key = "same").andExpect { status { isCreated() } }
+        val key = UUID.randomUUID().toString()
+        hold(seatIds.take(1), key = key).andExpect { status { isCreated() } }
 
-        hold(seatIds.drop(1).take(1), key = "same").andExpect {
+        hold(seatIds.drop(1).take(1), key = key).andExpect {
             status { isUnprocessableEntity() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:idempotency-key-reused") }
         }
@@ -100,6 +103,8 @@ class ReservationHoldTest : PostgresTestBase() {
 
     @Test
     fun missing_key_is_validation_failed() {
+        // 형식도 본다 — UUIDv4 가 아니면 같은 400 이다(`D4`).
+        hold(seatIds.take(1), key = "not-a-uuid").andExpect { status { isBadRequest() } }
         hold(seatIds.take(1), key = null).andExpect {
             status { isBadRequest() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:validation-failed") }
@@ -173,7 +178,7 @@ class ReservationHoldTest : PostgresTestBase() {
         }.andExpect { status { isUnauthorized() } }
     }
 
-    private fun hold(seats: List<Long>, key: String? = "key-1", performance: Long = performanceId): ResultActionsDsl =
+    private fun hold(seats: List<Long>, key: String? = UUID.randomUUID().toString(), performance: Long = performanceId): ResultActionsDsl =
         mvc.post("/api/performances/$performance/reservations") {
             with(user(buyer))
             with(csrf())

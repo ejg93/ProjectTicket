@@ -30,7 +30,7 @@ class PaymentTransitionService(
     /** ① 이 끝난 예매. 낼 돈은 여기서만 온다 — 클라이언트가 금액을 보내지 않는다 */
     data class Paying(val reservationId: Long, val amount: Int)
 
-    /** ③ 의 결과. [late] 면 승인은 났는데 좌석을 못 줬다 — 호출자가 트랜잭션 밖에서 PG 에 취소를 보낸다 */
+    /** ③ 의 결과. [late] 면 승인은 났는데 좌석을 못 줬다 — 감사 `payment.late` 가 남고 환불 행(17b)이 되돌린다 */
     data class Settled(val paymentId: Long, val reservationStatus: String, val late: Boolean)
 
     /**
@@ -86,13 +86,19 @@ class PaymentTransitionService(
      * 거절·실패는 예외가 아니라 결과다. 예외로 던지면 결제 행이 롤백돼 `declined`·`failed` 가 코드에서 안 쓰이고, 재전송이 PG 를 또 부른다.
      */
     @Transactional
-    fun settle(accountId: Long, paying: Paying, verdict: MockPaymentGateway.Result?): Settled {
+    fun settle(
+        accountId: Long,
+        paying: Paying,
+        verdict: MockPaymentGateway.Result?,
+        // 응답이 없으면 결과에 카드가 없다. 요청이 든 뒷 4자리를 호출자가 준다 — `0000` 같은 자리표시는 거절 카드와 겹친다.
+        cardLast4: String = requireNotNull(verdict) { "응답이 없으면 cardLast4 를 줘야 한다" }.cardLast4,
+    ): Settled {
         val status = when {
             verdict == null -> PaymentStatus.FAILED
             verdict.approved -> PaymentStatus.APPROVED
             else -> PaymentStatus.DECLINED
         }
-        val paymentId = insertPayment(paying, status, verdict)
+        val paymentId = insertPayment(paying, status, verdict, cardLast4)
 
         val reservationStatus = if (status == PaymentStatus.APPROVED) {
             confirm(accountId, paying.reservationId)
@@ -102,14 +108,14 @@ class PaymentTransitionService(
 
         val late = status == PaymentStatus.APPROVED && reservationStatus != ReservationStatus.RESERVED.code
         if (late) {
-            // 스윕·타임아웃이 먼저 갔다. 돈은 받았고 좌석은 없다 — 사람이 볼 것이라 WARN 이고, 되돌리는 것은 환불(17)이다.
+            // 스윕·타임아웃이 먼저 갔다. 돈은 받았고 좌석은 없다 — 사람이 볼 것이라 WARN 이고, 되돌리는 것은 환불 행(17b)이다.
             log.warn("승인이 늦어 좌석을 못 줬다 reservation_id={} payment_id={}", paying.reservationId, paymentId)
             auditLog.record(AuditLog.Kind.OUTCOME, "payment.late", accountId, AuditLog.Target.of("payment", paymentId))
         }
         return Settled(paymentId, reservationStatus, late)
     }
 
-    private fun insertPayment(paying: Paying, status: PaymentStatus, verdict: MockPaymentGateway.Result?): Long =
+    private fun insertPayment(paying: Paying, status: PaymentStatus, verdict: MockPaymentGateway.Result?, cardLast4: String): Long =
         jdbc.sql(
             """
             insert into payment (reservation_id, status, amount, approval_number, decline_reason, card_last4)
@@ -122,8 +128,7 @@ class PaymentTransitionService(
             .param("amount", paying.amount)
             .param("approval", verdict?.approvalNumber)
             .param("reason", if (verdict == null) NO_RESPONSE else verdict.declineReason)
-            // 응답이 없으면 뒷 4자리도 없다. 그 자리에 `----` 를 안 넣는 이유는 형식 check 다 — 실패 행은 카드를 모른다고 적는다.
-            .param("last4", verdict?.cardLast4 ?: UNKNOWN_LAST4)
+            .param("last4", cardLast4)
             .query(Long::class.java)
             .single()
 
@@ -213,8 +218,5 @@ class PaymentTransitionService(
 
         /** `payment.decline_reason` 에 적는 실패 사유 — 응답이 없었고 PG 도 모른다 */
         const val NO_RESPONSE = "no_response"
-
-        /** 응답이 없어 카드를 모를 때의 뒷 4자리. `payment_card_last4_format_check` 가 숫자 넷을 요구한다 */
-        const val UNKNOWN_LAST4 = "0000"
     }
 }

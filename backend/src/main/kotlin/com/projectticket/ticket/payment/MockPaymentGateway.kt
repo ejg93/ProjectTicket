@@ -45,8 +45,6 @@ class MockPaymentGateway {
     /** 같은 키에 같은 답을 주기 위한 기억. 지연 카드는 응답을 잃어도 여기엔 남는다 — 그것이 「승인은 났는데 응답만 못 받았다」다 */
     private val byKey = ConcurrentHashMap<String, Result>()
 
-    private val cancelledApprovals: MutableSet<String> = ConcurrentHashMap.newKeySet()
-
     /**
      * 승인을 요청한다.
      *
@@ -71,13 +69,6 @@ class MockPaymentGateway {
 
     /** 상태 조회. 무응답 뒤에 **재시도 대신** 부른다 — 재시도는 이중 결제다(`D4`). PG 가 모르면 null */
     fun inquire(idempotencyKey: String): Result? = byKey[idempotencyKey]
-
-    /** 승인 취소. 승인이 늦어 좌석을 못 준 것(`payment_late`)이 여기 온다. 실물 PG 라면 자동 환불 자리다(`D4`) */
-    fun cancel(approvalNumber: String) {
-        cancelledApprovals += approvalNumber
-    }
-
-    fun isCancelled(approvalNumber: String): Boolean = approvalNumber in cancelledApprovals
 
     /** @param refundNumber PG 가 채번한 환불 거래번호 */
     data class RefundResult(val refundNumber: String)
