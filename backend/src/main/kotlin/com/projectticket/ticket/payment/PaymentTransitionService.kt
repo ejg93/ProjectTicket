@@ -5,10 +5,12 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.reservation.ReservationStatus
+import com.projectticket.ticket.reservation.TicketService
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.OffsetDateTime
 
 /**
  * 결제의 트랜잭션 둘 — ① `held → paying` ③ 결과 반영. ②(PG 호출)는 [PaymentService] 가 트랜잭션 **밖**에서 한다(`D4` 「트랜잭션 경계」).
@@ -17,7 +19,11 @@ import org.springframework.transaction.annotation.Transactional
  * 승인이 0행이면 좌석을 못 주는 것이고, 그때가 `payment_late` 다.
  */
 @Service
-class PaymentTransitionService(private val jdbc: JdbcClient, private val auditLog: AuditLog) {
+class PaymentTransitionService(
+    private val jdbc: JdbcClient,
+    private val auditLog: AuditLog,
+    private val tickets: TicketService,
+) {
 
     private val log = LoggerFactory.getLogger(PaymentTransitionService::class.java)
 
@@ -144,7 +150,15 @@ class PaymentTransitionService(private val jdbc: JdbcClient, private val auditLo
             .param("held", PerformanceSeatStatus.HELD.code)
             .param("id", reservationId)
             .update()
-        auditLog.record(AuditLog.Kind.OUTCOME, "reservation.reserved", accountId, AuditLog.Target.of("reservation", reservationId))
+        // 확정과 발권이 한 트랜잭션이다(18). 발권일은 DB 시각이다(`D7`).
+        val issued = tickets.issue(reservationId, jdbc.sql("select now()").query(OffsetDateTime::class.java).single())
+        auditLog.record(
+            AuditLog.Kind.OUTCOME,
+            "reservation.reserved",
+            accountId,
+            AuditLog.Target.of("reservation", reservationId),
+            mapOf("tickets_issued" to issued),
+        )
         return ReservationStatus.RESERVED.code
     }
 

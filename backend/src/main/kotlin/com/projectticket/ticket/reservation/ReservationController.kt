@@ -24,6 +24,7 @@ import java.net.URI
 class ReservationController(
     private val reservationService: ReservationService,
     private val reservationQuery: ReservationQuery,
+    private val ticketQuery: TicketQuery,
 ) {
 
     @PostMapping("/api/performances/{performanceId}/reservations")
@@ -42,6 +43,11 @@ class ReservationController(
     @GetMapping("/api/reservations/{reservationId}")
     fun get(@PathVariable reservationId: Long, @AuthenticationPrincipal user: TicketUser): ReservationQuery.Reservation =
         reservationQuery.get(reservationId, user.id)
+
+    /** 발권된 티켓(18). 발권 전이면 `[]` — 빈 목록은 `[]` 다(`D5`) */
+    @GetMapping("/api/reservations/{reservationId}/tickets")
+    fun tickets(@PathVariable reservationId: Long, @AuthenticationPrincipal user: TicketUser): List<TicketQuery.Ticket> =
+        ticketQuery.forReservation(reservationId, user.id)
 
     /** 상한(4석)은 여기가 아니라 서비스가 422 `over-limit` 으로 낸다 — `@Size` 로 걸면 400 `validation-failed` 가 되어 `D5` 표와 어긋난다 */
     data class HoldRequest(@field:NotEmpty val seatIds: List<Long>)
