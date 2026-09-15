@@ -1,7 +1,6 @@
 package com.projectticket.ticket.reservation
 
 import org.slf4j.LoggerFactory
-import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -38,8 +37,9 @@ class PerformanceCloser(private val jdbc: JdbcClient, private val closeService: 
         due.forEach { performanceId ->
             try {
                 closeService.close(performanceId)?.let { closed++; expired += it }
-            } catch (e: DataAccessException) {
-                // 고르고 나서 닫기까지 기획사가 취소했거나 남이 먼저 닫았을 수 있다. 회차를 실패로 만들지 않는다.
+            } catch (e: RuntimeException) {
+                // 고르고 나서 닫기까지 기획사가 취소했거나 남이 먼저 닫았을 수 있다. 회차 하나를 실패로 만들어 나머지를 안 막는다 —
+                // DB 예외만 잡으면 사건 기록·감사에서 난 것이 루프를 끊는다.
                 log.warn("회차 종료 건너뜀 performance_id={} 이유={}", performanceId, e.javaClass.simpleName)
             }
         }

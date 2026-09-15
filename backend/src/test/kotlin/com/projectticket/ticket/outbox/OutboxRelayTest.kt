@@ -15,8 +15,8 @@ import java.util.UUID
 /**
  * 릴레이가 안 나간 것만 가져가 발행하고 표시하는가(`D11`).
  *
- * **롤백 레인이다.** 스케줄러가 1초마다 도는데, 테스트 트랜잭션 안에 있는 행은 다른 커넥션에서 안 보인다 —
- * 그래서 릴레이 회차를 손으로 불러도 스케줄러와 안 다툰다. 커밋 레인에서 재면 어느 쪽이 먼저 가져갔는지가 흔들린다.
+ * **롤백 레인이다.** 릴레이가 표만 읽고 남의 미커밋 데이터를 안 봐서 여기서 잴 수 있다(소비자와 다른 자리 — `stack.md`).
+ * 스케줄러는 꺼져 있다(`SchedulingConfig`) — 회차를 손으로 부른다.
  */
 @Import(OutboxRelayTest.Collector::class)
 class OutboxRelayTest : PostgresTestBase() {

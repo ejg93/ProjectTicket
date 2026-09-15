@@ -35,6 +35,19 @@ values (null, '2026-01-01T00:00:00Z', 0.10, 1.00, 7);
 -- 정책을 고쳐도 이미 열린 회차의 정산이 안 흔들리고, 새 정책은 다음 회차부터다.
 alter table performance add column settlement_policy_id bigint references settlement_policy (settlement_policy_id) on delete restrict;
 
+-- **이미 열린 회차도 채운다.** 안 채우면 그 회차가 닫힐 때 정산 예약이 조용히 0행이 되고(사건은 발행 표시된 뒤라 다시 안 온다)
+-- 「닫힌 회차 + 정산서 없음」이 남는다. 기본 정책 중 지금 효력 있는 최신을 준다 — 오픈 때 박제했을 값과 같다.
+update performance
+   set settlement_policy_id = (
+       select settlement_policy_id from settlement_policy
+        where organizer_id is null and effective_at <= now()
+        order by effective_at desc limit 1)
+ where status <> 'draft' and settlement_policy_id is null;
+
+-- `draft` 는 아직 정책이 없다. 여는 순간 박제된다 — 열린 회차에 정책이 없는 것은 결함이다.
+alter table performance
+    add constraint performance_open_has_policy_check check (status = 'draft' or settlement_policy_id is not null);
+
 comment on column performance.settlement_policy_id is '오픈 때 박제한 정산 정책. draft 면 null 이다';
 
 

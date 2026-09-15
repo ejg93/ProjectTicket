@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper
  * **확정 없이 사건 없고, 사건 없이 확정 없다**(`D11` 「발행」). Transactional Outbox 가 사는 이유가 이 한 줄이다.
  *
  * **커밋 레인이다.** 롤백이 사건도 되돌리는지는 커밋이 실제로 있어야 보인다 — 롤백 바탕에서는 서비스의 롤백이 rollback-only 표시만 남긴다(`stack.md`).
- * 릴레이가 1초마다 돌아 이 사건들을 발행해 갈 수 있다. 여기서 재는 것은 **행이 있나 없나**라 그것과 무관하다.
+ * 스케줄러는 꺼져 있다(`SchedulingConfig`) — 릴레이 회차를 손으로 부른다. 여기서 재는 것은 **행이 있나 없나**다.
  */
 class OutboxAtomicityTest : ConcurrencyTestBase() {
 

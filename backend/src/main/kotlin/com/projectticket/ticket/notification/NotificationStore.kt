@@ -118,7 +118,10 @@ class NotificationStore(private val jdbc: JdbcClient) {
             .update()
     }
 
-    /** 보낼 것을 고른다. **`for update skip locked`** — 인스턴스 셋이 같은 알림을 두 번 안 집는다(릴레이와 같은 방식) */
+    /**
+     * 보낼 것을 고른다. `for update skip locked` 로 **한 회에 같은 행을 둘이 안 집는다** — 다만 이 트랜잭션이 끝나면 락이 풀린다.
+     * 발송과 표시가 다른 트랜잭션이라 그 사이에 남이 같은 행을 집으면 **같은 메일이 두 번 나갈 수 있다**([NotificationSweeper] 가 그 대가를 든다).
+     */
     @Transactional
     fun takePending(batchSize: Int): List<Pending> =
         jdbc.sql(

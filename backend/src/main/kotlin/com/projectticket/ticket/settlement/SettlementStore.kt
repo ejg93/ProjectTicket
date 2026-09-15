@@ -33,17 +33,31 @@ class SettlementStore(private val jdbc: JdbcClient) {
         jdbc.sql(
             """
             insert into settlement (performance_id, settlement_policy_id, settle_at)
-            select p.performance_id, p.settlement_policy_id, now() + make_interval(days => sp.payout_delay_days)
+            select p.performance_id, p.settlement_policy_id, :closedAt::timestamptz + make_interval(days => sp.payout_delay_days)
               from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id
              where p.performance_id = :performance
             on conflict (performance_id) do nothing
             """,
         )
             .param("performance", envelope.aggregateId)
+            .param("closedAt", envelope.payload["closed_at"])
             .update()
+            .let { inserted ->
+                // 0행은 **이미 예약됨**이거나 **회차에 정책이 없음**이다. 뒤쪽은 결함이라 그 자리에서 드러낸다 —
+                // 안 그러면 「닫힌 회차 + 발행된 사건 + 정산서 없음」이 조용히 남고 사건은 다시 안 온다.
+                if (inserted == 0 && !isScheduled(envelope.aggregateId)) {
+                    throw IllegalStateException("정산을 예약 못 했다 — 회차에 정책이 없다: performance_id=${envelope.aggregateId}")
+                }
+            }
     }
 
-    /** 집계할 것을 고른다. `for update skip locked` — 인스턴스 셋이 같은 정산서를 두 번 안 만든다 */
+    private fun isScheduled(performanceId: Long): Boolean =
+        jdbc.sql("select count(*) from settlement where performance_id = :id").param("id", performanceId).query(Long::class.java).single() > 0
+
+    /**
+     * 집계할 것을 고른다. `for update skip locked` 로 **한 회에 같은 행을 둘이 안 집는다** — 다만 이 트랜잭션이 끝나면 락이 풀리므로,
+     * 두 번 집계되는 것을 실제로 막는 것은 [settle] 의 조건부 UPDATE(`and status = 'scheduled'`)다.
+     */
     @Transactional
     fun takeDue(batchSize: Int): List<Due> =
         jdbc.sql(
@@ -63,7 +77,7 @@ class SettlementStore(private val jdbc: JdbcClient) {
      * 반올림은 **항목마다 한 번, 원 단위 half-up**(`D21`). 좌석마다 반올림하면 합이 안 맞는다.
      */
     @Transactional
-    fun settle(due: Due): Int {
+    fun settle(due: Due): Int? {
         val sale = saleOf(due.performanceId)
         val platformFee = -round(sale, due.commissionRate)
         val cancelFee = round(cancelFeeBaseOf(due.performanceId), due.cancelFeeShare)
@@ -84,8 +98,8 @@ class SettlementStore(private val jdbc: JdbcClient) {
             .param("amount", amount)
             .param("id", due.settlementId)
             .update()
-        // 조건부다 — 남이 먼저 집계했으면 0행이고 항목도 그쪽이 넣었다.
-        if (moved == 0) return 0
+        // 조건부다 — 남이 먼저 집계했으면 0행이고 항목도 그쪽이 넣었다. null 은 「내가 안 했다」고, 0 은 「0원으로 집계했다」다.
+        if (moved == 0) return null
 
         lines.forEach { (kind, lineAmount) ->
             jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, :kind, :amount)")

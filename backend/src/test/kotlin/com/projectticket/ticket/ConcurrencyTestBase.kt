@@ -70,6 +70,8 @@ abstract class ConcurrencyTestBase {
             // 사건은 외래키가 없다 — 집합체 id 로 가리킨다. 예매를 지우기 전에 같이 걷는다.
             jdbc.sql("delete from outbox where aggregate_type = 'reservation' and aggregate_id in ($reservations)")
                 .param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from outbox where aggregate_type = 'performance' and aggregate_id in ($performances)")
+                .param("prefix", "$PREFIX%").update()
             // 티켓 → 환불 → 결제 → 예매. 전부 `restrict` 라 자식부터다.
             jdbc.sql("delete from ticket where reservation_seat_id in (select reservation_seat_id from reservation_seat where reservation_id in ($reservations))")
                 .param("prefix", "$PREFIX%").update()
