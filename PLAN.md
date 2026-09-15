@@ -41,7 +41,6 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 
 | Fable 몫 | 열리는 때 |
 |---|---|
-| `D11` 이벤트 카탈로그 + 알림 규약(26 의 축) | `21` 뒤, `25` 앞 |
 | `28` 의 ADR 0007(왜 지금 Kafka 인가) — 코드는 Opus | `27` 뒤 |
 | `32` = `D13` 성능 목표 | `31` 뒤 |
 | `34` → ADR 0008(Redisson vs 조건부 UPDATE) — 측정 코드는 Opus, 해석은 Fable | `33` 뒤 |
@@ -69,7 +68,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 | D8 | `testing-strategy.md` | 층·레인 셋(`measure` 추가), 격리, `ConcurrencyTestBase`, 승자 하나 판정, 날짜 고정 | 완료(P4) |
 | D9 | `security-baseline.md` | OWASP Top 10 2025 대응표, 비밀번호·세션·쿠키·CSRF·토큰·멱등키, 노출면, A10 | 완료(P8) |
 | D10 | `observability-rules.md` | 감사 vs 관측, 추적 ID, 형식·레벨, 개인정보 금지, 지표 이름 규약 | 완료(P8) |
-| D11 **[Fable]** | `event-catalog.md` | 아웃박스 이벤트 이름·페이로드·버전 | 미착수. 선행 `21` |
+| D11 | `event-catalog.md` | 봉투·카탈로그 넷·버전·발행·소비·알림 규약 | 완료(Fable, 선행을 `18` 로 — 근거는 13~18 의 사건) |
 | D12 | `queue-design.md` | 대기열 자료구조, 입장 속도·정원 등식, 토큰, 관문 범위, 이탈 | 완료(12c) |
 | D13 **[Fable]** | `performance-goals.md` | 응답 시간·처리량 목표, 측정 방법 | 미착수. 선행 `27` 의 측정값 |
 | D14 | `coding-rules.md` | 계층·예외·트랜잭션·SQL·테스트. **Kotlin 으로** | 이식됨 → `P1` |
@@ -154,7 +153,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 25 | 아웃박스 | `outbox` 테이블, 예매 확정 트랜잭션에 이벤트 행 커밋, 릴레이가 Spring 이벤트로 발행. 릴레이는 `for update skip locked` 로 가져간다 — 인스턴스 셋이 같은 행을 두 번 안 민다. `event-catalog.md`(`D11`) 초안. **축**: 표준(Transactional Outbox). **강제 지점**: 트랜잭션 + 테스트(확정 없이 이벤트 없음). **건드리는 자리**: `V12__outbox.sql`, 신설 `outbox/`. **닫힘**: `OutboxAtomicityTest` | 16 |
+| 25 | 아웃박스 | `outbox` 테이블, 예매 확정 트랜잭션에 이벤트 행 커밋, 릴레이가 Spring 이벤트로 발행. 릴레이는 `for update skip locked` 로 가져간다 — 인스턴스 셋이 같은 행을 두 번 안 민다. `D11` 대로 봉투·`outbox` 행. **축**: 표준(Transactional Outbox)·`D11`. **강제 지점**: 트랜잭션 + 테스트(확정 없이 이벤트 없음). **건드리는 자리**: `V12__outbox.sql`, 신설 `outbox/`. **닫힘**: `OutboxAtomicityTest` | 16 |
 | 26 | 알림 포팅 (소비자 1) | ProjectShop `notification` 개조 — 예매 확정·취소 메일(모의 발송, 본문 이력). **축**: `D11`. **강제 지점**: 멱등(이벤트 ID 유일) + 테스트. **건드리는 자리**: 신설 `notification/`, `V13`. **닫힘**: `NotificationIdempotencyTest` | 25 |
 | 27 | 정산 집계 (소비자 2) | `D21` 대로. `settlement_policy`(기본 행 시드)·`settlement`·`settlement_line`, `performance.settlement_policy_id`(오픈 때 박제 — `PerformanceOpenService` 수정), `refund_fee_tier` 는 17 이 만든다. `performance.closed` 사건을 받아 `payout_delay_days` 뒤 회차당 한 장. **둘째 소비자다 — 다음 청크가 Kafka 를 든다.** **축**: `D21`·`D11`. **강제 지점**: 유일(회차당 1)·check(`amount >= 0`)·지연 트리거(합 = 항목 합) + 테스트. **건드리는 자리**: 새 `V`, 신설 `settlement/`, `event/PerformanceOpenService`. **닫힘**: `SettlementAggregateTest.sale_equals_reserved_seat_prices`·`cancelled_performance_settles_to_zero` | 26 |
 | 28 | Kafka 도입 **[ADR 0007 은 Fable]** | compose 에 Kafka, 릴레이가 Kafka 로 발행, 소비자 둘을 Kafka 리스너로. ADR 0007(왜 지금인가). 파티션 키 = `reservation_id` — 한 예매의 사건이 순서를 지킨다. **축**: 관례(토픽 이름·파티션 키) + `D11`. **강제 지점**: Kafka Testcontainers 테스트. **건드리는 자리**: `docker-compose.yml`, `outbox/`, `notification/`, `settlement/`. **닫힘**: `KafkaRelayTest` | 27 |
