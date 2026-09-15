@@ -40,6 +40,10 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "reservation-not-found", "그런 예매가 없다"),
     DUPLICATE_HOLD(HttpStatus.CONFLICT, "duplicate-hold", "이 회차에 살아있는 선점이 이미 있다"),
 
+    // 전이(`D3`). `hold-expired` 는 `invalid-transition` 의 특수형 — 화면이 「다시 고르세요」로 가른다(`D5`).
+    INVALID_TRANSITION(HttpStatus.CONFLICT, "invalid-transition", "지금 상태에서 할 수 없다"),
+    HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
+
     // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "idempotency-key-reused", "같은 멱등키로 다른 요청이 왔다"),

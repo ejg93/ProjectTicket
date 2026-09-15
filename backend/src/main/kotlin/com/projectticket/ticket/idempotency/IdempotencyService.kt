@@ -49,6 +49,22 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
     }
 
     /**
+     * 이 키로 이미 끝난 요청이 있으면 그때 응답. **[run] 앞에 둘 자리가 필요해서 연다** — 결제는 PG 호출이 트랜잭션 밖이라(`D4` 「트랜잭션 경계」)
+     * [run] 에 들어가기 전에 예매가 낼 수 있는 상태인지 보는데, 재전송 시점에는 그 예매가 이미 `reserved` 라 재생에 닿기 전에 막힌다.
+     *
+     * 진행 중인 앞 요청은 커밋 전이라 여기서 안 보인다. 그때는 비어 있다고 답하고 [run] 의 유일 인덱스 대기가 그 뒤를 맡는다.
+     */
+    @Transactional(readOnly = true)
+    fun <T : Any> replayIfPresent(accountId: Long, key: String, request: Any, responseType: Class<T>): T? {
+        val hash = sha256(json.writeValueAsString(request))
+        val stored = findStored(accountId, key) ?: return null
+        if (stored.requestHash != hash) {
+            throw TicketException(ErrorCode.IDEMPOTENCY_KEY_REUSED)
+        }
+        return deserialize(stored, key, responseType)
+    }
+
+    /**
      * 이 키를 내가 처음 잡았나. **insert 가 곧 락이다** — 조회해서 검사하고 넣는 절차가 없어서 그 사이에 끼어들 틈이 없다.
      *
      * 같은 키의 뒤 요청은 앞이 끝날 때까지 유일 인덱스에서 기다린다. 앞이 커밋되면 재생을 읽고, 롤백되면 자기가 처리한다 —
@@ -76,21 +92,26 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
     }
 
     private fun <T : Any> replay(accountId: Long, key: String, hash: String, responseType: Class<T>): T {
-        val stored = jdbc.sql(
+        val stored = findStored(accountId, key) ?: throw IllegalStateException("선점에 실패했는데 행이 없다: $key")
+        if (stored.requestHash != hash) {
+            throw TicketException(ErrorCode.IDEMPOTENCY_KEY_REUSED)
+        }
+        return deserialize(stored, key, responseType)
+    }
+
+    private fun findStored(accountId: Long, key: String): Stored? =
+        jdbc.sql(
             "select request_hash, response_body::text as response_body from idempotency_key where account_id = :account and key_value = :key",
         )
             .param("account", accountId)
             .param("key", key)
             .query(Stored::class.java)
             .optional()
-            .orElseThrow { IllegalStateException("선점에 실패했는데 행이 없다: $key") }
+            .orElse(null)
 
-        if (stored.requestHash != hash) {
-            throw TicketException(ErrorCode.IDEMPOTENCY_KEY_REUSED)
-        }
-        // 커밋된 행에는 반드시 응답이 있다 — `idempotency_key_response_check` 가 커밋 때 본다(`V7`). 없으면 그 트리거가 빠진 것이다.
-        return json.readValue(stored.responseBody ?: throw IllegalStateException("저장된 멱등 응답이 비었다: $key"), responseType)
-    }
+    /** 커밋된 행에는 반드시 응답이 있다 — `idempotency_key_response_check` 가 커밋 때 본다(`V7`). 없으면 그 트리거가 빠진 것이다 */
+    private fun <T : Any> deserialize(stored: Stored, key: String, responseType: Class<T>): T =
+        json.readValue(stored.responseBody ?: throw IllegalStateException("저장된 멱등 응답이 비었다: $key"), responseType)
 
     data class Stored(val requestHash: String, val responseBody: String?)
 

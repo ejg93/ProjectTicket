@@ -23,20 +23,28 @@ class HoldSweeper(private val jdbc: JdbcClient, private val auditLog: AuditLog) 
 
     private val log = LoggerFactory.getLogger(HoldSweeper::class.java)
 
-    /** @return 만료시킨 예매 수 */
+    /**
+     * 선점 만료와 결제 타임아웃을 한 회에 훑는다(`D7` 「자동 전이의 주기와 기준」 — 같은 스케줄러).
+     * 타임아웃(`paying_until < now()`)은 결제 승인의 조건부 UPDATE(`where paying_until >= now()`)와 같은 행을 두고 다투지만
+     * 둘 다 조건부라 한쪽만 이긴다 — 승인이 지면 `payment_late` 다(`D4`).
+     *
+     * @return 만료시킨 예매 수
+     */
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
     @Transactional
     fun sweep(): Int {
         val expired = jdbc.sql(
             """
             update reservation
-               set status = :expired, expired_at = now()
+               set status = :expired, expired_at = now(), paying_until = null
              where status = :held and held_until < now()
+                or status = :paying and paying_until < now()
             returning reservation_id
             """,
         )
             .param("expired", ReservationStatus.EXPIRED.code)
             .param("held", ReservationStatus.HELD.code)
+            .param("paying", ReservationStatus.PAYING.code)
             .query(Long::class.java)
             .list()
             .filterNotNull()
