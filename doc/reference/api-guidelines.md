@@ -43,7 +43,7 @@
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
-| `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11·17a |
+| `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11 (취소 서비스는 17a 가 세웠다) |
 | `GET /api/organizer/settlements` | 정산 | 세션(기획사) | 27 |
 | `POST /api/admin/accounts/{id}/suspend` · `unsuspend` | 계정 정지·해제 | 세션(관리자) | 5b |
 | `DELETE /api/me` | 탈퇴 | 세션 | 5a |

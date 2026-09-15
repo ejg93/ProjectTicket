@@ -27,8 +27,9 @@ class NotificationStore(private val jdbc: JdbcClient) {
         when (envelope.type) {
             EventType.RESERVATION_RESERVED -> recordReserved(envelope)
             EventType.RESERVATION_CANCELLED -> recordCancelled(envelope)
-            // 회차 취소(17a)는 수신자가 여럿이라 그 청크가 이 자리를 채운다. 종료는 사람에게 알릴 것이 없다 — 산 사람은 그대로 본다.
-            EventType.PERFORMANCE_CANCELLED, EventType.PERFORMANCE_CLOSED -> Unit
+            EventType.PERFORMANCE_CANCELLED -> recordPerformanceCancelled(envelope)
+            // 종료는 사람에게 알릴 것이 없다 — 산 사람은 그대로 본다.
+            EventType.PERFORMANCE_CLOSED -> Unit
         }
     }
 
@@ -82,6 +83,38 @@ class NotificationStore(private val jdbc: JdbcClient) {
             .param("id", (envelope.payload["refund_id"] as Number).toLong())
             .query(Int::class.java)
             .single()
+
+    /**
+     * **수신자가 여럿인 유일한 사건**(`D11`). 사건은 회차 id 만 나르고 예매자는 여기서 표를 읽는다 —
+     * 그래서 `(event_id, account_id)` 가 멱등의 키다. 한 계정이 예매를 둘 했으면 메일도 둘이다(각 예매의 좌석·금액이 다르다).
+     */
+    private fun recordPerformanceCancelled(envelope: OutboxRelay.Envelope) {
+        val performanceId = envelope.aggregateId
+        val performance = performanceLineOf(performanceId)
+        jdbc.sql(
+            """
+            select r.reservation_id, r.account_id, coalesce(rf.refund_amount, 0) as refund_amount
+              from reservation r
+              left join payment pm on pm.reservation_id = r.reservation_id and pm.status = 'approved'
+              left join refund rf on rf.payment_id = pm.payment_id
+             where r.performance_id = :id and r.status = 'cancelled'
+             order by r.reservation_id
+            """,
+        ).param("id", performanceId).query(CancelledLine::class.java).list().filterNotNull()
+            .forEach {
+                val (subject, body) = NotificationTemplates.performanceCancelled(performance, it.refundAmount)
+                insert(envelope, it.accountId, subject, body)
+            }
+    }
+
+    private fun performanceLineOf(performanceId: Long): NotificationTemplates.PerformanceLine =
+        jdbc.sql(
+            "select e.title, p.starts_at from performance p join event e on e.event_id = p.event_id where p.performance_id = :id",
+        ).param("id", performanceId).query(Line::class.java).single().let {
+            NotificationTemplates.PerformanceLine(it.title, it.startsAt)
+        }
+
+    data class CancelledLine(val reservationId: Long, val accountId: Long, val refundAmount: Int)
 
     private fun accountId(envelope: OutboxRelay.Envelope): Long = (envelope.payload["account_id"] as Number).toLong()
 
