@@ -102,7 +102,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | 12c | `D12` 대기열 설계 | 완료 — `queue-design.md` 신설. 등식(R ≤ 풀/지연), 키 다섯, `ZADD NX` 로 순번 유지, Lua 원자 입장, 무작위 토큰(반납 가능), **관문은 선점만**(ADR 0004), 선점 성공 시 반납, Redis 죽으면 관문 닫힘(503) | 완료 |
 | 12d | `D20` 좌석 읽기 모델 | 완료 — `seat-read-model.md` 신설 + ADR 0005. 커밋 뒤 `INCR` 버전, 버전 키 스냅샷(TTL 10s), STREAM 변경 로그, `ETag`/304, `?since=` 델타·410. DB 는 정하는 일만, Redis 는 보여주는 일만 | 완료 |
 | 12e | 세션 저장소 결정 | 완료 — ADR 0004 에 흡수. Spring Session Redis. JWT(즉시 취소 불가)·sticky(문제를 숨긴다) 버림 | 완료 |
-| 12f | 동시성 테스트 바탕 | 롤백 없는 `ConcurrencyTestBase`(각 스레드가 자기 커넥션·트랜잭션) + 접두 정리. **축**: `D8`. **강제 지점**: 테스트(스레드 100 이 각자 커밋한 행이 100 이다). **건드리는 자리**: 신설 테스트 바탕, `testing-strategy.md` 한 절. **닫힘**: `ConcurrencyTestBase` 위에서 병렬 삽입 100 전부 커밋 | 12b |
+| 12f | 동시성 테스트 바탕 | 완료 — `ConcurrencyTestBase`(`@Transactional` 없음, 애너테이션은 `PostgresTestBase` 와 동일해 컨텍스트 하나). `runConcurrently(n)` 이 출발선을 맞추고 스레드별 `Result` 를 돌려준다. 정리는 `concurrency-` 접두(계정·기획사·공연장)를 앞뒤 한 트랜잭션에서 `restrict` 순서로. 닫힘: `ConcurrencyTestBaseTest` 둘(스레드 100 커밋 100, 접두만 지움) | 완료 |
 
 ### 2 — 예매 동시성 (핵심)
 
