@@ -35,6 +35,23 @@ queue(Redis ZSET, 회차 단위) → 활성 토큰이 있어야 예매 API 를 �
 **좌석 상태의 단일 진실은 `performance_seat.status` 다.** `AVAILABLE → held → reserved`, held 는 `held_until` 이 지나면 스윕이 되돌린다.
 Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 
+## 누가 치나 — 모델 배정
+
+**설계·판단 청크는 Fable, 코드 청크는 Opus.** Fable 용량이 적어 그 몫만 남긴다. 아래 표와 분할표의 `[Fable]` 표시가 같은 것이다.
+
+| Fable 몫 | 열리는 때 |
+|---|---|
+| `D11` 이벤트 카탈로그 + 알림 규약(26 의 축) | `21` 뒤, `25` 앞 |
+| `28` 의 ADR 0007(왜 지금 Kafka 인가) — 코드는 Opus | `27` 뒤 |
+| `32` = `D13` 성능 목표 | `31` 뒤 |
+| `34` → ADR 0008(Redisson vs 조건부 UPDATE) — 측정 코드는 Opus, 해석은 Fable | `33` 뒤 |
+| `P9` `D16`·`D17` 화면 규약 | `41` 뒤 |
+| `P10` `D18` 품질 게이트 | `46`·`47` 뒤 |
+| `/inspection` | 묶음 서너 개마다 |
+| `/wrapup` 의 독립 리뷰 처분 | 묶음마다 — 리뷰 에이전트 결과를 읽고 처분하는 판단 |
+
+Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. 갈리는 결정이 코드 청크에서 나오면 그것도 Fable 에 묻는다(`CLAUDE.md` 「중간 — 갈리면 멈춘다」).
+
 ## 기준 문서
 
 여러 청크가 같이 참조하는 결정이다. 조건(선행 완료 + 정할 근거가 코드에 있음)이 찬 것부터 코드 청크보다 먼저 쓴다.
@@ -52,14 +69,14 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | D8 | `testing-strategy.md` | 층·레인 셋(`measure` 추가), 격리, `ConcurrencyTestBase`, 승자 하나 판정, 날짜 고정 | 완료(P4) |
 | D9 | `security-baseline.md` | OWASP Top 10 2025 대응표, 비밀번호·세션·쿠키·CSRF·토큰·멱등키, 노출면, A10 | 완료(P8) |
 | D10 | `observability-rules.md` | 감사 vs 관측, 추적 ID, 형식·레벨, 개인정보 금지, 지표 이름 규약 | 완료(P8) |
-| D11 | `event-catalog.md` | 아웃박스 이벤트 이름·페이로드·버전 | 미착수. 선행 `21` |
+| D11 **[Fable]** | `event-catalog.md` | 아웃박스 이벤트 이름·페이로드·버전 | 미착수. 선행 `21` |
 | D12 | `queue-design.md` | 대기열 자료구조, 입장 속도·정원 등식, 토큰, 관문 범위, 이탈 | 완료(12c) |
-| D13 | `performance-goals.md` | 응답 시간·처리량 목표, 측정 방법 | 미착수. 선행 `27` 의 측정값 |
+| D13 **[Fable]** | `performance-goals.md` | 응답 시간·처리량 목표, 측정 방법 | 미착수. 선행 `27` 의 측정값 |
 | D14 | `coding-rules.md` | 계층·예외·트랜잭션·SQL·테스트. **Kotlin 으로** | 이식됨 → `P1` |
 | D15 | `naming-rules.md` | DB·Kotlin 식별자 | 이식됨 → `P2` |
-| D16 | `frontend-rules.md` | 서버·클라이언트 경계, `api.ts` | 이식됨 → `P9` |
-| D17 | `screen-rules.md` | 화면 문구·권한 없는 버튼·오류 표시 | 이식됨 → `P9` |
-| D18 | `quality-gates.md` | 게이트 목록과 문턱, 리뷰 지적 처분 | 이식됨 → `P10` |
+| D16 **[Fable]** | `frontend-rules.md` | 서버·클라이언트 경계, `api.ts` | 이식됨 → `P9` |
+| D17 **[Fable]** | `screen-rules.md` | 화면 문구·권한 없는 버튼·오류 표시 | 이식됨 → `P9` |
+| D18 **[Fable]** | `quality-gates.md` | 게이트 목록과 문턱, 리뷰 지적 처분 | 이식됨 → `P10` |
 | D19 | `stack.md` | 버전, 공식 문서, 기억으로 쓰면 틀리는 자리 | 완료(P11) |
 | D20 | `seat-read-model.md` | 좌석 현황 계약, 버전·스냅샷·델타, ETag | 완료(12d) |
 | D21 | `settlement-rules.md` | **정책 표 + 명세 항목.** 회차당 정산서 하나, 종료 뒤 D+7, 불변식 셋 | 완료 |
@@ -140,7 +157,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | 25 | 아웃박스 | `outbox` 테이블, 예매 확정 트랜잭션에 이벤트 행 커밋, 릴레이가 Spring 이벤트로 발행. 릴레이는 `for update skip locked` 로 가져간다 — 인스턴스 셋이 같은 행을 두 번 안 민다. `event-catalog.md`(`D11`) 초안. **축**: 표준(Transactional Outbox). **강제 지점**: 트랜잭션 + 테스트(확정 없이 이벤트 없음). **건드리는 자리**: `V12__outbox.sql`, 신설 `outbox/`. **닫힘**: `OutboxAtomicityTest` | 16 |
 | 26 | 알림 포팅 (소비자 1) | ProjectShop `notification` 개조 — 예매 확정·취소 메일(모의 발송, 본문 이력). **축**: `D11`. **강제 지점**: 멱등(이벤트 ID 유일) + 테스트. **건드리는 자리**: 신설 `notification/`, `V13`. **닫힘**: `NotificationIdempotencyTest` | 25 |
 | 27 | 정산 집계 (소비자 2) | `D21` 대로. `settlement_policy`(기본 행 시드)·`settlement`·`settlement_line`, `performance.settlement_policy_id`(오픈 때 박제 — `PerformanceOpenService` 수정), `refund_fee_tier` 는 17 이 만든다. `performance.closed` 사건을 받아 `payout_delay_days` 뒤 회차당 한 장. **둘째 소비자다 — 다음 청크가 Kafka 를 든다.** **축**: `D21`·`D11`. **강제 지점**: 유일(회차당 1)·check(`amount >= 0`)·지연 트리거(합 = 항목 합) + 테스트. **건드리는 자리**: 새 `V`, 신설 `settlement/`, `event/PerformanceOpenService`. **닫힘**: `SettlementAggregateTest.sale_equals_reserved_seat_prices`·`cancelled_performance_settles_to_zero` | 26 |
-| 28 | Kafka 도입 | compose 에 Kafka, 릴레이가 Kafka 로 발행, 소비자 둘을 Kafka 리스너로. ADR 0007(왜 지금인가). 파티션 키 = `reservation_id` — 한 예매의 사건이 순서를 지킨다. **축**: 관례(토픽 이름·파티션 키) + `D11`. **강제 지점**: Kafka Testcontainers 테스트. **건드리는 자리**: `docker-compose.yml`, `outbox/`, `notification/`, `settlement/`. **닫힘**: `KafkaRelayTest` | 27 |
+| 28 | Kafka 도입 **[ADR 0007 은 Fable]** | compose 에 Kafka, 릴레이가 Kafka 로 발행, 소비자 둘을 Kafka 리스너로. ADR 0007(왜 지금인가). 파티션 키 = `reservation_id` — 한 예매의 사건이 순서를 지킨다. **축**: 관례(토픽 이름·파티션 키) + `D11`. **강제 지점**: Kafka Testcontainers 테스트. **건드리는 자리**: `docker-compose.yml`, `outbox/`, `notification/`, `settlement/`. **닫힘**: `KafkaRelayTest` | 27 |
 | 29 | 재시도·DLQ·멱등 소비 | 소비 실패 재시도, 초과 시 DLQ, 중복 전달에 멱등. **축**: 표준(at-least-once). **강제 지점**: 테스트(같은 이벤트 두 번 → 한 번 처리). **건드리는 자리**: `outbox/`·소비자. **닫힘**: `ConsumerIdempotencyTest`·`DlqTest` | 28 |
 
 ### 5 — 관측·부하·다중 인스턴스
@@ -149,9 +166,9 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 |---|---|---|---|
 | 30 | 지표·대시보드 | Micrometer → Prometheus, Grafana 대시보드(선점 성공률·대기열 길이·응답 시간). compose 추가. **축**: `D10`. **강제 지점**: 테스트(지표 이름이 문서와 같다). **건드리는 자리**: `docker-compose.yml`, `observability/`, `docker/grafana/`. **닫힘**: `MetricNamesTest` | 13·21 |
 | 31 | k6 시나리오 | 동시 1만 접속·좌석 1천 경쟁. 결과를 `doc/notes/load-1.md` 에. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: 신설 `load/`. **닫힘**: 리포트에 p95·성공 좌석 수·오류율이 있다 | 23·30 |
-| 32 | `D13` 성능 목표 | 31 의 측정값으로 목표를 정한다. **축**: 측정값. **강제 지점**: 없다 — 문서. `35` 가 검증. **건드리는 자리**: 신설 `performance-goals.md`. **닫힘**: 수치 셋(p95·처리량·오류율) | 31 |
+| 32 **[Fable]** | `D13` 성능 목표 | 31 의 측정값으로 목표를 정한다. **축**: 측정값. **강제 지점**: 없다 — 문서. `35` 가 검증. **건드리는 자리**: 신설 `performance-goals.md`. **닫힘**: 수치 셋(p95·처리량·오류율) | 31 |
 | 33 | 다중 인스턴스 | `docker compose up --scale app=3` + nginx. **첫 검사는 세션이 인스턴스를 넘어가나**(20a). 그다음 스케줄러 셋(스윕·타임아웃·종료·입장)이 Redis 락으로 하나만 도나. **축**: `D4`·ADR 0004. **강제 지점**: 테스트(세션 공유·스케줄러 단일 실행). **건드리는 자리**: `docker-compose.yml`, `docker/nginx/`, 스케줄러, `application.yml`(`forward-headers-strategy: native` + 신뢰 대역 루프백 — 안 켜면 `acted_ip` 가 프록시 IP 가 된다, `D9`). **닫힘**: `SharedSessionTest` + `SchedulerSingleRunTest` | 20a·22·30 |
-| 34 | Redisson 분산락 비교 | 조건부 UPDATE vs Redisson 락 을 33 환경에서 재고 ADR 0008. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: `reservation/`, `doc/adr/0005`. **닫힘**: ADR 에 두 수치 | 33 |
+| 34 | Redisson 분산락 비교 **[ADR 0008 은 Fable]** | 조건부 UPDATE vs Redisson 락 을 33 환경에서 재고 ADR 0008. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: `reservation/`, `doc/adr/0005`. **닫힘**: ADR 에 두 수치 | 33 |
 | 35 | 부하 2차 | 33 환경에서 31 재실행, `D13` 대조. **축**: `D13`. **강제 지점**: 없다. **건드리는 자리**: `doc/notes/load-2.md`. **닫힘**: 목표 대비 표 | 32·33 |
 | 35a | 운영 설정 | `server.shutdown=graceful`(선점 트랜잭션이 잘리지 않게), actuator `readiness`/`liveness` 그룹 + DB·Redis 인디케이터, `spring.threads.virtual.enabled` 켜기 전후를 31 시나리오로 측정. **축**: 관례(k8s 프로브) + 측정. **강제 지점**: 테스트(`/actuator/health/readiness` 가 DB 끊기면 DOWN). **건드리는 자리**: `application.yml`, `doc/notes/virtual-threads.md`. **닫힘**: `ReadinessTest` | 30 |
 
@@ -185,8 +202,8 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | P4 | `testing-strategy.md` 이식 | 완료 — 실물 기준 재작성. 레인 셋(`measure` 는 `build` 밖), `ConcurrencyTestBase` 규칙 다섯, 「승자 하나」를 응답·DB 넷으로, 정렬 지운 대조 테스트, 만료 테스트는 지난 행을 직접 넣는다 | 완료 |
 | P7 | `time-rules.md` 이식 | 완료 — 실물 기준 재작성. **시계는 DB**(`now()`), 관람일 N일 전 = KST 달력일 차(`at time zone` 없으면 0~9시 취소가 전날로), 박제 표 다섯 | 완료 |
 | P8 | `security-baseline.md`·`observability-rules.md` 이식 | 완료 — 실물 기준 재작성. 선행을 23 으로 뒀었지만 근거(3·4·5·D12)가 이미 있었다. 보안: 정지 계정 타이밍, 세션 재생성, 프록시 IP 미설정(33 이 켠다), 트리거 한계(4a). 관측: 지표 이름 표 10개 | 완료 |
-| P9 | `frontend-rules.md`·`screen-rules.md` 이식 | 예매·좌석도 화면 규약. **축**: 규약 + WCAG. **강제 지점**: lint 접근성 규칙. **건드리는 자리**: 두 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 41 |
-| P10 | `quality-gates.md` 이식 | detekt·CodeQL Kotlin. **축**: 규약. **강제 지점**: CI 잡 목록이 문서와 같다. **건드리는 자리**: 그 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 46·47 |
+| P9 **[Fable]** | `frontend-rules.md`·`screen-rules.md` 이식 | 예매·좌석도 화면 규약. **축**: 규약 + WCAG. **강제 지점**: lint 접근성 규칙. **건드리는 자리**: 두 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 41 |
+| P10 **[Fable]** | `quality-gates.md` 이식 | detekt·CodeQL Kotlin. **축**: 규약. **강제 지점**: CI 잡 목록이 문서와 같다. **건드리는 자리**: 그 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 46·47 |
 | P11 | `stack.md`·`identifier-rules.md`·`external-references.md` 이식 | 완료 — 셋 다 머리말 없이 재작성. `stack.md`: 버전표를 실물(Boot 4.1.1·Kotlin 2.3.21·JDK 25·Gradle 9.7.1·PG 17·Redis 7·Testcontainers 2.0.5·ArchUnit 1.5.0·Node 22)로, 쇼핑 전용 절(카트·셀러·SpotBugs·find-sec-bugs·claude-code-action·support)을 지우고 이 저장소가 밟은 사실(on conflict·부분 유일 인덱스·query 별칭·measure up-to-date)을 더했다. `identifier-rules.md`: 노출 번호는 티켓만, 나머지는 내부 id + 404. `external-references.md`: D 번호를 이 저장소 것으로. 닫힘: `StackVersionConsistencyTest`(빠른 레인, 표 ↔ 빌드·wrapper·compose·CI) 초록 | 완료 |
 | 48 | Railway 배포(선택) | 사용자가 켜면. **축**: 관례. **강제 지점**: 없다. **건드리는 자리**: `Dockerfile`·env. **닫힘**: 공개 URL 의 `/api/health` 200 | 38 |
 
