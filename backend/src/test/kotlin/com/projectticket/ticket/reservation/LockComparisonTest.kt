@@ -25,7 +25,7 @@ import java.sql.SQLException
  * | 낙관락 | `select status, version` → `update … where id=? and version=?`. 진 쪽은 0행 |
  *
  * 스크래치 표(`lock_measure_seat`)를 쓰는 이유는 `performance_seat` 에 `version` 이 없어서다 — 측정 때문에 스키마를 안 바꾼다.
- * 재는 것은 「승자 하나」가 아니라(셋 다 하나다) **비용**이다: 전체 소요·스레드별 지연 p50/p95·DB 왕복 수.
+ * 재는 것은 「승자 하나」가 아니라(셋 다 하나다) **비용**이다: 전체 소요(스레드 생성 포함)·스레드별 지연 p50/p95. 왕복 수는 안 재고 문장에서 센다.
  * 커넥션 풀은 기본 10 이라 1000 스레드는 풀 앞에서 줄을 선다 — 운영도 그렇다.
  */
 @Tag("measure")
