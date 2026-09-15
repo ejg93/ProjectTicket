@@ -32,6 +32,23 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 형식은 맞는데 지금 상태가 못 받는 것이라 422 다. 좌석이 없거나 등급이 안 붙은 구역이 있으면 열 수 없다.
     PERFORMANCE_NOT_OPENABLE(HttpStatus.UNPROCESSABLE_CONTENT, "performance-not-openable", "지금 열 수 없는 회차다"),
 
+    // 예매·선점(13). 추가 필드는 `D5` 「type 목록」이 정했다 — 화면이 그 값으로 「어느 좌석」을 표시한다.
+    PERFORMANCE_NOT_OPEN(HttpStatus.CONFLICT, "performance-not-open", "판매 중인 회차가 아니다"),
+    SEAT_TAKEN(HttpStatus.CONFLICT, "seat-taken", "이미 잡힌 좌석이 있다"),
+    SEAT_NOT_IN_PERFORMANCE(HttpStatus.UNPROCESSABLE_CONTENT, "seat-not-in-performance", "이 회차의 좌석이 아니다"),
+    OVER_LIMIT(HttpStatus.UNPROCESSABLE_CONTENT, "over-limit", "한 번에 잡을 수 있는 좌석 수를 넘었다"),
+    RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "reservation-not-found", "그런 예매가 없다"),
+    DUPLICATE_HOLD(HttpStatus.CONFLICT, "duplicate-hold", "이 회차에 살아있는 선점이 이미 있다"),
+
+    // 전이(`D3`). `hold-expired` 는 `invalid-transition` 의 특수형 — 화면이 「다시 고르세요」로 가른다(`D5`).
+    INVALID_TRANSITION(HttpStatus.CONFLICT, "invalid-transition", "지금 상태에서 할 수 없다"),
+    HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
+    CANCEL_WINDOW_CLOSED(HttpStatus.CONFLICT, "cancel-window-closed", "관람일 당일이라 취소할 수 없다"),
+
+    // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
+    IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),
+    IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "idempotency-key-reused", "같은 멱등키로 다른 요청이 왔다"),
+
     // 요청 형식. 프레임워크가 정한 상태 코드를 우리 type 으로 옮길 때 쓴다 — 하나로 뭉치면
     // 405·415·깨진 JSON 이 같은 type 으로 나가서 상태 코드보다 type 이 더 뭉친다.
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "요청 형식이 맞지 않는다"),

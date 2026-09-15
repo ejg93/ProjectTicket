@@ -1,12 +1,19 @@
 package com.projectticket.ticket
 
+import com.tngtech.archunit.core.domain.JavaMethod
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
+import com.tngtech.archunit.lang.ArchCondition
 import com.tngtech.archunit.lang.ArchRule
+import com.tngtech.archunit.lang.ConditionEvents
+import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
+import jakarta.validation.Valid
+import org.springframework.web.bind.annotation.RequestBody
 
 /**
  * `coding-rules.md`(D14)가 글로만 적어 둔 계층 규칙을 기계가 지킨다.
@@ -52,4 +59,25 @@ class ArchitectureTest {
         .that().resideOutsideOfPackage("..error..")
         .and().haveSimpleNameNotEndingWith("Controller")
         .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.http.HttpStatus")
+
+    /** 시간대 없는 시각을 안 든다(`D7`). `LocalDateTime` 은 받는 쪽이 시간대를 짐작하게 만들고, 세 인스턴스가 다르게 짐작한다 */
+    @ArchTest
+    val noLocalDateTime: ArchRule = noClasses()
+        .should().dependOnClassesThat().haveFullyQualifiedName("java.time.LocalDateTime")
+
+    /**
+     * `@RequestBody` 에 `@Valid` 가 없으면 검증이 **조용히 안 돈다**(`D9`). 새 입구가 생길 때 빠뜨리는 자리라 문서(5위)에서 테스트(4위)로 내린다.
+     */
+    @ArchTest
+    val requestBodiesAreValidated: ArchRule = methods()
+        .that().areDeclaredInClassesThat().haveSimpleNameEndingWith("Controller")
+        .should(
+            object : ArchCondition<JavaMethod>("have @Valid on every @RequestBody parameter") {
+                override fun check(method: JavaMethod, events: ConditionEvents) {
+                    method.parameters
+                        .filter { it.isAnnotatedWith(RequestBody::class.java) && !it.isAnnotatedWith(Valid::class.java) }
+                        .forEach { events.add(SimpleConditionEvent.violated(method, "${method.fullName} 의 @RequestBody 에 @Valid 가 없다")) }
+                }
+            },
+        )
 }

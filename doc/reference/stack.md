@@ -422,6 +422,14 @@ insert into cart (cart_token, updated_at) values (:t, :old)
 
 `created_at` 은 트리거가 없어서 `update` 로도 된다. **`updated_at` 만 이 문제가 있다.**
 
+### `now()` 는 트랜잭션 시작 시각이라 롤백 테스트 안에서는 `updated_at` 이 안 움직인다
+
+`set_updated_at` 이 `now()` 를 쓰는데 Postgres 의 `now()` 는 **트랜잭션 시작 시각**이다(`clock_timestamp()` 가 실제 시각).
+`@Transactional` 테스트 안에서 오픈하고 바로 갱신하면 두 `updated_at` 이 같다 — 「좌석이 바뀌면 버전이 는다」를 `PostgresTestBase` 위에서 재면 304 가 나온다.
+
+`max(updated_at)` 을 버전으로 쓰는 `SeatQuery` 가 그래서 `SeatVersionTest` 를 `ConcurrencyTestBase`(자동 커밋, 문장마다 트랜잭션) 위에 둔다.
+트리거를 `clock_timestamp()` 로 바꾸지 않는다 — 한 트랜잭션의 행들이 같은 시각을 갖는 것이 `updated_at` 의 뜻이다.
+
 ### `LocalTime.MAX` 를 `timestamptz` 에 넣으면 다음날이 된다
 
 `23:59:59.999999999` 는 나노초까지고 Postgres 는 **마이크로초까지만 담고 나머지를 올린다.**
@@ -537,6 +545,14 @@ jdbc.sql("set constraints all immediate").update();
 트리거가 `raise exception` 으로 떨어뜨리면 SQLSTATE 가 `P0001` 이라
 Spring 이 `UncategorizedSQLException` 으로 준다. `DataIntegrityViolationException` 이 아니다 —
 둘을 같이 받으려면 `DataAccessException` 으로 잡는다.
+
+### `@Transactional` 테스트 안에서는 서비스의 롤백이 안 보인다
+
+서비스의 `@Transactional` 이 테스트 트랜잭션에 **참여**한다(`REQUIRED`). 서비스가 예외를 던지면 Spring 은 그 트랜잭션에 rollback-only 표시만 남기고,
+서비스가 예외 전에 넣은 행은 같은 트랜잭션이라 **테스트에 그대로 보인다.** 「실패하면 아무것도 안 남는다」를 `PostgresTestBase` 위에서 재면 행이 남아 있다고 나온다.
+
+`ReservationHoldTest` 가 그렇게 빨개졌다. 롤백이 실제로 일어나는 것은 `ConcurrencyTestBase`(트랜잭션 없음) 위에서만이라, 그 단언은 `ReservationSeatConsistencyTest` 로 옮겼다.
+지연 트리거(위)와 같은 부류다 — **커밋·롤백 자체를 재는 단언은 커밋 레인에 둔다.**
 
 ### 지연 트리거 안에서 `NEW` 는 커밋 시점의 값이 아니다
 

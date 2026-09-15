@@ -57,6 +57,8 @@ If-None-Match: "1842"
 
 ## 버전과 스냅샷 — Redis
 
+**10 은 DB 대체값으로 시작했다** — `SeatQuery.version` 이 `performance_seat.updated_at` 의 최댓값(마이크로초)을 버전으로 쓴다. Redis 절반(아래)과 델타는 `10a` 다.
+
 | 키 | 타입 | 무엇 |
 |---|---|---|
 | `seat:ver:{performanceId}` | STRING(정수) | 현재 버전. 쓰기 트랜잭션이 커밋된 **뒤** `INCR` |

@@ -32,7 +32,7 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
 
     @ExceptionHandler(TicketException::class)
     fun handle(e: TicketException, request: HttpServletRequest): ResponseEntity<ProblemDetail> =
-        respond(problems.create(e.code, e.message, request))
+        respond(problems.create(e.code, e.message, request).apply { e.properties.forEach { (name, value) -> setProperty(name, value) } })
 
     /** 메서드 보안이 던지는 것. 안 잡으면 아래 마지막 그물이 500 으로 삼킨다 */
     @ExceptionHandler(AccessDeniedException::class)

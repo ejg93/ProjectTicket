@@ -179,6 +179,8 @@ class SecurityConfig {
             "/api/auth/login",
             // 가입 화면이 무엇에 동의를 받아야 하는지 알아야 한다. 로그인 전에 보는 것이라 공개다.
             "/api/consent-items",
+            // 좌석도는 로그인 전에 본다 — 자리를 보고 나서 로그인한다.
+            "/api/performances/*/seats",
         )
     }
 }
