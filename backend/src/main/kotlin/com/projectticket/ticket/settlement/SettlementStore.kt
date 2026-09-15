@@ -1,0 +1,123 @@
+package com.projectticket.ticket.settlement
+
+import com.projectticket.ticket.outbox.EventType
+import com.projectticket.ticket.outbox.OutboxRelay
+import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
+import java.math.RoundingMode
+
+/**
+ * 정산 표를 만지는 트랜잭션 전부. [schedule] 은 사건을 받아 예약하고, [settle] 은 `settle_at` 이 지난 것을 집계한다(사용자 선택 — 둘이 갈려 있다).
+ *
+ * [schedule] 이 `REQUIRES_NEW` 인 이유는 알림(26)과 같다 — 릴레이가 자기 트랜잭션에서 동기 발행하므로, 경계가 없으면 정산 쪽 실패가
+ * `published_at` 을 막아 같은 사건이 영영 재발행된다(`D11` 「소비자 하나의 결함이 발행자를 멈추지 않는다」).
+ *
+ * 스케줄러와 빈이 갈린 이유는 자기 호출이다(`stack.md`).
+ */
+@Component
+class SettlementStore(private val jdbc: JdbcClient) {
+
+    /**
+     * 회차 종료 사건을 정산 예약으로. **금액 0, 항목 없음** — 집계는 `settle_at` 뒤다.
+     *
+     * 두 번 받아도 `settlement_performance_id_key` 가 둘째를 0행으로 끝낸다(`D11` 멱등). 예약 표를 따로 안 둔 이유가 이것이다 —
+     * 정산서의 유일 제약이 그 일을 이미 한다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    fun schedule(envelope: OutboxRelay.Envelope) {
+        if (envelope.type != EventType.PERFORMANCE_CLOSED) return
+
+        jdbc.sql(
+            """
+            insert into settlement (performance_id, settlement_policy_id, settle_at)
+            select p.performance_id, p.settlement_policy_id, now() + make_interval(days => sp.payout_delay_days)
+              from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id
+             where p.performance_id = :performance
+            on conflict (performance_id) do nothing
+            """,
+        )
+            .param("performance", envelope.aggregateId)
+            .update()
+    }
+
+    /** 집계할 것을 고른다. `for update skip locked` — 인스턴스 셋이 같은 정산서를 두 번 안 만든다 */
+    @Transactional
+    fun takeDue(batchSize: Int): List<Due> =
+        jdbc.sql(
+            """
+            select s.settlement_id, s.performance_id, sp.commission_rate, sp.cancel_fee_share
+              from settlement s join settlement_policy sp on sp.settlement_policy_id = s.settlement_policy_id
+             where s.status = 'scheduled' and s.settle_at <= now()
+             order by s.settlement_id
+             limit :batch
+               for update of s skip locked
+            """,
+        ).param("batch", batchSize).query(Due::class.java).list().filterNotNull()
+
+    /**
+     * 항목을 넣고 정산서를 `pending` 으로. **한 트랜잭션이다** — 합계와 항목이 갈리면 지연 트리거가 커밋 때 막는다.
+     *
+     * 반올림은 **항목마다 한 번, 원 단위 half-up**(`D21`). 좌석마다 반올림하면 합이 안 맞는다.
+     */
+    @Transactional
+    fun settle(due: Due): Int {
+        val sale = saleOf(due.performanceId)
+        val platformFee = -round(sale, due.commissionRate)
+        val cancelFee = round(cancelFeeBaseOf(due.performanceId), due.cancelFeeShare)
+        val lines = listOf(
+            SettlementLineKind.SALE to sale,
+            SettlementLineKind.PLATFORM_FEE to platformFee,
+            SettlementLineKind.CANCEL_FEE to cancelFee,
+        )
+        val amount = lines.sumOf { it.second }
+
+        val moved = jdbc.sql(
+            """
+            update settlement set status = :pending, amount = :amount, settled_at = now()
+             where settlement_id = :id and status = 'scheduled'
+            """,
+        )
+            .param("pending", SettlementStatus.PENDING.code)
+            .param("amount", amount)
+            .param("id", due.settlementId)
+            .update()
+        // 조건부다 — 남이 먼저 집계했으면 0행이고 항목도 그쪽이 넣었다.
+        if (moved == 0) return 0
+
+        lines.forEach { (kind, lineAmount) ->
+            jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, :kind, :amount)")
+                .param("id", due.settlementId).param("kind", kind.code).param("amount", lineAmount).update()
+        }
+        return amount
+    }
+
+    /** 판매된 것 — `reserved` 예매의 좌석 가격 합(`D21`). 취소·만료된 예매는 안 든다 */
+    private fun saleOf(performanceId: Long): Int =
+        jdbc.sql(
+            """
+            select coalesce(sum(rs.price), 0)
+              from reservation_seat rs join reservation r on r.reservation_id = rs.reservation_id
+             where r.performance_id = :id and r.status = 'reserved'
+            """,
+        ).param("id", performanceId).query(Int::class.java).single()
+
+    /** 관객 취소의 수수료 합. 회차 취소·승인 지연은 수수료가 0 이라(`D6`) 여기 안 든다 */
+    private fun cancelFeeBaseOf(performanceId: Long): Int =
+        jdbc.sql(
+            """
+            select coalesce(sum(rf.fee_amount), 0)
+              from refund rf
+              join payment pm on pm.payment_id = rf.payment_id
+              join reservation r on r.reservation_id = pm.reservation_id
+             where r.performance_id = :id and rf.reason = 'audience'
+            """,
+        ).param("id", performanceId).query(Int::class.java).single()
+
+    private fun round(base: Int, rate: BigDecimal): Int =
+        BigDecimal(base).multiply(rate).setScale(0, RoundingMode.HALF_UP).intValueExact()
+
+    data class Due(val settlementId: Long, val performanceId: Long, val commissionRate: BigDecimal, val cancelFeeShare: BigDecimal)
+}

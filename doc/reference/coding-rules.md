@@ -182,9 +182,11 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 
 **자원 단위로 판다.** 관객·기획사 같은 사람 단위로 안 판다 — 같은 자원을 두 사람이 다루면 코드가 두 벌이 된다.
 
-지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `observability` · `payment` · `reservation`.
+지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `reservation` · `settlement`.
 
-**의존 방향은 `payment → reservation → event`, 그리고 셋 다 `idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있는 이유다 — 취소는 환불을 부르고 환불은 예매를 부른다.
+**의존 방향은 `payment → reservation → event → settlement`, 그리고 전부 `outbox`·`idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있고 회차 종료가 `reservation` 에 있는 이유다 — 부르는 쪽이 아래로 간다.
+
+**소비자(`notification`·`settlement`)는 봉투만 알고 서로 모른다**(`D11`). 알림이 죽어도 정산은 간다 — 그것이 소비자를 가른 값이다.
 
 ### 의존
 

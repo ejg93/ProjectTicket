@@ -3,6 +3,7 @@ package com.projectticket.ticket.event
 import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
+import com.projectticket.ticket.settlement.SettlementPolicyQuery
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,7 +15,11 @@ import org.springframework.transaction.annotation.Transactional
  * 상태만 바뀌고 복제가 안 되면 **좌석이 하나도 없는 열린 회차**가 된다.
  */
 @Service
-class PerformanceOpenService(private val jdbc: JdbcClient, private val auditLog: AuditLog) {
+class PerformanceOpenService(
+    private val jdbc: JdbcClient,
+    private val auditLog: AuditLog,
+    private val policies: SettlementPolicyQuery,
+) {
 
     @Transactional
     fun open(performanceId: Long, actorAccountId: Long?): Int {
@@ -43,7 +48,10 @@ class PerformanceOpenService(private val jdbc: JdbcClient, private val auditLog:
             )
         }
 
-        jdbc.sql("update performance set status = 'open' where performance_id = :id")
+        // **정책을 오픈 때 박제한다**(`D21`). 가격을 박제한 것과 같은 논리다 — 요율을 고쳐도 이미 열린 회차의 정산이 안 흔들린다.
+        val policy = policies.currentFor(organizerOf(performance.eventId))
+        jdbc.sql("update performance set status = 'open', settlement_policy_id = :policy where performance_id = :id")
+            .param("policy", policy.settlementPolicyId)
             .param("id", performanceId)
             .update()
 
@@ -75,6 +83,9 @@ class PerformanceOpenService(private val jdbc: JdbcClient, private val auditLog:
             .query(Performance::class.java)
             .optional()
             .orElseThrow { TicketException(ErrorCode.PERFORMANCE_NOT_FOUND) }
+
+    private fun organizerOf(eventId: Long): Long =
+        jdbc.sql("select organizer_id from event where event_id = :id").param("id", eventId).query(Long::class.java).single()
 
     private fun seatCountOf(hallId: Long): Int =
         jdbc.sql("select count(*) from seat where hall_id = :hallId")
