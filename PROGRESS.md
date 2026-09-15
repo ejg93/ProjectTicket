@@ -2,13 +2,13 @@
 
 ## 현재 상태
 
-**대상**: 공연 예매 시스템 (Kotlin + Spring Boot 4 + Next.js, 로컬 전용). **가지**: `work/2026-09-16-b`
+**대상**: 공연 예매 시스템 (Kotlin + Spring Boot 4 + Next.js, 로컬 전용). **가지**: `work/2026-09-16-c`
 
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
 | 진행중 청크 | 없음 | |
 | 다음 첫 손 | **Fable**: `28` 의 ADR 0007. **Opus**: `20a` 세션 Redis → `21`~`24` 대기열. 곁가지로 `26a`(무엇이 물렀나)·`25a`·`17b` ⓑ | `PLAN.md` 의 `20a` 행 |
-| PR | `#15` 머지됨. 이 가지는 `17a`·`11`·`12` + 마무리 4차 | PR 을 연다 |
+| PR | `#16` 머지됨(`17a`·`11`·`12` + 마무리 4차). 이 가지는 비어 있다 | 다음 청크 |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
 | GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(네 잡 필수). 그 뒤로는 `work/<날짜>` + PR | |
