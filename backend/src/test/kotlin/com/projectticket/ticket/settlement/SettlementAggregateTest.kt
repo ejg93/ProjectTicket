@@ -32,6 +32,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
     @Autowired lateinit var openService: PerformanceOpenService
+    @Autowired lateinit var cancelService: com.projectticket.ticket.payment.PerformanceCancelService
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     private lateinit var fixture: EventFixture
@@ -113,6 +114,21 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         assertThat(lineOf("cancel_fee")).isEqualTo(15_400)
         assertThat(settlementRow().amount).isEqualTo(154_000 - 15_400 + 15_400)
         assertThat(kept).isPositive()
+    }
+
+    @Test
+    fun cancelled_performance_settles_to_zero() {
+        reserve(fixture.account("${PREFIX}buyer@test.local"), seats = 2)
+        cancelService.cancel(performanceId, actorAccountId = null)
+        relay.relay()
+
+        settleNow()
+
+        // 취소된 회차도 정산서가 선다 — 항목이 전부 0 이고 「이 회차는 취소돼서 0 이다」가 기록으로 남는다(`D21` 「회차 취소」).
+        // 분기가 없다: 매출은 `reserved` 만 세고 취소 수수료는 `audience` 만 세므로 계산이 저절로 0 이다.
+        assertThat(settlementRow().amount).isZero()
+        assertThat(lineOf("sale")).isZero()
+        assertThat(lineOf("cancel_fee")).isZero()
     }
 
     @Test

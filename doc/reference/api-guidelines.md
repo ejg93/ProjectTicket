@@ -32,6 +32,7 @@
 | `GET /api/me` | 내 계정 | 세션 | 있다 |
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
 | `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 40 |
+| `GET /api/performances/{id}` | 회차 하나. **회차 등록 201 의 `Location` 이 이미 이것을 가리킨다**(11) | 공개 | 40 |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
 | `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |
 | `POST /api/queue/{performanceId}` · `GET` · `DELETE` | 대기열 진입·순번·이탈(`D12`) | 세션 | 21·24 |
@@ -43,7 +44,7 @@
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
-| `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11·17a |
+| `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11 (취소 서비스는 17a 가 세웠다) |
 | `GET /api/organizer/settlements` | 정산 | 세션(기획사) | 27 |
 | `POST /api/admin/accounts/{id}/suspend` · `unsuspend` | 계정 정지·해제 | 세션(관리자) | 5b |
 | `DELETE /api/me` | 탈퇴 | 세션 | 5a |
@@ -144,7 +145,9 @@
 | **`idempotency-in-progress`** | 409 | 같은 키가 처리 중 | | 13 |
 | **`idempotency-key-reused`** | 422 | 같은 키인데 본문이 다르다 | | 13 |
 | **`organizer-forbidden`** | 403 | 기획사 역할이 아니다 | | 11 |
+| **`organizer-not-found`** | 404 | 없거나 내 소속이 아닌 기획사 | | 11 |
 | **`event-not-found`** | 404 | 없거나 남의 기획사 공연 | | 11 |
+| **`performance-slot-taken`** | 409 | 그 홀의 그 시각에 회차가 이미 있다 | | 11 |
 
 **`detail` 은 사람 문장이고 추가 필드가 기계 값이다.** 화면이 `detail` 을 파싱하지 않는다.
 
@@ -170,6 +173,9 @@
 | 역할이 없는 경로 접두 | **403** | 존재를 숨길 자원이 없다 — 경로 자체가 공개다 |
 
 로그인이 안 됐으면 자원과 무관하게 **401** 이다.
+
+**404 하나로는 안 가려진다 — `type` 이 같아야 한다.** 「없다」와 「남의 것이다」에 다른 이름을 주면 번호를 훑어 존재를 알아낼 수 있고,
+그러면 상태 코드로 가린 것을 `type` 이 도로 연다. 입구마다 이름 하나로 모은다 — 회차 경로는 둘 다 `performance-not-found` 다(11).
 
 ## 목록 조회
 

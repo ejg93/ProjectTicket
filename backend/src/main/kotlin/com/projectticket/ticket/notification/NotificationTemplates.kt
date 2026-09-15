@@ -42,6 +42,18 @@ object NotificationTemplates {
             환불은 결제하신 카드로 처리됩니다.
             """.trimIndent()
 
+    fun performanceCancelled(performance: PerformanceLine, refundAmount: Int): Pair<String, String> =
+        "[회차 취소] ${performance.title}" to
+            """
+            공연이 취소되어 예매가 자동으로 취소되었습니다.
+
+            공연: ${performance.title}
+            일시: ${kst(performance.startsAt)}
+            환불 금액: ${money(refundAmount)} (전액)
+
+            취소 수수료는 없습니다. 환불은 결제하신 카드로 처리됩니다.
+            """.trimIndent()
+
     /** 본문에 드는 회차 정보. 소비자가 표에서 읽어 채운다(`D11` — 사건은 식별자만 나른다) */
     data class PerformanceLine(val title: String, val startsAt: OffsetDateTime)
 

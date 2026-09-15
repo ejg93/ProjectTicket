@@ -32,6 +32,14 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 형식은 맞는데 지금 상태가 못 받는 것이라 422 다. 좌석이 없거나 등급이 안 붙은 구역이 있으면 열 수 없다.
     PERFORMANCE_NOT_OPENABLE(HttpStatus.UNPROCESSABLE_CONTENT, "performance-not-openable", "지금 열 수 없는 회차다"),
 
+    // 기획사(11). 역할이 없으면 경로 규칙이 막고(`SecurityConfig`) 이름은 `ProblemAccessDeniedHandler` 가 붙인다.
+    // 남의 기획사·공연은 **없는 것**이다 — 404(`D5` 「403 이냐 404 냐」).
+    ORGANIZER_FORBIDDEN(HttpStatus.FORBIDDEN, "organizer-forbidden", "기획사 권한이 필요하다"),
+    ORGANIZER_NOT_FOUND(HttpStatus.NOT_FOUND, "organizer-not-found", "그런 기획사가 없다"),
+    EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "event-not-found", "그런 공연이 없다"),
+    // 같은 홀·같은 시각에 회차가 둘일 수 없다(`performance_hall_slot_key`). 형식이 아니라 지금 상태가 못 받는 것이라 409 다(`D5`).
+    PERFORMANCE_SLOT_TAKEN(HttpStatus.CONFLICT, "performance-slot-taken", "그 홀의 그 시각에 회차가 이미 있다"),
+
     // 예매·선점(13). 추가 필드는 `D5` 「type 목록」이 정했다 — 화면이 그 값으로 「어느 좌석」을 표시한다.
     PERFORMANCE_NOT_OPEN(HttpStatus.CONFLICT, "performance-not-open", "판매 중인 회차가 아니다"),
     SEAT_TAKEN(HttpStatus.CONFLICT, "seat-taken", "이미 잡힌 좌석이 있다"),

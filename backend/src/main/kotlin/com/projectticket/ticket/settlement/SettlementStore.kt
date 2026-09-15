@@ -21,26 +21,31 @@ import java.math.RoundingMode
 class SettlementStore(private val jdbc: JdbcClient) {
 
     /**
-     * 회차 종료 사건을 정산 예약으로. **금액 0, 항목 없음** — 집계는 `settle_at` 뒤다.
+     * 회차 종료·취소 사건을 정산 예약으로. **금액 0, 항목 없음** — 집계는 `settle_at` 뒤다.
+     *
+     * **취소된 회차도 정산서를 만든다**(`D21` 「회차 취소」) — 항목이 전부 0 이고, 「이 회차는 취소돼서 0 이다」가 기록으로 남는다.
+     * 매출은 `reserved` 만 세고 취소 수수료는 `audience` 만 세므로(`settle`) 계산이 저절로 0 이다 — 분기가 없다.
+     *
+     * `settle_at` 은 봉투의 `occurred_at` 기준이다 — **사건이 일어난 시각**이라 종료든 취소든 같은 뜻이고, 릴레이가 늦어도 안 흔들린다.
      *
      * 두 번 받아도 `settlement_performance_id_key` 가 둘째를 0행으로 끝낸다(`D11` 멱등). 예약 표를 따로 안 둔 이유가 이것이다 —
      * 정산서의 유일 제약이 그 일을 이미 한다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun schedule(envelope: OutboxRelay.Envelope) {
-        if (envelope.type != EventType.PERFORMANCE_CLOSED) return
+        if (envelope.type != EventType.PERFORMANCE_CLOSED && envelope.type != EventType.PERFORMANCE_CANCELLED) return
 
         jdbc.sql(
             """
             insert into settlement (performance_id, settlement_policy_id, settle_at)
-            select p.performance_id, p.settlement_policy_id, :closedAt::timestamptz + make_interval(days => sp.payout_delay_days)
+            select p.performance_id, p.settlement_policy_id, :occurredAt::timestamptz + make_interval(days => sp.payout_delay_days)
               from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id
              where p.performance_id = :performance
             on conflict (performance_id) do nothing
             """,
         )
             .param("performance", envelope.aggregateId)
-            .param("closedAt", envelope.payload["closed_at"])
+            .param("occurredAt", envelope.occurredAt)
             .update()
             .let { inserted ->
                 // 0행은 **이미 예약됨**이거나 **회차에 정책이 없음**이다. 뒤쪽은 결함이라 그 자리에서 드러낸다 —

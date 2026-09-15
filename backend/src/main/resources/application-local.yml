@@ -2,9 +2,10 @@
 #
 # 켜는 법: ./gradlew bootRun --args='--spring.profiles.active=local'
 #
-# 하는 일은 하나다 — 데모 데이터(청크 12)를 Flyway 의 대상에 더한다.
+# 하는 일은 하나다 — 데모 데이터(청크 12)를 켠다. 넣는 것은 Flyway 가 아니라 `DemoSeeder` 다(사용자 선택).
+# 시드가 실제 서비스를 밟으므로 그 경로가 도는지도 같이 확인되고, Flyway 번호 함정(시드가 V900 대면 다음 마이그레이션이 막힌다)이 없다.
+#
 # 다른 설정을 여기 넣지 않는다. 프로필마다 설정이 갈리면 안 돌려본 조합이 생긴다.
-spring:
-  flyway:
-    # 기본 location 을 다시 적어야 한다. 이 키는 합쳐지지 않고 덮어쓴다.
-    locations: classpath:db/migration,classpath:db/seed
+ticket:
+  demo:
+    enabled: true
