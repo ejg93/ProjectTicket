@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper
  * 좌석 현황 응답이 `D20` 계약 그대로인가. 좌석도(41)·대기열 화면(43)이 이 모양을 그대로 읽는다.
  *
  * 스냅샷이 계약을 막는다 — 필드를 빼거나 이름을 바꾸면 여기서 빨개지고, 바꾸는 것이면 스냅샷 갱신을 이력에 적는다(`D8`).
+ * 「좌석이 바뀌면 버전이 는다」는 여기가 아니라 `SeatVersionTest` 가 잰다 — 롤백 테스트 안에서는 `now()` 가 안 움직인다(`stack.md`).
  */
 class SeatQueryTest : PostgresTestBase() {
 
@@ -27,20 +28,22 @@ class SeatQueryTest : PostgresTestBase() {
     private lateinit var fixture: EventFixture
     private var eventId: Long = 0
     private var hallId: Long = 0
+    private var accountId: Long = 0
 
     @BeforeEach
     fun setUp() {
         fixture = EventFixture(jdbc)
         eventId = fixture.event(fixture.organizer())
         hallId = fixture.hall()
+        accountId = fixture.account("seat-query@test.local")
     }
 
     @Test
     fun full_response_matches_the_contract_snapshot() {
         val performanceId = openedPerformance()
-        // 상태 셋이 다 보이게 한 자리씩 잡는다. 예매 표는 13 이 만들므로 `reservation_id` 는 아직 아무 값이나 된다.
-        markSeat(performanceId, "F1-A", 2, "held")
-        markSeat(performanceId, "F1-B", 1, "reserved")
+        // 상태 셋이 다 보이게 한 자리씩 잡는다.
+        fixture.hold(accountId, performanceId, "F1-A", 2)
+        fixture.reserve(fixture.hold(accountId, performanceId, "F1-B", 1))
 
         val body = mockMvc.get("/api/performances/$performanceId/seats")
             .andExpect {
@@ -50,6 +53,7 @@ class SeatQueryTest : PostgresTestBase() {
                 jsonPath("$.version") { isNumber() }
                 jsonPath("$.sections[0].name") { value("1층 A구역") }
                 jsonPath("$.sections[0].rows[0].seats[1].s") { value("H") }
+                jsonPath("$.sections[1].rows[0].seats[0].s") { value("R") }
             }
             .andReturn().response.contentAsString
 
@@ -110,19 +114,4 @@ class SeatQueryTest : PostgresTestBase() {
 
     private fun etagOf(performanceId: Long): String =
         mockMvc.get("/api/performances/$performanceId/seats").andReturn().response.getHeader("ETag")!!  // 200 에는 늘 있다 — 없으면 여기서 죽는 것이 맞다
-
-    private fun markSeat(performanceId: Long, section: String, number: Int, status: String) {
-        jdbc.sql(
-            """
-            update performance_seat ps
-               set status = :status,
-                   held_until = case when :status = 'held' then now() + interval '5 minutes' end,
-                   reservation_id = 1
-              from seat s
-             where s.seat_id = ps.seat_id
-               and ps.performance_id = :performanceId
-               and s.section = :section and s.seat_number = :number
-            """,
-        ).param("status", status).param("performanceId", performanceId).param("section", section).param("number", number).update()
-    }
 }

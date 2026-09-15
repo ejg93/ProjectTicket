@@ -110,7 +110,7 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 
 | 어디에 | 요구 |
 |---|---|
-| `POST /api/reservations`(선점, 13) | **필수.** 없으면 400 `validation-failed` |
+| `POST /api/performances/{id}/reservations`(선점, 13) | **필수.** 없으면 400 `validation-failed` |
 | `POST /api/reservations/{id}/payments`(결제, 16) | **필수** |
 | `POST /api/reservations/{id}/cancel`(취소, 17) | **안 받는다** — 이미 있는 자원의 상태를 옮기는 것이라 조건부 UPDATE 가 둘째 요청을 0행으로 끝낸다 |
 | 그 밖 | 안 받는다 |

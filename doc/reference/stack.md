@@ -546,6 +546,14 @@ jdbc.sql("set constraints all immediate").update();
 Spring 이 `UncategorizedSQLException` 으로 준다. `DataIntegrityViolationException` 이 아니다 —
 둘을 같이 받으려면 `DataAccessException` 으로 잡는다.
 
+### `@Transactional` 테스트 안에서는 서비스의 롤백이 안 보인다
+
+서비스의 `@Transactional` 이 테스트 트랜잭션에 **참여**한다(`REQUIRED`). 서비스가 예외를 던지면 Spring 은 그 트랜잭션에 rollback-only 표시만 남기고,
+서비스가 예외 전에 넣은 행은 같은 트랜잭션이라 **테스트에 그대로 보인다.** 「실패하면 아무것도 안 남는다」를 `PostgresTestBase` 위에서 재면 행이 남아 있다고 나온다.
+
+`ReservationHoldTest` 가 그렇게 빨개졌다. 롤백이 실제로 일어나는 것은 `ConcurrencyTestBase`(트랜잭션 없음) 위에서만이라, 그 단언은 `ReservationSeatConsistencyTest` 로 옮겼다.
+지연 트리거(위)와 같은 부류다 — **커밋·롤백 자체를 재는 단언은 커밋 레인에 둔다.**
+
 ### 지연 트리거 안에서 `NEW` 는 커밋 시점의 값이 아니다
 
 **`NEW` 는 그 트리거를 걸어 준 문장 시점의 행이다.** 커밋 때 도는 것이지 커밋 때의 값을 보는 게 아니다.

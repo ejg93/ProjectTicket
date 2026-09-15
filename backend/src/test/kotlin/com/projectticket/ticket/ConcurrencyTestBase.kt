@@ -43,22 +43,28 @@ abstract class ConcurrencyTestBase {
      * 앞에서만 지우면 이 클래스 뒤에 도는 [PostgresTestBase] 계열이 남은 행을 본다.
      *
      * **한 트랜잭션**이다. 합계 등식이 지연 트리거라 자식만 지운 채 커밋되면 거기서 터진다.
-     * 순서는 `restrict` 외래키를 거슬러 올라간다 — 회차가 공연·홀을 `restrict` 로 잡아서 회차가 맨 앞이고,
-     * 나머지는 `cascade` 라 부모만 지운다.
+     * 순서는 `restrict` 외래키를 거슬러 올라간다 — 좌석의 포인터를 먼저 풀어야 예매가 지워지고, 예매가 계정·회차를 `restrict` 로 잡아서
+     * 예매가 그다음, 회차가 공연·홀을 `restrict` 로 잡아서 회차가 그다음이다. 나머지는 `cascade` 라 부모만 지운다.
      */
     @BeforeEach
     @AfterEach
     fun purgePrefixedRows() {
         TransactionTemplate(txManager).executeWithoutResult {
+            val performances = """
+                select performance_id from performance where event_id in (
+                    select event_id from event where organizer_id in (
+                        select organizer_id from organizer where code like :prefix))
+            """
+            jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_id in ($performances)")
+                .param("prefix", "$PREFIX%").update()
             jdbc.sql(
                 """
-                delete from performance where event_id in (
-                    select event_id from event where organizer_id in (
-                        select organizer_id from organizer where code like :prefix
-                    )
-                )
+                delete from reservation
+                 where performance_id in ($performances)
+                    or account_id in (select account_id from account where email like :prefix)
                 """,
             ).param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from performance where performance_id in ($performances)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from event where organizer_id in (select organizer_id from organizer where code like :prefix)")
                 .param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from organizer where code like :prefix").param("prefix", "$PREFIX%").update()

@@ -26,15 +26,8 @@ class SeatVersionTest : ConcurrencyTestBase() {
         openService.open(performanceId, actorAccountId = null)
         val before = seatQuery.version(performanceId)
 
-        // 자동 커밋이라 이 문장이 자기 트랜잭션이다. 예매 표는 13 이 만들므로 `reservation_id` 는 아직 아무 값이나 된다.
-        jdbc.sql(
-            """
-            update performance_seat
-               set status = 'held', held_until = now() + interval '5 minutes', reservation_id = 1
-             where performance_id = :id and performance_seat_id = (
-                   select min(performance_seat_id) from performance_seat where performance_id = :id)
-            """,
-        ).param("id", performanceId).update()
+        // 자동 커밋이라 이 문장이 자기 트랜잭션이다 — 오픈과 다른 트랜잭션이라 `now()` 가 다르다.
+        fixture.hold(fixture.account("${PREFIX}viewer@test.local"), performanceId, "F1-A", 1)
 
         assertThat(seatQuery.version(performanceId))
             .describedAs("버전이 그대로면 폴링이 304 만 받아 잡힌 좌석이 화면에서 빈자리로 남는다")
