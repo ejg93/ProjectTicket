@@ -39,7 +39,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * `@AutoConfigureMockMvc` 를 바탕에 두는 이유는 컨텍스트 캐시다 — 클래스마다 붙이면 같은 설정인데 컨텍스트가 갈린다.
  * fork 별 DB 분리·Redis 컨테이너는 그것이 필요한 청크(13·21)에서 더한다.
  */
-@SpringBootTest
+@SpringBootTest(properties = ["ticket.scheduling.enabled=false"])
 @AutoConfigureMockMvc
 @Transactional
 @Tag("db")
