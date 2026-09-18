@@ -179,7 +179,7 @@ update performance_seat set status = 'available', held_until = null, reservation
 | 항목 | 왜 |
 |---|---|
 | 낙관락 `version` 컬럼 | 조건부 UPDATE 가 같은 일을 한다. **19 가 셋을 쟀다** — 1000 스레드에서 조건부 1 : 낙관 1.4 : 비관 4.3(p95 는 1 : 1.5 : 7.5)(ADR 0006, `doc/notes/lock-comparison.md`) |
-| Redisson 좌석 락 | 34 가 33 환경에서 재서 ADR 0008 에 남긴다. 지금은 DB 가 락이다 |
+| ~~Redisson 좌석 락~~ | **닫혔다 — ADR 0008**. 34 가 재 보니 Redis 락이 1000 스레드에서 전체 1.5~2배·p50 4~6배 느리다(왕복이 셋, 클라이언트가 커넥션 하나를 나눠 쓴다). 좌석은 DB 가 락이고, Redis 락은 스케줄러에만 쓴다(33) |
 | 좌석 단위 대기열 | 대기열은 회차 단위다(`D12`). 좌석마다 줄을 세우면 줄이 2천 개다 |
 
 ## 이 문서를 고칠 때
