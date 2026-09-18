@@ -1,5 +1,6 @@
 package com.projectticket.ticket.queue
 
+import com.projectticket.ticket.observability.TicketMetrics
 import java.security.SecureRandom
 import java.time.Duration
 import java.util.Base64
@@ -22,6 +23,7 @@ import tools.jackson.databind.ObjectMapper
 class AdmissionService(
     private val redis: StringRedisTemplate,
     private val objectMapper: ObjectMapper,
+    private val metrics: TicketMetrics,
 ) {
 
     private val random = SecureRandom()
@@ -46,7 +48,16 @@ class AdmissionService(
             performanceId.toString(),
         ) + tokens
 
-        return redis.execute(ADMIT, listOf(waitingKey, QueueKeys.active(performanceId)), *args.toTypedArray()) ?: 0
+        val answer = redis.execute(ADMIT, listOf(waitingKey, QueueKeys.active(performanceId)), *args.toTypedArray())
+            ?: return 0
+
+        // 「몇 명」과 「얼마나 기다렸나」를 같이 받는다 — 줄 앞에서 뺀 사람의 진입 시각은 스크립트 안에만 있다.
+        val admitted = answer.substringBefore('|').toLong()
+        answer.substringAfter('|').split(',')
+            .filter { it.isNotBlank() }
+            .forEach { metrics.queueWaited(Duration.ofMillis(it.toLong())) }
+        metrics.queueAdmitted(admitted)
+        return admitted
     }
 
     /** 그 계정이 이미 들어와 있나. 브라우저를 껐다 켜도 자리를 안 잃는 자리다(`D12`) */
@@ -104,7 +115,7 @@ class AdmissionService(
          *
          * 시각은 `TIME` 이다. 앱이 주면 인스턴스 시계가 어긋난 만큼 토큰 수명이 들쭉날쭉해진다.
          */
-        private val ADMIT = DefaultRedisScript<Long>(
+        private val ADMIT = DefaultRedisScript<String>(
             """
             local t = redis.call('TIME')
             local now = t[1] * 1000 + math.floor(t[2] / 1000)
@@ -118,10 +129,11 @@ class AdmissionService(
             local free = capacity - redis.call('ZCARD', KEYS[2])
             local wanted = #ARGV - 5
             if free < wanted then wanted = free end
-            if wanted <= 0 then return 0 end
+            if wanted <= 0 then return '0|' end
 
             local popped = redis.call('ZPOPMIN', KEYS[1], wanted)
             local count = 0
+            local waits = {}
             for i = 1, #popped, 2 do
                 local account = popped[i]
                 count = count + 1
@@ -139,10 +151,12 @@ class AdmissionService(
                     ttl
                 )
                 redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
+                -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
+                waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
             end
-            return count
+            return count .. '|' .. table.concat(waits, ',')
             """.trimIndent(),
-            Long::class.java,
+            String::class.java,
         )
     }
 }

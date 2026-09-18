@@ -1,0 +1,18 @@
+# 로컬 수집기(30). 앱은 호스트에서 돌 수도(gradlew bootRun) 컨테이너로 돌 수도(33) 있어서 둘 다 적는다 —
+# 안 뜬 쪽은 `up == 0` 으로 보이고, 그것이 「지금 무엇이 도나」를 그대로 말해 준다.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: ticket-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 호스트에서 띄운 앱. Docker Desktop 에서 컨테이너가 호스트를 보는 이름이다.
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          instance_kind: host
+      # compose 로 띄운 앱(33 이 `--scale app=3` 으로 늘린다). DNS 가 인스턴스 수만큼 답한다.
+      - targets: ["app:8080"]
+        labels:
+          instance_kind: compose

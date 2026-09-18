@@ -4,6 +4,7 @@ import com.projectticket.ticket.auth.SecuredApiFilter
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.ProblemWriter
+import com.projectticket.ticket.observability.TicketMetrics
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -30,6 +31,7 @@ class QueueGateFilter(
     private val admission: AdmissionService,
     private val queue: QueueService,
     private val problems: ProblemWriter,
+    private val metrics: TicketMetrics,
 ) : OncePerRequestFilter(), SecuredApiFilter {
 
     override fun shouldNotFilter(request: HttpServletRequest): Boolean = performanceIdOf(request) == null
@@ -46,12 +48,7 @@ class QueueGateFilter(
         } catch (e: RuntimeException) {
             // Redis 가 죽었다. **관문을 닫는다** — 열어 두면 대기열이 막으려던 폭발이 그대로 DB 로 간다(`D12`).
             logger.warn("대기열 관문이 Redis 를 못 본다 — 선점을 막는다 이유=${e.javaClass.simpleName}")
-            return problems.write(
-                request,
-                response,
-                ErrorCode.QUEUE_UNAVAILABLE,
-                headers = mapOf("Retry-After" to RETRY_AFTER_SECONDS),
-            )
+            return reject(request, response, ErrorCode.QUEUE_UNAVAILABLE, headers = mapOf("Retry-After" to RETRY_AFTER_SECONDS))
         }
 
         if (admitted == null) {
@@ -60,10 +57,10 @@ class QueueGateFilter(
             if (!queue.isGated(performanceId)) return chain.doFilter(request, response)
 
             // 헤더가 없거나 만료·위조된 토큰이다. 둘을 안 가른다 — 가르면 「그 토큰은 있었다」를 알려 주는 것이다(`D9`).
-            return problems.write(request, response, ErrorCode.ADMISSION_REQUIRED, waitingProperties(performanceId, user.id))
+            return reject(request, response, ErrorCode.ADMISSION_REQUIRED, waitingProperties(performanceId, user.id))
         }
         if (admitted.accountId != user.id || admitted.performanceId != performanceId) {
-            return problems.write(request, response, ErrorCode.ADMISSION_MISMATCH)
+            return reject(request, response, ErrorCode.ADMISSION_MISMATCH)
         }
 
         chain.doFilter(request, response)
@@ -72,6 +69,18 @@ class QueueGateFilter(
         if (response.status == CREATED) {
             admission.release(performanceId, user.id)
         }
+    }
+
+    /** 막은 이유를 센다(`D10`). 셋이 한 숫자로 뭉치면 「Redis 가 죽었나」와 「줄을 안 섰나」를 못 가른다 */
+    private fun reject(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        code: ErrorCode,
+        properties: Map<String, Any> = emptyMap(),
+        headers: Map<String, String> = emptyMap(),
+    ) {
+        metrics.gateRejected(code.slug)
+        problems.write(request, response, code, properties, headers)
     }
 
     /** 429 본문에 순번을 실어 화면이 바로 줄을 보여 준다(`D5` 「type 목록」). 줄에 없으면 순번도 없다 */

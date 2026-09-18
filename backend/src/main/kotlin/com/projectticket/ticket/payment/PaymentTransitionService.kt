@@ -5,6 +5,7 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.CancelledBy
@@ -29,6 +30,7 @@ class PaymentTransitionService(
     private val tickets: TicketService,
     private val outbox: OutboxWriter,
     private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     private val log = LoggerFactory.getLogger(PaymentTransitionService::class.java)
@@ -195,6 +197,7 @@ class PaymentTransitionService(
             .filterNotNull()
         // 커밋 뒤에 판이 오른다(`D20`). 커밋 전에 올리면 롤백된 확정이 화면에 팔린 자리로 보인다.
         seatVersions.publishAfterCommit(confirmedSeats, PerformanceSeatStatus.RESERVED)
+        metrics.reservationConfirmed()
         // 확정과 발권이 한 트랜잭션이다(18). 발권일은 DB 시각이다(`D7`).
         val issued = tickets.issue(reservationId, jdbc.sql("select now()").query(OffsetDateTime::class.java).single())
         auditLog.record(

@@ -5,6 +5,8 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
+import java.time.Duration
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -33,6 +35,7 @@ class SeatHoldService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     /** 멱등키의 본문 해시가 이것으로 만들어진다 — 같은 회차·같은 좌석 순서면 같은 요청이다 */
@@ -40,7 +43,23 @@ class SeatHoldService(
 
     /** @return 만든 예매 id. 실패는 전부 [TicketException] 이고 그때 이 트랜잭션은 통째로 롤백된다 */
     @Transactional
+    /**
+     * 시도와 결과를 센다(`D10`). **경합에서 진 것(`taken`)과 규칙에 막힌 것(`rejected`)을 가른다** —
+     * 앞은 정상이고 뒤는 화면이나 계약이 틀린 것이라, 한 숫자로 뭉치면 어느 쪽이 늘었는지 못 본다.
+     */
     fun hold(accountId: Long, command: Command): Long {
+        val started = System.nanoTime()
+        try {
+            return holdInternal(accountId, command).also { metrics.seatHoldAttempt("won") }
+        } catch (e: TicketException) {
+            metrics.seatHoldAttempt(if (e.code == ErrorCode.SEAT_TAKEN) "taken" else "rejected")
+            throw e
+        } finally {
+            metrics.seatHoldLatency(Duration.ofNanos(System.nanoTime() - started))
+        }
+    }
+
+    private fun holdInternal(accountId: Long, command: Command): Long {
         val seatIds = command.seatIds.distinct()
         if (seatIds.size > MAX_SEATS_PER_HOLD) {
             throw TicketException(

@@ -1,6 +1,8 @@
 package com.projectticket.ticket.queue
 
+import com.projectticket.ticket.observability.TicketMetrics
 import org.slf4j.LoggerFactory
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -15,7 +17,12 @@ import org.springframework.stereotype.Component
  * 33 이 Redis 락으로 하나만 돌린다 — 속도가 설정값과 같아야 31 의 측정이 뜻을 갖는다.
  */
 @Component
-class AdmissionScheduler(private val jdbc: JdbcClient, private val admission: AdmissionService) {
+class AdmissionScheduler(
+    private val jdbc: JdbcClient,
+    private val admission: AdmissionService,
+    private val redis: StringRedisTemplate,
+    private val metrics: TicketMetrics,
+) {
 
     private val log = LoggerFactory.getLogger(AdmissionScheduler::class.java)
 
@@ -28,6 +35,11 @@ class AdmissionScheduler(private val jdbc: JdbcClient, private val admission: Ad
             .filterNotNull()
 
         val admitted = open.sumOf { admission.admit(it) }
+        // 게이지는 **회차 합**이다(`D10`). 회차를 태그로 달면 회차마다 시계열이 늘어 저장소가 터진다.
+        metrics.queueSizes(
+            length = open.sumOf { redis.opsForZSet().size(QueueKeys.waiting(it)) ?: 0 },
+            active = open.sumOf { redis.opsForZSet().size(QueueKeys.active(it)) ?: 0 },
+        )
         if (admitted > 0) {
             log.info("대기열 입장 회차={}건 입장={}명", open.size, admitted)
         }

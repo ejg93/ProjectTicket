@@ -217,6 +217,8 @@ class SecurityConfig {
             "/api/health",
             "/actuator/health",
             "/actuator/health/**",
+            // 수집기가 읽는다(30). 로컬 compose 는 인증이 없어서 열어 두고, 밖에 나갈 때는 망으로 가른다(`D9`).
+            "/actuator/prometheus",
             "/api/auth/signup",
             "/api/auth/login",
             // 가입 화면이 무엇에 동의를 받아야 하는지 알아야 한다. 로그인 전에 보는 것이라 공개다.

@@ -3,6 +3,7 @@ package com.projectticket.ticket.event
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import org.springframework.jdbc.core.simple.JdbcClient
+import com.projectticket.ticket.observability.TicketMetrics
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 
@@ -20,6 +21,7 @@ class SeatQuery(
     private val jdbc: JdbcClient,
     private val versions: SeatVersions,
     private val json: ObjectMapper,
+    private val metrics: TicketMetrics,
 ) {
 
     /**
@@ -65,6 +67,8 @@ class SeatQuery(
     }
 
     private fun buildSeatMap(performanceId: Long, version: Long): SeatMap {
+        // 이 수가 폴링 수에 비례하면 캐시가 안 먹는 것이다(`D10`).
+        metrics.snapshotBuilt()
         val grades = jdbc.sql(
             """
             select distinct g.code, g.name, ps.price

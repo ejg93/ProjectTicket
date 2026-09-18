@@ -5,6 +5,7 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.CancelledBy
@@ -31,6 +32,7 @@ class PerformanceCancelService(
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
     private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     private val log = LoggerFactory.getLogger(PerformanceCancelService::class.java)
@@ -134,6 +136,7 @@ class PerformanceCancelService(
             .filterNotNull()
 
         seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
+        metrics.reservationCancelled(CancelledBy.ORGANIZER.code, released.size)
         return released.size
     }
 

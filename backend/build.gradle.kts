@@ -58,6 +58,8 @@ dependencies {
 	// 어느 쪽이 빠져도 증상은 같다: 빈은 뜨는데 그게 `Tracer.NOOP` 이라 추적 ID 가 조용히 안 찍힌다.
 	implementation("org.springframework.boot:spring-boot-micrometer-tracing-brave")
 	implementation("io.micrometer:micrometer-tracing-bridge-brave")
+	// 지표를 Prometheus 형식으로 내놓는다(30). 액추에이터가 `/actuator/prometheus` 를 여는 것은 이 의존이 있을 때뿐이다.
+	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 	// Kotlin data class 를 Jackson 이 읽고 쓰게 한다. 없으면 기본 생성자가 없다고 죽는다.
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")

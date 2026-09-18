@@ -5,6 +5,7 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.CancelledBy
@@ -27,6 +28,7 @@ class RefundTransitionService(
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
     private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     /** ① 이 끝난 환불. [refundAmount] 만 PG 로 간다 */
@@ -92,6 +94,7 @@ class RefundTransitionService(
             .list()
             .filterNotNull()
         seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
+        metrics.reservationCancelled(CancelledBy.AUDIENCE.code)
 
         // 취소 트랜잭션이 사건을 같이 커밋한다(`D11`). 감사와 이름이 같지만 목적이 다르다 — 이쪽은 소비자가 반응하려고 있는 계약이다.
         outbox.append(
