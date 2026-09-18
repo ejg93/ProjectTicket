@@ -142,7 +142,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 21 | 대기열 진입·순번 **[종료 시 키 삭제도]** | Redis ZSET(score=진입 시각) 회차 단위. `POST /api/queue/{performanceId}` → 순번·예상 대기. 테스트 Redis 는 `20a` 가 `PostgresTestBase` 에 들였다. **축**: `D12`(이 청크가 초안을 쓴다). **강제 지점**: 테스트(순번 단조). **건드리는 자리**: 신설 `queue/`, `doc/reference/queue-design.md`. **닫힘**: `QueueRankTest` | 13 |
+| 21 | 대기열 진입·순번 **[종료 시 키 삭제도]** | 완료 — `queue/` 신설 셋(`QueueKeys`·`QueueService`·`QueueController`). `POST`·`GET /api/queue/{performanceId}` → `{rank, eta_seconds}`, 200(자원이 아니라 동작이라 `Location` 이 없다). 진입은 Lua 한 번 — `TIME`(서버 시계)·`ZADD NX`(재진입이 순번 유지)·`ZRANK` 가 원자다. `eta = 올림(rank / 20)`(ADR 0003 의 R). 종료 시 키 삭제는 `PerformanceCloser`·`OrganizerCancelController` 가 **커밋 뒤에** 부른다. `ErrorCode` 둘 추가(`queue-closed` 410·`not-in-queue` 404, `D5` 에 줄). `D12` 의 「키 다섯 삭제」를 셋으로 고쳤다 — 토큰 키는 회차로 못 훑어 TTL 이 지운다. 닫힘: `QueueRankTest`(일곱 — 순번 단조·재진입·eta 올림·404·410·종료가 줄을 걷는다·응답 계약) | 완료 |
 | 22 | 입장 스케줄러·활성 토큰 | N초마다 앞 M명을 활성 집합으로 옮기고 토큰(TTL) 발급. **축**: `D12`. **강제 지점**: TTL + 테스트(만료 토큰 거부). **건드리는 자리**: `queue/AdmissionScheduler`. **닫힘**: `AdmissionTest` | 21 |
 | 23 | 대기열 관문 | 활성 토큰 없이 예매 API 를 부르면 429/403. 필터. **축**: `D9`(토큰 위조·재사용). **강제 지점**: 필터 + 테스트. **건드리는 자리**: `queue/QueueGateFilter`. **닫힘**: `QueueGateTest.no_token_rejected` | 22 |
 | 24 | 이탈·새로고침 | 하트비트 없으면 제거, 새로고침해도 순번 유지. **축**: `D12`. **강제 지점**: TTL. **건드리는 자리**: `queue/`. **닫힘**: `QueueHeartbeatTest` | 22 |
