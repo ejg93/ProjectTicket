@@ -1,5 +1,6 @@
 package com.projectticket.ticket.queue
 
+import com.projectticket.ticket.SchedulerLock
 import com.projectticket.ticket.observability.TicketMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -22,12 +23,19 @@ class AdmissionScheduler(
     private val admission: AdmissionService,
     private val redis: StringRedisTemplate,
     private val metrics: TicketMetrics,
+    private val lock: SchedulerLock,
 ) {
 
     private val log = LoggerFactory.getLogger(AdmissionScheduler::class.java)
 
     /** @return 이번에 들인 사람 수 */
+    /**
+     * 스케줄러 입구(33). **여기서 락이 특히 중요하다** — Lua 가 원자라 같은 사람을 두 번 들이지는 않지만,
+     * 세 대가 돌면 5초에 300명이 들어가 입장 속도 R 이 설정값의 세 배가 된다. 그러면 31 의 측정이 뜻을 잃는다.
+     */
     @Scheduled(fixedDelayString = AdmissionService.ADMIT_INTERVAL)
+    fun admitDueExclusively(): Long = lock.runExclusively(LOCK_NAME) { admitDue() } ?: 0
+
     fun admitDue(): Long {
         val open = jdbc.sql("select performance_id from performance where status = 'open' order by performance_id")
             .query(Long::class.java)
@@ -44,5 +52,10 @@ class AdmissionScheduler(
             log.info("대기열 입장 회차={}건 입장={}명", open.size, admitted)
         }
         return admitted
+    }
+
+    companion object {
+        /** 락 이름(33). 여기가 여러 대에서 돌면 입장 속도가 대수배가 된다 */
+        const val LOCK_NAME = "admission-scheduler"
     }
 }

@@ -40,6 +40,7 @@ class StackVersionConsistencyTest {
         val compose = Files.readString(root.resolve("docker-compose.yml"))
         assertThat(compose).contains("image: postgres:${tableVersion("PostgreSQL")}")
         assertThat(compose).contains("image: redis:${tableVersion("Redis")}")
+        assertThat(compose).contains("image: nginx:${tableVersion("nginx")}")
         assertThat(compose).contains("image: prom/prometheus:${tableVersion("Prometheus")}")
         assertThat(compose).contains("image: grafana/grafana:${tableVersion("Grafana")}")
         // 테스트 컨테이너도 같은 이미지다 — 갈리면 테스트가 통과해도 운영에서 깨진다.

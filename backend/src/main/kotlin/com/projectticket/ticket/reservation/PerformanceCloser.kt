@@ -1,5 +1,6 @@
 package com.projectticket.ticket.reservation
 
+import com.projectticket.ticket.SchedulerLock
 import com.projectticket.ticket.queue.QueueService
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -20,12 +21,16 @@ class PerformanceCloser(
     private val jdbc: JdbcClient,
     private val closeService: PerformanceCloseService,
     private val queue: QueueService,
+    private val lock: SchedulerLock,
 ) {
 
     private val log = LoggerFactory.getLogger(PerformanceCloser::class.java)
 
     /** @return 닫은 회차 수 */
+    /** 스케줄러 입구(33). 락은 바깥 고리에만 있다 — [closeDue] 는 테스트가 직접 부른다 */
     @Scheduled(fixedDelayString = CLOSE_INTERVAL)
+    fun closeDueExclusively(): Int = lock.runExclusively(LOCK_NAME) { closeDue() } ?: 0
+
     fun closeDue(): Int {
         val due = jdbc.sql("select performance_id from performance where status = 'open' and sales_close_at < now() order by performance_id")
             .query(Long::class.java)
@@ -60,6 +65,9 @@ class PerformanceCloser(
     }
 
     companion object {
+        /** 락 이름(33) */
+        const val LOCK_NAME = "performance-closer"
+
         /** `D7` 「자동 전이의 주기와 기준」 — 1분 */
         const val CLOSE_INTERVAL = "PT1M"
     }

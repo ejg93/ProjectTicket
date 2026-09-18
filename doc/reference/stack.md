@@ -17,6 +17,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Gradle | 9.7.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
+| nginx | 1.27-alpine | `docker-compose.yml`, `docker/nginx/nginx.conf`. 인스턴스 셋 앞의 문(33) |
 | Prometheus | v3.1.0 | `docker-compose.yml`. 수집기 — 앱은 `micrometer-registry-prometheus` 로 `/actuator/prometheus` 를 연다(30) |
 | Grafana | 11.5.0 | `docker-compose.yml`. 데이터 소스·대시보드는 `docker/grafana/provisioning/` 이 심는다 |
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
@@ -286,6 +287,11 @@ Testcontainers 2.x 에는 Redis 전용 모듈이 없어서 `GenericContainer` �
 
 `spring.session.redis.repository-type: indexed` 면 저장소가 뜰 때 Redis 에 `CONFIG SET notify-keyspace-events` 를 보낸다(만료 세션을 색인에서 걷어내려고).
 `CONFIG` 를 막아 둔 Redis 에서는 기동이 실패한다. 그때는 `ConfigureRedisAction.NO_OP` 을 빈으로 두고 서버 쪽 설정을 손으로 켠다.
+
+### 컨테이너로 띄우면 로그 파일 자리가 없다
+
+`logback-spring.xml` 이 `logs/ticket.log` 를 상대 경로로 여는데, 이미지가 비루트 사용자로 돌면 `/app` 이 root 것이라 기동이 죽는다 —
+증상은 Logback 스택 트레이스와 무한 재시작이다(33 에서 겪었다). `Dockerfile` 이 `mkdir -p /app/logs && chown` 을 한다.
 
 ### Lua 는 큰 정수를 지수 표기로 접는다
 
