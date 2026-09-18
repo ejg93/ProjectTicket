@@ -1,6 +1,8 @@
 package com.projectticket.ticket.reservation
 
 import com.projectticket.ticket.ConcurrencyTestBase
+import com.projectticket.ticket.SchedulerLock
+import java.time.Duration
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -14,7 +16,7 @@ import java.nio.file.Path
 import java.sql.SQLException
 
 /**
- * 락 방식 셋의 비교 측정(19, ADR 0006). **테스트가 아니라 계측이다** — 결과가 초록·빨강이 아니라 숫자고, `gradlew measure` 로만 돈다(`D8` 「측정」).
+ * 락 방식 넷의 비교 측정(19·34, ADR 0006·0008). **테스트가 아니라 계측이다** — 결과가 초록·빨강이 아니라 숫자고, `gradlew measure` 로만 돈다(`D8` 「측정」).
  *
  * 같은 좌석 하나를 N 스레드가 동시에 잡는다. 세 방식이 같은 스크래치 표 위에서 같은 조건으로 돈다:
  *
@@ -23,6 +25,7 @@ import java.sql.SQLException
  * | 조건부 UPDATE | `update … set status='held' where id=? and status='available'` — 한 문장, 갱신 행 수가 판정(`D4`) |
  * | 비관락 | `select … for update` → 앱이 상태를 보고 → `update`. 한 트랜잭션 |
  * | 낙관락 | `select status, version` → `update … where id=? and version=?`. 진 쪽은 0행 |
+ * | Redis 락 | `SET NX PX` 로 잡고 `update`. 못 잡으면 진 것이다(34 — `SchedulerLock` 과 같은 모양) |
  *
  * 스크래치 표(`lock_measure_seat`)를 쓰는 이유는 `performance_seat` 에 `version` 이 없어서다 — 측정 때문에 스키마를 안 바꾼다.
  * 재는 것은 「승자 하나」가 아니라(셋 다 하나다) **비용**이다: 전체 소요(스레드 생성 포함)·스레드별 지연 p50/p95. 왕복 수는 안 재고 문장에서 센다.
@@ -32,6 +35,7 @@ import java.sql.SQLException
 class LockComparisonTest : ConcurrencyTestBase() {
 
     @Autowired lateinit var transactionManager: PlatformTransactionManager
+    @Autowired lateinit var schedulerLock: SchedulerLock
 
     @BeforeEach
     fun createScratchTable() {
@@ -51,6 +55,7 @@ class LockComparisonTest : ConcurrencyTestBase() {
             rows += measure("조건부 UPDATE", threads) { conditionalUpdate() }
             rows += measure("비관락 for update", threads) { pessimistic() }
             rows += measure("낙관락 version", threads) { optimistic() }
+            rows += measure("Redis 락", threads) { redisLock() }
         }
 
         val table = render(rows)
@@ -83,6 +88,16 @@ class LockComparisonTest : ConcurrencyTestBase() {
         return jdbc.sql("update lock_measure_seat set status = 'held', version = version + 1 where seat_id = :id and version = :version")
             .param("id", SEAT).param("version", version).update() == 1
     }
+
+    /**
+     * 34 가 더한 넷째. 33 이 스케줄러에 쓴 락과 같은 모양이다 — **못 잡으면 기다리지 않고 진다.**
+     * 기다리게 하면 재는 것이 락 비용이 아니라 대기 시간이 되고, 좌석은 기다릴 이유가 없다(남이 잡았으면 끝이다).
+     */
+    private fun redisLock(): Boolean =
+        schedulerLock.runExclusively("seat-$SEAT", Duration.ofSeconds(5)) {
+            jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id and status = 'available'")
+                .param("id", SEAT).update() == 1
+        } ?: false
 
     private fun measure(strategy: String, threads: Int, attempt: () -> Boolean): Row {
         jdbc.sql("delete from lock_measure_seat").update()
