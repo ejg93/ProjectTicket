@@ -120,12 +120,16 @@ val measure = tasks.register<Test>("measure") {
 tasks.test {
 	useJUnitPlatform { excludeTags("db") }
 
-	// `ComposeContractTest` 가 이 셋을 글자로 읽는다(35). 입력으로 안 걸면 Kotlin 이 그대로일 때
-	// Gradle 이 `UP-TO-DATE` 로 건너뛰어서, compose·conf 만 고친 커밋에서 그 검사가 안 돈다.
+	// 아래 파일들을 테스트가 **글자로 읽는다**. 입력으로 안 걸면 Kotlin 이 그대로일 때 Gradle 이
+	// `UP-TO-DATE` 로 건너뛰어서, 그 파일만 고친 커밋에서 대조가 안 돈다(점검 2차).
+	// `verify-fingerprint.sh` 의 backend 레인에도 같은 경로가 있어야 도장이 다시 찍힌다.
 	inputs.files(
 		rootProject.file("../docker-compose.yml"),
 		rootProject.file("../docker/nginx/nginx.conf"),
 		rootProject.file("Dockerfile"),
+		rootProject.file("../doc/reference/api-guidelines.md"),
+		rootProject.file("../doc/reference/observability-rules.md"),
+		rootProject.file("../doc/reference/stack.md"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

@@ -123,6 +123,7 @@
 | `unauthenticated` | 401 | 로그인 필요 | | 있다 |
 | `forbidden` | 403 | 권한 없음·CSRF 실패 | | 있다 |
 | `email-taken` | 409 | 가입된 이메일 | | 있다 |
+| `account-not-found` | 404 | 없거나 이미 탈퇴한 계정. **관리자에게도 404 다**(아래 「403 이냐 404 냐」) | | 5b |
 | `unknown-consent-item` · `required-consent-missing` | 422 | 동의 | | 있다 |
 | `performance-not-found` | 404 | 회차 없음 | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
