@@ -4,8 +4,11 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -28,6 +31,8 @@ class PerformanceCancelService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
+    private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     private val log = LoggerFactory.getLogger(PerformanceCancelService::class.java)
@@ -64,12 +69,13 @@ class PerformanceCancelService(
             jdbc.sql(
                 """
                 update reservation
-                   set status = :cancelled, cancelled_at = now(), paying_until = null
+                   set status = :cancelled, cancelled_at = now(), paying_until = null, cancelled_by = :by
                  where reservation_id in (:ids) and status in (:live)
                 returning reservation_id
                 """,
             )
                 .param("cancelled", ReservationStatus.CANCELLED.code)
+                .param("by", CancelledBy.ORGANIZER.code)
                 .param("ids", locked)
                 .param("live", LIVE_STATUSES)
                 .query(Long::class.java)
@@ -79,6 +85,9 @@ class PerformanceCancelService(
 
         if (affected.isNotEmpty()) {
             releaseSeats(performanceId)
+            // **예매 수로 센다**(`D10` — `reservation.cancelled` 는 예매 단위다). 좌석 수로 세면 관객 취소(1건)와
+            // 회차 취소(좌석 수)가 같은 카운터에서 단위가 달라진다.
+            metrics.reservationCancelled(CancelledBy.ORGANIZER.code, affected.size)
             refundInFull(affected)
             affected.forEach {
                 auditLog.record(AuditLog.Kind.OUTCOME, "reservation.cancelled", actorAccountId, AuditLog.Target.of("reservation", it))
@@ -113,18 +122,25 @@ class PerformanceCancelService(
         )
     }
 
-    private fun releaseSeats(performanceId: Long) =
-        jdbc.sql(
+    private fun releaseSeats(performanceId: Long): Int {
+        val released = jdbc.sql(
             """
             update performance_seat
                set status = :available, held_until = null, reservation_id = null
              where performance_id = :id and status in (:taken)
+            returning performance_seat_id, performance_id
             """,
         )
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
             .param("id", performanceId)
             .param("taken", listOf(PerformanceSeatStatus.HELD.code, PerformanceSeatStatus.RESERVED.code))
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+
+        seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
+        return released.size
+    }
 
     /**
      * **이번에 무른 예매**의 승인 결제에 전액 환불 행을 만든다(`D6` 「사유별」 — 구간과 무관하게 0%).

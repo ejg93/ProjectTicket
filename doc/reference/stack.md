@@ -16,7 +16,11 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
 | Gradle | 9.7.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
-| Redis | 7-alpine | `docker-compose.yml`. 코드는 아직 안 쓴다 — `20a`·`21` 부터 |
+| Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
+| detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
+| nginx | 1.27-alpine | `docker-compose.yml`, `docker/nginx/nginx.conf`. 인스턴스 셋 앞의 문(33) |
+| Prometheus | v3.1.0 | `docker-compose.yml`. 수집기 — 앱은 `micrometer-registry-prometheus` 로 `/actuator/prometheus` 를 연다(30) |
+| Grafana | 11.5.0 | `docker-compose.yml`. 데이터 소스·대시보드는 `docker/grafana/provisioning/` 이 심는다 |
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
 | ArchUnit | 1.5.0 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
@@ -274,6 +278,55 @@ CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사
 `Containers` 가 `@TestConfiguration` 이라 **컨텍스트가 갈리면 컨테이너도 따로 뜬다.** 컨텍스트 캐시 키는 애너테이션으로 갈리므로 `ConcurrencyTestBase` 가 `PostgresTestBase` 와 애너테이션을 똑같이 맞춘다(`@AutoConfigureMockMvc` 까지) — `@Transactional` 만 캐시 키에 안 들어간다.
 재사용을 켜면 갈린 컨텍스트도 같은 컨테이너에 붙는다.
 
+### `GenericContainer` 는 `@ServiceConnection` 에 이름을 적어야 한다
+
+이미지 이름(`redis:7-alpine`)만으로 알아보는 길이 Kotlin 의 `GenericContainer<Nothing>` 에서는 안 먹었다 — `@ServiceConnection(name = "redis")` 로 적어야 붙는다.
+안 적으면 기동이 `ConnectionDetailsNotFoundException` 으로 죽고, 문구가 「You may need to add a 'name'」이라 그대로 따르면 된다(`20a` 에서 겪었다).
+Testcontainers 2.x 에는 Redis 전용 모듈이 없어서 `GenericContainer` 를 쓸 수밖에 없다.
+
+### Spring Session 색인은 기동 때 Redis 설정을 바꾼다
+
+`spring.session.redis.repository-type: indexed` 면 저장소가 뜰 때 Redis 에 `CONFIG SET notify-keyspace-events` 를 보낸다(만료 세션을 색인에서 걷어내려고).
+`CONFIG` 를 막아 둔 Redis 에서는 기동이 실패한다. 그때는 `ConfigureRedisAction.NO_OP` 을 빈으로 두고 서버 쪽 설정을 손으로 켠다.
+
+### 컨테이너로 띄우면 로그 파일 자리가 없다
+
+`logback-spring.xml` 이 `logs/ticket.log` 를 상대 경로로 여는데, 이미지가 비루트 사용자로 돌면 `/app` 이 root 것이라 기동이 죽는다 —
+증상은 Logback 스택 트레이스와 무한 재시작이다(33 에서 겪었다). `Dockerfile` 이 `mkdir -p /app/logs && chown` 을 한다.
+
+### 최소 15자면 유출 목록이 거의 안 걸린다
+
+SecLists 의 `10k-most-common` 10,001개 중 **15자를 넘는 것은 하나뿐**이다(`films+pic+galeries`).
+길이 규칙이 이미 그 목록을 막고 있어서, 블록리스트가 실제로 잡는 것은 **흔한 것을 늘려 만든 것**이다 —
+`passwordpassword`·`123456789012345`. 그래서 목록은 대조용이자 **반복 검사의 사전**으로 쓴다(`3b`).
+
+### `DataSource` 빈을 하나 더 만들면 기본 자동설정이 꺼진다
+
+Boot 의 `DataSourceAutoConfiguration` 은 `@ConditionalOnMissingBean(DataSource)` 다 — **타입으로 본다.**
+파기 전용 풀을 빈으로 하나 만들었더니 기본 DataSource 가 아예 안 생기고 **앱 전체가 그 연결을 썼다**(4a 에서 겪었다).
+연결을 가르고 싶으면 기본 빈도 같이 직접 정의하거나, 아예 **같은 연결에서 `set local role`** 로 가른다(지금 방식).
+
+### 실패한 트랜잭션은 그 뒤 문장을 전부 거절한다
+
+`current transaction is aborted, commands ignored until end of transaction block`. 한 테스트에서 **거절을 두 번 재려면**
+저장점이 필요하다 — `TransactionTemplate` 에 `PROPAGATION_NESTED` 를 주면 실패가 저장점까지만 되돌아가고 `SET LOCAL` 도 같이 풀린다.
+
+### detekt 1.23 은 JDK 25 에서 안 돈다
+
+묶여 있는 IntelliJ 유틸이 `25.0.1` 이라는 판 문자열을 못 읽어 `IllegalArgumentException: 25.0.1` 로 선다.
+`jvmTarget` 을 낮춰도 소용없다 — 분석기가 **도는** JVM 이 문제고, detekt 의 Gradle 태스크는 그 JVM 을 바꿀 자리를 안 준다.
+그래서 2.0 알파(`dev.detekt`, 좌표가 바뀌었다)를 쓴다.
+
+**detekt 는 자기가 빌드된 Kotlin 으로만 돈다.** 우리 판과 다르면 「compiled with X but running with Y」로 선다 —
+`configurations.named("detekt")` 에서 detekt 쪽 Kotlin 의존만 그 판으로 고정한다(2.0.0-alpha.6 은 2.4.10).
+우리 코드가 컴파일되는 판은 그대로다.
+
+### Lua 는 큰 정수를 지수 표기로 접는다
+
+Redis 스크립트 안에서 `1789699665760900 .. ''` 같은 잇기를 하면 `1.7896996657609e+15` 가 된다 — Lua 5.1 의 수가 double 이고 기본 서식이 `%.14g` 라서다.
+좌석 판·스트림 id 처럼 **정수를 문자열로 만들 때는 `string.format('%d', n)`** 을 쓴다. 안 쓰면 파싱이 `NumberFormatException` 으로 죽고,
+그 값이 스트림 id 면 애초에 XADD 가 거절한다(`10a` 에서 겪었다).
+
 ### Gradle 은 Test 태스크를 up-to-date 로 건너뛴다
 
 입력이 같으면 두 번째 실행은 안 돈다. 숫자를 내는 측정(`gradlew measure`)은 그러면 **지난 표를 이번 것으로 읽게 된다** — `outputs.upToDateWhen { false }` 로 늘 돌린다(19 에서 두 번째 실행이 첫 표와 같아서 알았다).
@@ -326,7 +379,7 @@ git update-index --chmod=+x backend/gradlew
 
 ### Redis 는 테스트 롤백이 안 되돌린다
 
-`PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. Redis 를 쓰는 테스트(21 부터)는 `@BeforeEach` 에서 자기 키를 지운다.
+`PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.
 
 ### `initdb.d` 는 볼륨이 비었을 때만 돈다
 
@@ -367,7 +420,7 @@ git update-index --chmod=+x backend/gradlew
 | 대상 | 언제 |
 |---|---|
 | Next.js 버전·패키지 매니저 | 39 |
-| Redis 클라이언트(Lettuce·Redisson) | `20a`·`21`. 스케줄러 락은 33(Redisson, ADR 0003) |
+| Redisson(스케줄러 락·좌석 락) | 33, ADR 0003. Lettuce 는 `20a` 가 스타터로 들였다 |
 | 품질 게이트 도구(detekt·CodeQL·SpotBugs) | `P10`(46·47). ProjectShop 의 SpotBugs·find-sec-bugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봤다 — 그 판단은 그때 다시 |
 | Kafka | 28, ADR 0007 |
 

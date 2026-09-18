@@ -2,7 +2,6 @@ package com.projectticket.ticket.auth
 
 import jakarta.validation.Constraint
 import jakarta.validation.Payload
-import jakarta.validation.ReportAsSingleViolation
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import kotlin.reflect.KClass
@@ -16,14 +15,15 @@ import kotlin.reflect.KClass
  *
  * 가입과 비밀번호 변경이 각자 규칙을 들면 한쪽만 고치는 날 갈린다. 그래서 하나로 모았다.
  *
- * 블록리스트 대조(유출·사전 단어)는 아직 없다 — 같은 문서의 SHALL 이라 열려 있는 위반이고 청크 `3b` 가 닫는다.
+ * 블록리스트 대조(유출·사전 단어·연속 문자·문맥 단어)는 [NoCommonPassword] 가 한다(`3b`).
  *
- * `@ReportAsSingleViolation` 이 있어야 아래 `message` 가 나간다. 없으면 구성 제약의 프레임워크 기본 문구가 각각 나가서
- * 여기 적은 문구는 죽은 글이 된다.
+ * **`@ReportAsSingleViolation` 을 뺐다.** 그것이 있으면 무엇을 어겼든 아래 `message` 하나로 뭉쳐서
+ * 「15자가 안 된다」와 「흔한 비밀번호다」가 같은 말로 나간다 — 고칠 방법이 다른데 같은 문구면 사용자가 헤맨다(`D5`).
+ * 대신 구성 제약마다 문구를 직접 적는다.
  */
-@Size(min = 15, max = 64)
-@Pattern(regexp = "^[\\x20-\\x7E]+$")
-@ReportAsSingleViolation
+@Size(min = 15, max = 64, message = "비밀번호는 15~64자여야 한다")
+@Pattern(regexp = "^[\\x20-\\x7E]+$", message = "비밀번호는 ASCII 출력 가능 문자만 쓴다")
+@NoCommonPassword
 @Constraint(validatedBy = [])
 @Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.PROPERTY)
 @Retention(AnnotationRetention.RUNTIME)

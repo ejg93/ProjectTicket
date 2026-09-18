@@ -8,9 +8,10 @@ import org.springframework.stereotype.Component
 /**
  * 아직 안 나간 환불(`requested`)을 PG 로 보낸다(`17b` ⓐ — 17a 가 흡수했다).
  *
- * 두 자리가 이것을 만든다:
+ * 세 자리가 이것을 만든다:
  * - 관객 취소(17)가 ② 뒤 ③ 전에 죽어 `requested` 로 남은 것
  * - **회차 취소(17a)가 만든 전액 환불** — 예매가 수백 건이면 PG 호출도 수백 번이라 그 트랜잭션에서 안 부른다(`D4`)
+ * - **승인이 늦어 좌석을 못 준 결제**(`17b` ⓑ) — 이 스윕이 [RefundTransitionService.queueLatePayments] 로 행부터 만든다
  *
  * **같은 키로 다시 보내는 것이 안전하다**(`D4`). 키는 우리 환불 id 고 PG 가 같은 키에 같은 답을 준다 —
  * 이미 나간 환불을 또 보내도 돈이 두 번 안 나간다. 그래서 「보냈는지 모르겠다」를 재시도로 푼다.
@@ -30,6 +31,12 @@ class RefundSweeper(
     /** @return 내보낸 환불 수 */
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
     fun sweep(): Int {
+        // 행을 먼저 만든다. 만들기와 보내기가 한 회에 있으면 늦은 승인이 다음 회를 기다리지 않는다.
+        val queued = transitions.queueLatePayments()
+        if (queued.isNotEmpty()) {
+            log.info("늦은 승인 환불 행 {}건", queued.size)
+        }
+
         val pending = takeRequested()
         if (pending.isEmpty()) {
             log.debug("환불 발송 — 보낼 것 없음")

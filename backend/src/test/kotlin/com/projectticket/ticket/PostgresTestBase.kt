@@ -12,6 +12,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -22,6 +23,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import org.testcontainers.containers.GenericContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
@@ -36,8 +38,10 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * `db` 태그가 레인을 가른다(`build.gradle.kts`). 이 바탕을 상속하면 느린 레인(`integrationTest`)으로 가고,
  * 빠른 레인(`test`)은 컨테이너를 한 번도 안 띄운다. 상속하지 않고 DB 를 쓰면 빠른 레인에서 곧바로 빨개진다.
  *
+ * **연결은 앱과 같은 역할(`ticket_app`)을 입는다**(4a) — 테스트가 운영보다 넓은 권한으로 돌면 권한 결함을 여기서 못 잡는다.
+ *
  * `@AutoConfigureMockMvc` 를 바탕에 두는 이유는 컨텍스트 캐시다 — 클래스마다 붙이면 같은 설정인데 컨텍스트가 갈린다.
- * fork 별 DB 분리·Redis 컨테이너는 그것이 필요한 청크(13·21)에서 더한다.
+ * Redis 도 같이 띄운다 — 세션이 거기 산다(ADR 0004, `20a`). fork 별 DB 분리는 그것이 필요한 청크(13)에서 더한다.
  */
 @SpringBootTest(properties = ["ticket.scheduling.enabled=false"])
 @AutoConfigureMockMvc
@@ -55,6 +59,22 @@ abstract class PostgresTestBase {
     fun clearSecurityContext() {
         SecurityContextHolder.clearContext()
         TestSecurityContextHolder.clearContext()
+    }
+
+    @Autowired private lateinit var redisConnections: RedisConnectionFactory
+
+    /**
+     * 앞 테스트가 남긴 세션을 지운다. `@Transactional` 은 DB 만 되돌려서 Redis 는 그대로 남고,
+     * 세션은 계정 이름으로 색인된다 — 테스트들이 같은 이메일을 쓰면 남이 남긴 세션을 자기 것으로 센다.
+     */
+    @BeforeEach
+    fun flushRedis() {
+        val connection = redisConnections.connection
+        try {
+            connection.serverCommands().flushDb()
+        } finally {
+            connection.close()
+        }
     }
 
     @Autowired private lateinit var auditCleanup: JdbcClient
@@ -79,6 +99,9 @@ abstract class PostgresTestBase {
         TransactionTemplate(auditTxManager)
             .apply { propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW }
             .executeWithoutResult {
+                // 연결은 `ticket_app` 역할을 입고 있다(4a) — 그 역할에는 감사를 지울 권한도, 트리거를 건너뛸 권한도 없다.
+                // **정리하는 동안만** 주인으로 돌아간다. `set local` 이라 이 트랜잭션이 끝나면 역할이 되돌아간다.
+                auditCleanup.sql("set local role none").update()
                 auditCleanup.sql("set local session_replication_role = 'replica'").update()
                 auditCleanup.sql("delete from audit_log").update()
             }
@@ -97,6 +120,19 @@ abstract class PostgresTestBase {
          * 테스트에서만 bcrypt 비용을 4 로 낮춘다. 운영은 그대로 10 이다(`SecurityConfig`).
          * `DelegatingPasswordEncoder` 를 그대로 쓴다 — 저장값에 `{bcrypt}` 접두가 붙어서 접두를 안 읽는 인코더로 바꾸면 시드 계정 로그인이 깨진다.
          */
+        /**
+         * 세션 저장소(ADR 0004). `@ServiceConnection(name = "redis")` 가 호스트·포트를 꽂는다 — 이름을 적어야 한다.
+         * 이미지 이름으로 알아보는 길은 `GenericContainer<Nothing>` 에서 안 먹는다(실제로 빈을 못 찾았다).
+         * Testcontainers 2.x 에 Redis 전용 모듈이 없어서 코어의 `GenericContainer` 를 쓴다.
+         */
+        @Bean
+        @ServiceConnection(name = "redis")
+        fun redis(): GenericContainer<Nothing> =
+            GenericContainer<Nothing>("redis:7-alpine").apply {
+                withExposedPorts(6379)
+                withReuse(true)
+            }
+
         @Bean
         @Primary
         fun testPasswordEncoder(): PasswordEncoder =

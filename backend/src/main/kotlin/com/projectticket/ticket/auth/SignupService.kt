@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 class SignupService(
     private val jdbc: JdbcClient,
     private val passwordEncoder: PasswordEncoder,
+    private val blocklist: PasswordBlocklist,
     private val consentService: ConsentService,
     private val auditLog: AuditLog,
 ) {
@@ -35,6 +36,17 @@ class SignupService(
 
     @Transactional
     fun signUp(command: Command): Long {
+        // **이메일에서 딴 비밀번호도 문맥 단어다**(NIST SHALL, `3b`). 형식 제약은 비밀번호만 보므로
+        // 둘을 같이 아는 이 자리에서 본다. 문구는 형식 위반과 같은 `validation-failed` 다(`D5`).
+        if (blocklist.mentionsAccount(command.password, command.email)) {
+            throw TicketException(
+                ErrorCode.VALIDATION_FAILED,
+                // **이유를 응답에 안 싣는다**(`D9`) — 형식 제약과 같은 태도다. 무엇이 걸렸는지는 로그에만 남는다.
+                "비밀번호가 규칙에 맞지 않는다",
+                mapOf("errors" to listOf(mapOf("field" to "password", "message" to "흔하거나 규칙적인 비밀번호다. 다른 것을 쓴다"))),
+            )
+        }
+
         val items = consentService.currentItems()
         consentService.verify(command.consents, items)
 

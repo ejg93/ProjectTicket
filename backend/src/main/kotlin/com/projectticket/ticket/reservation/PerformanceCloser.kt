@@ -1,5 +1,7 @@
 package com.projectticket.ticket.reservation
 
+import com.projectticket.ticket.SchedulerLock
+import com.projectticket.ticket.queue.QueueService
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
@@ -15,12 +17,20 @@ import org.springframework.stereotype.Component
  * 어차피 `held` 라 닫을 때 만료되고, 좌석은 돌아간다.
  */
 @Component
-class PerformanceCloser(private val jdbc: JdbcClient, private val closeService: PerformanceCloseService) {
+class PerformanceCloser(
+    private val jdbc: JdbcClient,
+    private val closeService: PerformanceCloseService,
+    private val queue: QueueService,
+    private val lock: SchedulerLock,
+) {
 
     private val log = LoggerFactory.getLogger(PerformanceCloser::class.java)
 
     /** @return 닫은 회차 수 */
+    /** 스케줄러 입구(33). 락은 바깥 고리에만 있다 — [closeDue] 는 테스트가 직접 부른다 */
     @Scheduled(fixedDelayString = CLOSE_INTERVAL)
+    fun closeDueExclusively(): Int = lock.runExclusively(LOCK_NAME) { closeDue() } ?: 0
+
     fun closeDue(): Int {
         val due = jdbc.sql("select performance_id from performance where status = 'open' and sales_close_at < now() order by performance_id")
             .query(Long::class.java)
@@ -36,7 +46,13 @@ class PerformanceCloser(private val jdbc: JdbcClient, private val closeService: 
         var expired = 0
         due.forEach { performanceId ->
             try {
-                closeService.close(performanceId)?.let { closed++; expired += it }
+                closeService.close(performanceId)?.let {
+                    closed++
+                    expired += it
+                    // 줄을 걷는 것은 **커밋 뒤**다(`D12`). close() 가 트랜잭션 경계라 여기는 이미 그 밖이고,
+                    // 안에서 지우면 롤백된 종료가 남의 줄을 날린다 — Redis 에는 되돌릴 방법이 없다.
+                    queue.drop(performanceId)
+                }
             } catch (e: RuntimeException) {
                 // 고르고 나서 닫기까지 기획사가 취소했거나 남이 먼저 닫았을 수 있다. 회차 하나를 실패로 만들어 나머지를 안 막는다 —
                 // DB 예외만 잡으면 사건 기록·감사에서 난 것이 루프를 끊는다.
@@ -49,6 +65,9 @@ class PerformanceCloser(private val jdbc: JdbcClient, private val closeService: 
     }
 
     companion object {
+        /** 락 이름(33) */
+        const val LOCK_NAME = "performance-closer"
+
         /** `D7` 「자동 전이의 주기와 기준」 — 1분 */
         const val CLOSE_INTERVAL = "PT1M"
     }

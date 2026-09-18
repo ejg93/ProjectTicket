@@ -4,8 +4,11 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import com.projectticket.ticket.reservation.TicketService
 import org.slf4j.LoggerFactory
@@ -26,6 +29,8 @@ class PaymentTransitionService(
     private val auditLog: AuditLog,
     private val tickets: TicketService,
     private val outbox: OutboxWriter,
+    private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     private val log = LoggerFactory.getLogger(PaymentTransitionService::class.java)
@@ -177,11 +182,22 @@ class PaymentTransitionService(
             .update()
         if (confirmed == 0) return statusOf(reservationId)
 
-        jdbc.sql("update performance_seat set status = :reserved, held_until = null where reservation_id = :id and status = :held")
+        val confirmedSeats = jdbc.sql(
+            """
+            update performance_seat set status = :reserved, held_until = null
+             where reservation_id = :id and status = :held
+            returning performance_seat_id, performance_id
+            """,
+        )
             .param("reserved", PerformanceSeatStatus.RESERVED.code)
             .param("held", PerformanceSeatStatus.HELD.code)
             .param("id", reservationId)
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+        // 커밋 뒤에 판이 오른다(`D20`). 커밋 전에 올리면 롤백된 확정이 화면에 팔린 자리로 보인다.
+        seatVersions.publishAfterCommit(confirmedSeats, PerformanceSeatStatus.RESERVED)
+        metrics.reservationConfirmed()
         // 확정과 발권이 한 트랜잭션이다(18). 발권일은 DB 시각이다(`D7`).
         val issued = tickets.issue(reservationId, jdbc.sql("select now()").query(OffsetDateTime::class.java).single())
         auditLog.record(
@@ -215,23 +231,31 @@ class PaymentTransitionService(
         val expired = jdbc.sql(
             """
             update reservation
-               set status = :expired, expired_at = now(), paying_until = null
+               set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by
              where reservation_id = :id and status = :paying
             """,
         )
             .param("expired", ReservationStatus.EXPIRED.code)
+            .param("by", CancelledBy.EXPIRED.code)
             .param("paying", ReservationStatus.PAYING.code)
             .param("id", reservationId)
             .update()
         if (expired == 0) return statusOf(reservationId)
 
-        jdbc.sql(
-            "update performance_seat set status = :available, held_until = null, reservation_id = null where reservation_id = :id and status = :held",
+        val released = jdbc.sql(
+            """
+            update performance_seat set status = :available, held_until = null, reservation_id = null
+             where reservation_id = :id and status = :held
+            returning performance_seat_id, performance_id
+            """,
         )
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
             .param("held", PerformanceSeatStatus.HELD.code)
             .param("id", reservationId)
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+        seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
         auditLog.record(AuditLog.Kind.OUTCOME, "reservation.expired", accountId, AuditLog.Target.of("reservation", reservationId))
         return ReservationStatus.EXPIRED.code
     }

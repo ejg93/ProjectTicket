@@ -1,19 +1,22 @@
 package com.projectticket.ticket.event
 
 import com.projectticket.ticket.ConcurrencyTestBase
+import com.projectticket.ticket.reservation.SeatHoldService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 
 /**
- * 좌석이 바뀌면 버전이 움직이는가. **롤백 없는 바탕에서 잰다** — 버전이 `updated_at` 의 최댓값이고 `now()` 는 트랜잭션 시작 시각이라,
- * 한 트랜잭션에 묶인 테스트 안에서는 오픈과 선점의 `updated_at` 이 같아서 버전이 안 움직인다(`stack.md`).
- * 운영은 선점마다 트랜잭션이 따로라 이 바탕이 실물에 가깝다.
+ * 좌석이 바뀌면 버전이 움직이는가.
+ *
+ * **롤백 없는 바탕에서 잰다**(`10a` 뒤로는 더 그렇다) — 판을 올리는 자리가 `afterCommit` 이라 커밋이 없으면 아무 일도 안 난다.
+ * 그리고 판을 올리는 것은 **서비스 경로**다: 생 SQL 로 좌석을 바꾸면 DB 는 바뀌지만 Redis 는 모른다(`D20` — DB 가 진실, Redis 는 순서).
  */
 class SeatVersionTest : ConcurrencyTestBase() {
 
     @Autowired lateinit var seatQuery: SeatQuery
     @Autowired lateinit var openService: PerformanceOpenService
+    @Autowired lateinit var seatHoldService: SeatHoldService
 
     @Test
     fun committed_seat_change_moves_the_version() {
@@ -25,9 +28,13 @@ class SeatVersionTest : ConcurrencyTestBase() {
         val performanceId = fixture.performance(eventId, hallId)
         openService.open(performanceId, actorAccountId = null)
         val before = seatQuery.version(performanceId)
+        val seatId = fixture.performanceSeatIds(performanceId).first()
 
-        // 자동 커밋이라 이 문장이 자기 트랜잭션이다 — 오픈과 다른 트랜잭션이라 `now()` 가 다르다.
-        fixture.hold(fixture.account("${PREFIX}viewer@test.local"), performanceId, "F1-A", 1)
+        // 선점 서비스가 커밋하고, 그 커밋 뒤에 판이 오른다(`D20`).
+        seatHoldService.hold(
+            fixture.account("${PREFIX}viewer@test.local"),
+            SeatHoldService.Command(performanceId, listOf(seatId)),
+        )
 
         assertThat(seatQuery.version(performanceId))
             .describedAs("버전이 그대로면 폴링이 304 만 받아 잡힌 좌석이 화면에서 빈자리로 남는다")

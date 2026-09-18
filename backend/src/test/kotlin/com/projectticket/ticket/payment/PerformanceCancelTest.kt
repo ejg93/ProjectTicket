@@ -99,6 +99,36 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun an_early_canceller_is_not_told_it_was_full() {
+        val early = fixture.account("${PREFIX}quit@test.local")
+        val quit = reserve(early, seats = 1)
+        refunds.request(early, quit)
+        val stayed = fixture.account("${PREFIX}stay@test.local")
+        reserve(stayed, seats = 1, from = 1)
+
+        cancelService.cancel(performanceId, actorAccountId = null)
+        relay.relay()
+
+        // 둘 다 `cancelled` 지만 무른 것이 다르다(26a). 먼저 무른 사람은 수수료를 뗀 부분 환불을 받았는데
+        // 「전액·수수료 없음」이라고 말하면 거짓말이고, 그 편지는 이미 나간 뒤라 못 주워 담는다.
+        assertThat(cancelMailCountFor(early)).isZero()
+        assertThat(cancelMailCountFor(stayed)).isOne()
+        assertThat(cancelledByOf(quit)).isEqualTo("audience")
+    }
+
+    @Test
+    fun what_undid_it_is_required_by_the_trigger() {
+        val buyer = fixture.account("${PREFIX}forced@test.local")
+        val reservationId = reserve(buyer, seats = 1)
+
+        // 앱 검증이 아니라 트리거다 — 새 취소 경로가 생겨도 이 열을 빠뜨릴 수가 없다(`D14`).
+        assertThatThrownBy {
+            jdbc.sql("update reservation set status = 'cancelled', cancelled_at = now() where reservation_id = :id")
+                .param("id", reservationId).update()
+        }.hasMessageContaining("무엇이 물렀는지 없이")
+    }
+
+    @Test
     fun the_sweeper_sends_what_the_cancellation_queued() {
         reserve(fixture.account("${PREFIX}buyer@test.local"), seats = 1)
         cancelService.cancel(performanceId, actorAccountId = null)
@@ -213,6 +243,15 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     private fun eventCount(): Long =
         jdbc.sql("select count(*) from outbox where type = 'performance.cancelled' and aggregate_id = :id")
             .param("id", performanceId).query(Long::class.java).single()
+
+    private fun cancelMailCountFor(accountId: Long): Long =
+        jdbc.sql(
+            "select count(*) from notification where event_type = 'performance.cancelled' and account_id = :id",
+        ).param("id", accountId).query(Long::class.java).single()
+
+    private fun cancelledByOf(reservationId: Long): String =
+        jdbc.sql("select cancelled_by from reservation where reservation_id = :id")
+            .param("id", reservationId).query(String::class.java).single()
 
     private fun mailCount(): Long =
         jdbc.sql("select count(*) from notification where event_type = 'performance.cancelled'").query(Long::class.java).single()

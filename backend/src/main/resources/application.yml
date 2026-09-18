@@ -6,12 +6,35 @@ ticket:
 spring:
   application:
     name: ticket-backend
+  lifecycle:
+    # 종료를 기다려 주는 상한(35a). 선점 트랜잭션 하나가 이보다 오래 걸리면 그 자체가 신호다.
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ticket}
     username: ${POSTGRES_USER:ticket}
     password: ${POSTGRES_PASSWORD:ticket}
+    hikari:
+      # **앱은 붙자마자 제한된 역할을 입는다**(4a). `audit_log` 를 고치거나 지울 권한이 이 역할에는 없다 —
+      # `V3` 의 보존 트리거는 표 주인이 끌 수 있어서 트리거만으로는 못 막는다(`D9`).
+      connection-init-sql: set role ticket_app
   flyway:
     locations: classpath:db/migration
+    # 마이그레이션은 **주인으로** 돈다. 위 역할을 입은 연결로는 DDL 을 못 해서 자기 연결을 따로 연다.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ticket}
+    user: ${POSTGRES_USER:ticket}
+    password: ${POSTGRES_PASSWORD:ticket}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  session:
+    data:
+      redis:
+        # 계정으로 세션을 찾을 수 있어야 한다(`SpringSessionBackedSessionRegistry`). 기본값(`default`)의 저장소는 세션 id 로만 찾아서
+        # 정지·탈퇴(5a·5b)가 그 계정의 세션을 못 고른다. 이 값이면 기동 때 Redis 에 `CONFIG SET notify-keyspace-events` 를 건다.
+        repository-type: indexed
+        # 대기열·좌석 캐시와 같은 Redis 라 접두로 가른다(21 뒤).
+        namespace: ticket:session
   # JSON 속성을 snake_case 로 내린다(D5). Kotlin 필드는 camelCase 로 두고 직렬화할 때만 바뀐다.
   # DB 컬럼명과 JSON 필드명이 같아져서 로그·쿼리·응답을 같은 단어로 검색할 수 있다.
   jackson:
@@ -37,19 +60,36 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # `prometheus` 는 수집기만 읽는다. 로컬은 그대로 열어 두고, 밖에 나갈 때는 망으로 가른다(`D9`).
+        include: health,prometheus
   endpoint:
     health:
+      # k8s·compose 가 두 질문을 따로 한다(35a): 「살아 있나」와 「지금 트래픽을 받아도 되나」.
+      # 살아 있는데 DB 가 끊긴 상태는 **재시작이 아니라 트래픽 차단**이 답이라 그룹을 가른다.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,redis
+        liveness:
+          include: livenessState
       # 인증된 요청에만 상세를 준다. always 면 아무나 DB 연결 상태·컴포넌트 목록을 본다(OWASP A05).
       # 살아 있나만 보는 것은 상세 없이도 되고, 자세히 볼 때는 /api/health 가 있다.
       show-details: when-authorized
 
 server:
+  # **받던 요청을 끝내고 죽는다**(35a). 바로 끊으면 선점 트랜잭션이 중간에 잘려서 사용자는 실패를 보는데
+  # 좌석은 잡힌 채로 스윕을 기다린다. 롤링 배포(36)와 `--scale` 변경이 이 설정 위에서 돈다.
+  shutdown: graceful
   # `PORT` 는 호스팅이 주입하는 이름이다. 둘 다 없으면 로컬 기본값.
   port: ${SERVER_PORT:${PORT:8080}}
+  # 프록시 뒤에 선다(33). 안 켜면 감사의 `acted_ip` 가 전부 nginx IP 가 되고(`D9`) 로그인 실패 카운터(3a)도 한 IP 로 뭉친다.
+  # 신뢰 대역은 톰캣 기본값(사설망·루프백)이다 — 문이 같은 compose 망 안에 있어서 그 안에 든다.
+  forward-headers-strategy: native
   servlet:
     session:
-      # 무활동 만료. 절대 만료 12시간은 서블릿에 설정 자리가 없어서 코드로 넣는다(AbsoluteSessionTimeoutFilter).
+      # 무활동 만료. Spring Session 이 이 값과 아래 쿠키 설정을 그대로 쓴다 — 저장소만 Redis 로 바뀌고 계약은 그대로다(ADR 0004).
+      # 절대 만료 12시간은 서블릿에 설정 자리가 없어서 코드로 넣는다(AbsoluteSessionTimeoutFilter).
       timeout: 30m
       cookie:
         name: TICKETSESSION

@@ -22,6 +22,9 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 가입
     EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "이미 가입된 이메일이다"),
 
+    // 계정 관리(5b). 탈퇴한 계정도 **없는 것**이다 — 관리자에게도 마찬가지다(`D5` 「403 이냐 404 냐」).
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "account-not-found", "그런 계정이 없다"),
+
     // 동의. 형식은 맞는데 값이 규칙에 안 맞는 자리라 422 다(`D5`).
     UNKNOWN_CONSENT_ITEM(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-consent-item", "모르는 동의 항목이다"),
     REQUIRED_CONSENT_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "required-consent-missing", "필수 동의 항목이다"),
@@ -52,6 +55,20 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     INVALID_TRANSITION(HttpStatus.CONFLICT, "invalid-transition", "지금 상태에서 할 수 없다"),
     HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
     CANCEL_WINDOW_CLOSED(HttpStatus.CONFLICT, "cancel-window-closed", "관람일 당일이라 취소할 수 없다"),
+
+    // 좌석 읽기 모델(10a, `D20`). 변경 로그 밖을 물으면 410 — 화면이 그 코드로 전체를 다시 받는다.
+    SEAT_CHANGES_EXPIRED(HttpStatus.GONE, "seat-changes-expired", "그 판 이후의 변경은 남아 있지 않다"),
+
+    // 대기열(21, `D12`). 닫힌 회차는 **있었는데 끝난 것**이라 410 이고, 없는 회차(404)와 가른다 —
+    // 화면이 앞에서는 줄을 걷고 뒤에서는 잘못된 링크를 말한다.
+    QUEUE_CLOSED(HttpStatus.GONE, "queue-closed", "회차가 닫혀 대기열이 없다"),
+    NOT_IN_QUEUE(HttpStatus.NOT_FOUND, "not-in-queue", "줄에 서 있지 않다"),
+
+    // 관문(23). 429 는 「지금은 안 되지만 나중엔 된다」고, 줄을 안 선 사람은 403(「너는 안 된다」)이 아니다(`D12`).
+    ADMISSION_REQUIRED(HttpStatus.TOO_MANY_REQUESTS, "admission-required", "대기열을 지나야 한다"),
+    ADMISSION_MISMATCH(HttpStatus.FORBIDDEN, "admission-mismatch", "다른 계정·회차의 입장권이다"),
+    // Redis 가 죽으면 관문을 **닫는다**. 열어 두면 대기열이 막으려던 폭발이 그대로 DB 로 간다(`D12` 「장애」).
+    QUEUE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "queue-unavailable", "지금은 예매를 받을 수 없다"),
 
     // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),

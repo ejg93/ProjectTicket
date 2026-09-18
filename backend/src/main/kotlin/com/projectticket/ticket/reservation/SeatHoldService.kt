@@ -4,6 +4,9 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
+import java.time.Duration
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -28,14 +31,35 @@ import org.springframework.transaction.annotation.Transactional
  * 관문(`X-Admission-Token`)은 여기가 아니라 23 이 컨트롤러 앞에 세운다. 이 서비스는 「토큰이 있는 사람」이 이미 걸러졌다고 본다.
  */
 @Service
-class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditLog) {
+class SeatHoldService(
+    private val jdbc: JdbcClient,
+    private val auditLog: AuditLog,
+    private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
+) {
 
     /** 멱등키의 본문 해시가 이것으로 만들어진다 — 같은 회차·같은 좌석 순서면 같은 요청이다 */
     data class Command(val performanceId: Long, val seatIds: List<Long>)
 
     /** @return 만든 예매 id. 실패는 전부 [TicketException] 이고 그때 이 트랜잭션은 통째로 롤백된다 */
     @Transactional
+    /**
+     * 시도와 결과를 센다(`D10`). **경합에서 진 것(`taken`)과 규칙에 막힌 것(`rejected`)을 가른다** —
+     * 앞은 정상이고 뒤는 화면이나 계약이 틀린 것이라, 한 숫자로 뭉치면 어느 쪽이 늘었는지 못 본다.
+     */
     fun hold(accountId: Long, command: Command): Long {
+        val started = System.nanoTime()
+        try {
+            return holdInternal(accountId, command).also { metrics.seatHoldAttempt("won") }
+        } catch (e: TicketException) {
+            metrics.seatHoldAttempt(if (e.code == ErrorCode.SEAT_TAKEN) "taken" else "rejected")
+            throw e
+        } finally {
+            metrics.seatHoldLatency(Duration.ofNanos(System.nanoTime() - started))
+        }
+    }
+
+    private fun holdInternal(accountId: Long, command: Command): Long {
         val seatIds = command.seatIds.distinct()
         if (seatIds.size > MAX_SEATS_PER_HOLD) {
             throw TicketException(
@@ -83,7 +107,8 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             )
         }
 
-        val held = holdAvailable(command.performanceId, seatIds, reservationId)
+        val heldSeats = holdAvailable(command.performanceId, seatIds, reservationId)
+        val held = heldSeats.map { it.performanceSeatId }
         if (held.size != seatIds.size) {
             // 0행의 원인이 「좌석이 잡혔다」인지 「그 사이에 회차가 닫혔다」인지는 잠근 상태에서 다시 읽으면 갈린다.
             val statusNow = performanceStatusOf(command.performanceId)
@@ -99,6 +124,9 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
         }
 
         recordSeats(reservationId, seatIds)
+
+        // 잡힌 좌석을 화면이 알아야 한다(`D20`). **커밋 뒤**라 롤백된 선점은 화면에 안 보인다.
+        seatVersions.publishAfterCommit(heldSeats, PerformanceSeatStatus.HELD)
 
         auditLog.record(
             AuditLog.Kind.OUTCOME,
@@ -195,7 +223,7 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             .filterNotNull()
 
     /** 조건부 UPDATE. 갱신된 행이 곧 잡은 좌석이다 — 갱신 행 수가 판정이고 0행은 「남이 이겼다」는 확정 답이다 */
-    private fun holdAvailable(performanceId: Long, seatIds: List<Long>, reservationId: Long): List<Long> =
+    private fun holdAvailable(performanceId: Long, seatIds: List<Long>, reservationId: Long): List<SeatVersions.Row> =
         jdbc.sql(
             """
             update performance_seat ps
@@ -208,7 +236,7 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
                and ps.performance_seat_id in (:seatIds)
                and ps.status = :available
                and exists (select 1 from performance p where p.performance_id = :performance and p.status = 'open')
-            returning ps.performance_seat_id
+            returning ps.performance_seat_id, ps.performance_id
             """,
         )
             .param("held", PerformanceSeatStatus.HELD.code)
@@ -216,7 +244,7 @@ class SeatHoldService(private val jdbc: JdbcClient, private val auditLog: AuditL
             .param("reservation", reservationId)
             .param("performance", performanceId)
             .param("seatIds", seatIds)
-            .query(Long::class.java)
+            .query(SeatVersions.Row::class.java)
             .list()
             .filterNotNull()
 

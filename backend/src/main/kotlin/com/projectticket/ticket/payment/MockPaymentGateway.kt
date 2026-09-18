@@ -84,13 +84,13 @@ class MockPaymentGateway {
      */
     fun refund(refundKey: String, amount: Int): RefundResult {
         require(amount >= 0) { "환불 금액이 음수다" }
-        return refundsByKey.computeIfAbsent(refundKey) { RefundResult("MR%d%04d".format(System.currentTimeMillis(), random.nextInt(10_000))) }
+        return refundsByKey.computeIfAbsent(refundKey) { RefundResult("MR%d%04d".format(System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))) }
     }
 
     private fun approved(last4: String) = Result(issueApprovalNumber(), last4, null)
 
     /** 시각을 앞에 둬서 재기동해도 안 겹친다 — 일련번호만 쓰면 다시 뜬 뒤 1번부터라 `payment_approval_number_key` 에 걸린다 */
-    private fun issueApprovalNumber(): String = "M%d%04d".format(System.currentTimeMillis(), random.nextInt(10_000))
+    private fun issueApprovalNumber(): String = "M%d%04d".format(System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))
 
     /** 하이픈과 공백은 사람이 읽으라고 넣은 것이라 걷어낸다. 길이는 ISO/IEC 7812 의 12~19 자리 */
     private fun digitsOf(cardNumber: String): String {
@@ -100,6 +100,9 @@ class MockPaymentGateway {
     }
 
     companion object {
+        /** 승인·환불 번호 뒤에 붙는 네 자리. `%04d` 와 같이 움직인다 — 넓히면 형식도 같이 넓힌다 */
+        private const val SERIAL_BOUND = 10_000
+
         const val DECLINE_LAST4 = "0000"
         const val SILENT_LAST4 = "0001"
         const val DELAYED_LAST4 = "0002"

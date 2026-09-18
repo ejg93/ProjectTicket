@@ -8,6 +8,9 @@ plugins {
 	// Kotlin 은 기본이 final 이라 이 플러그인 없이는 프록시가 안 만들어진다.
 	kotlin("plugin.spring") version "2.3.21"
 	jacoco
+	// 정적 분석(47). ProjectShop 의 SpotBugs 자리다 — 그쪽은 Java 바이트코드를 보고 이쪽은 Kotlin 소스를 본다.
+	// **2.0 알파를 쓴다**: 1.23.8 은 묶인 IntelliJ 유틸이 JDK 25 의 `25.0.1` 을 못 읽어 그냥 선다(`stack.md`).
+	id("dev.detekt") version "2.0.0-alpha.6"
 	id("org.springframework.boot") version "4.1.1"
 	id("io.spring.dependency-management") version "1.1.7"
 }
@@ -47,6 +50,9 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
 	implementation("org.springframework.boot:spring-boot-starter-security")
+	// 세션을 톰캣 메모리가 아니라 Redis 에 둔다(ADR 0004). 스타터가 Lettuce 와 `spring-session-data-redis` 를 같이 끌고 온다 —
+	// `spring-boot-starter-data-redis` 를 따로 안 넣는다. 두 번 적으면 한쪽만 올라가는 날이 온다.
+	implementation("org.springframework.boot:spring-boot-starter-session-data-redis")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.flywaydb:flyway-database-postgresql")
@@ -55,6 +61,8 @@ dependencies {
 	// 어느 쪽이 빠져도 증상은 같다: 빈은 뜨는데 그게 `Tracer.NOOP` 이라 추적 ID 가 조용히 안 찍힌다.
 	implementation("org.springframework.boot:spring-boot-micrometer-tracing-brave")
 	implementation("io.micrometer:micrometer-tracing-bridge-brave")
+	// 지표를 Prometheus 형식으로 내놓는다(30). 액추에이터가 `/actuator/prometheus` 를 여는 것은 이 의존이 있을 때뿐이다.
+	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 	// Kotlin data class 를 Jackson 이 읽고 쓰게 한다. 없으면 기본 생성자가 없다고 죽는다.
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -68,6 +76,8 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.testcontainers:testcontainers-postgresql")
+	// Redis 는 Testcontainers 2.x 에 전용 모듈이 없다. 코어의 `GenericContainer` 로 띄우므로 코어를 직접 적는다.
+	testImplementation("org.testcontainers:testcontainers")
 	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	// 계층 규칙을 문서에서 테스트로 내린다(D14). JUnit 6 아티팩트다 — Boot 4 BOM 이 JUnit 6 을 준다.
@@ -106,6 +116,26 @@ val measure = tasks.register<Test>("measure") {
 tasks.test {
 	useJUnitPlatform { excludeTags("db") }
 }
+
+// 문턱은 「새 검출 0건」이다(`D18`). 기준선 파일을 안 만든다 — 눌러 둔 목록은 아무도 다시 안 본다.
+detekt {
+	config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+	// 기본 규칙 위에 우리 설정만 얹는다. 처음부터 다시 쓰면 새 규칙이 생겨도 안 켜진다.
+	buildUponDefaultConfig = true
+	// 빌드를 세운다. 경고로 두면 그 줄은 아무도 안 읽는다(`D18` 「게이트가 만든 신호」).
+	ignoreFailures = false
+}
+
+// **detekt 는 자기가 빌드된 Kotlin 으로만 돈다.** 우리 판(2.3.21)과 다르면 「not supported」로 그냥 선다 —
+// 그래서 분석기가 쓰는 의존만 그쪽 판에 묶는다(detekt 문서가 정한 방법). 우리 코드가 컴파일되는 판은 그대로다.
+configurations.named("detekt") {
+	resolutionStrategy.eachDependency {
+		if (requested.group == "org.jetbrains.kotlin") {
+			useVersion("2.4.10")
+		}
+	}
+}
+
 
 // `gradlew build` 가 두 레인을 다 돈다. 빠른 레인만 보고 push 하면 DB 결함이 CI 에서야 드러난다.
 tasks.check {

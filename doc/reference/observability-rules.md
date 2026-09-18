@@ -91,7 +91,9 @@
 
 **시작·끝 두 줄로 안 쓴다.** 끝 줄에 시간이 있으면 시작 줄이 답하는 것이 「왔다」뿐이고, 로그가 두 배가 된다.
 
-## 지표 — 이름 규약 (30 이 든다)
+## 지표 — 이름 규약 (30 이 들였다)
+
+이름은 `observability/TicketMetrics` 한 자리에 있고 `MetricNamesTest` 가 이 표와 대조한다. 수집기·대시보드는 `docker-compose.yml` 의 `prometheus`·`grafana` 다.
 
 `<도메인>.<무엇>` 소문자 점 표기. 태그는 값이 유한한 것만 — `performance_id` 를 태그로 두면 회차마다 시계열이 는다.
 

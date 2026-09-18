@@ -4,8 +4,11 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
+import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
@@ -24,6 +27,8 @@ class RefundTransitionService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
+    private val seatVersions: SeatVersions,
+    private val metrics: TicketMetrics,
 ) {
 
     /** ① 이 끝난 환불. [refundAmount] 만 PG 로 간다 */
@@ -47,7 +52,7 @@ class RefundTransitionService(
         val cancelled = jdbc.sql(
             """
             update reservation r
-               set status = :cancelled, cancelled_at = now()
+               set status = :cancelled, cancelled_at = now(), cancelled_by = :by
               from performance p
              where p.performance_id = r.performance_id
                and r.reservation_id = :id and r.account_id = :account and r.status = :reserved
@@ -55,6 +60,7 @@ class RefundTransitionService(
             """,
         )
             .param("cancelled", ReservationStatus.CANCELLED.code)
+            .param("by", CancelledBy.AUDIENCE.code)
             .param("reserved", ReservationStatus.RESERVED.code)
             .param("id", reservationId)
             .param("account", accountId)
@@ -74,13 +80,21 @@ class RefundTransitionService(
         val fee = RefundPolicy.fee(payment.amount, rate)
         val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, payment.amount - fee)
 
-        jdbc.sql(
-            "update performance_seat set status = :available, held_until = null, reservation_id = null where reservation_id = :id and status = :reserved",
+        val released = jdbc.sql(
+            """
+            update performance_seat set status = :available, held_until = null, reservation_id = null
+             where reservation_id = :id and status = :reserved
+            returning performance_seat_id, performance_id
+            """,
         )
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
             .param("reserved", PerformanceSeatStatus.RESERVED.code)
             .param("id", reservationId)
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+        seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
+        metrics.reservationCancelled(CancelledBy.AUDIENCE.code)
 
         // 취소 트랜잭션이 사건을 같이 커밋한다(`D11`). 감사와 이름이 같지만 목적이 다르다 — 이쪽은 소비자가 반응하려고 있는 계약이다.
         outbox.append(
@@ -116,6 +130,37 @@ class RefundTransitionService(
             .orElse(null) ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
         return TicketException(ErrorCode.INVALID_TRANSITION, "취소할 수 없는 상태다: $status", mapOf("from" to status, "action" to "cancel"))
     }
+
+    /**
+     * 승인이 늦어 좌석을 못 준 결제에 전액 환불 행을 만든다(`17b` ⓑ).
+     *
+     * 16 은 PG 취소만 보내고 **행을 안 만들었다** — 돈은 돌아갔는데 우리 표에는 그 사실이 없어서
+     * 정산(27)과 조회가 「승인된 결제인데 예매가 없다」를 설명하지 못한다.
+     *
+     * 관객 잘못이 아니라 전액이다(`D6`) — 율 0·수수료 0. 스윕이 이 행을 PG 로 보낸다.
+     *
+     * **`not exists` 로 멱등이다.** 두 번 돌아도 둘째는 0행이고, 뚫려도 결제당 하나라는 유일 제약이 받는다.
+     */
+    @Transactional
+    fun queueLatePayments(): List<Long> =
+        jdbc.sql(
+            """
+            insert into refund (payment_id, reason, days_before, tier_rate, fee_amount, refund_amount)
+            select p.payment_id, :reason, 0, 0, 0, p.amount
+              from payment p
+              join reservation r on r.reservation_id = p.reservation_id
+             where p.status = :approved
+               and r.status = :expired
+               and not exists (select 1 from refund rf where rf.payment_id = p.payment_id)
+            returning refund_id
+            """,
+        )
+            .param("reason", REASON_PAYMENT_LATE)
+            .param("approved", PaymentStatus.APPROVED.code)
+            .param("expired", ReservationStatus.EXPIRED.code)
+            .query(Long::class.java)
+            .list()
+            .filterNotNull()
 
     /** ③ 환불이 나갔다. 조건부라 두 번 와도 둘째는 0행이다 */
     @Transactional
@@ -180,6 +225,9 @@ class RefundTransitionService(
     data class ApprovedPayment(val paymentId: Long, val amount: Int)
 
     companion object {
+        /** `refund.reason` — 승인이 늦어 좌석을 못 준 결제(`17b` ⓑ). 관객 잘못이 아니라 전액이다 */
+        const val REASON_PAYMENT_LATE = "payment_late"
+
         /** `refund.reason` — 관객 취소. `performance_cancelled` 는 17a, `payment_late` 는 17b 가 든다 */
         const val REASON_AUDIENCE = "audience"
     }
