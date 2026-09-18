@@ -6,6 +6,7 @@ import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,7 +26,8 @@ import tools.jackson.databind.ObjectMapper
  * 관문(`D12` 「관문」, 청크 23의 닫힘 조건).
  *
  * **강제 지점이 필터인 이유**는 입구가 늘어도 빠뜨릴 자리가 없어서다 — 서비스에 검사를 넣으면 새 입구가 그것을 안 부른다.
- * 여기서 재는 것은 넷이다: 토큰 없이 못 산다, 남의 토큰으로 못 산다, 성공하면 반납한다, 실패하면 안 뺏긴다.
+ * 여기서 재는 것은 다섯이다: 토큰 없이 못 산다, 남의 토큰으로 못 산다, 성공하면 반납한다, 실패하면 안 뺏긴다,
+ * 그리고 **응답을 못 받은 재시도가 관문을 지나 저장된 답을 받는다**(23a).
  */
 class QueueGateTest : PostgresTestBase() {
 
@@ -89,9 +91,38 @@ class QueueGateTest : PostgresTestBase() {
         hold(seatIds.take(1), token).andExpect { status { isCreated() } }
 
         // 좌석을 잡았으면 문지기는 볼일이 끝났다. 반납해야 뒷사람이 들어온다(`D12`).
+        // **정원은 활성 집합이 센다** — 토큰 키가 남아 있어도 그 자리는 이미 돌아갔다.
         assertThat(admission.tokenFor(performanceId, buyer.id)).isNull()
         assertThat(redis.opsForZSet().size(QueueKeys.active(performanceId))).isZero()
-        assertThat(admission.find(token)).isNull()
+
+        // 토큰은 바로 안 죽고 짧은 창만 남는다(23a). 10분 TTL 이 그대로면 반납이 안 된 것이다.
+        val leftMs = redis.getExpire(QueueKeys.admission(token), TimeUnit.MILLISECONDS)
+        assertThat(leftMs).isPositive().isLessThanOrEqualTo(AdmissionService.RETRY_GRACE.toMillis())
+    }
+
+    @Test
+    fun a_retry_with_the_same_key_replays() {
+        val token = admit(buyer.id, performanceId)
+        val key = UUID.randomUUID().toString()
+
+        val first = hold(seatIds.take(1), token, key).andExpect { status { isCreated() } }
+            .andReturn().response.contentAsString
+
+        // 첫 응답을 못 받은 클라이언트가 같은 키로 다시 온다. 관문이 여기서 429 를 내면
+        // `D4` 가 약속한 「저장된 본문을 그대로 돌려준다」에 영영 못 닿는다.
+        hold(seatIds.take(1), token, key)
+            .andExpect { status { isCreated() } }
+            .andReturn().response.contentAsString
+            .let { assertThat(it).isEqualTo(first) }
+    }
+
+    @Test
+    fun the_grace_window_does_not_hand_the_seat_out_twice() {
+        val token = admit(buyer.id, performanceId)
+        hold(seatIds.take(1), token).andExpect { status { isCreated() } }
+
+        // 창 안에서는 관문을 지나지만 좌석은 못 늘린다 — 계정당 한 석 제한(15)이 그 뒤에 선다.
+        hold(seatIds.drop(1).take(1), token).andExpect { status { isConflict() } }
     }
 
     @Test
@@ -140,13 +171,13 @@ class QueueGateTest : PostgresTestBase() {
         return requireNotNull(admission.tokenFor(performance, accountId)) { "진입했는데 토큰이 없다" }
     }
 
-    private fun hold(seats: List<Long>, token: String?): ResultActionsDsl =
+    private fun hold(seats: List<Long>, token: String?, key: String = UUID.randomUUID().toString()): ResultActionsDsl =
         mvc.post("/api/performances/$performanceId/reservations") {
             with(user(buyer))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
             content = json.writeValueAsString(mapOf("seat_ids" to seats))
-            header("Idempotency-Key", UUID.randomUUID().toString())
+            header("Idempotency-Key", key)
             token?.let { header(QueueGateFilter.ADMISSION_HEADER, it) }
         }
 
