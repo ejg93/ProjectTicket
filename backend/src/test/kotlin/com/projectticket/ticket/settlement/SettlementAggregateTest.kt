@@ -1,9 +1,11 @@
 package com.projectticket.ticket.settlement
 
+import tools.jackson.databind.ObjectMapper
+import org.springframework.jdbc.core.simple.JdbcClient
 import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
-import com.projectticket.ticket.outbox.OutboxRelay
+import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
 import com.projectticket.ticket.payment.RefundTransitionService
@@ -25,7 +27,9 @@ import org.springframework.transaction.support.TransactionTemplate
  */
 class SettlementAggregateTest : ConcurrencyTestBase() {
 
-    @Autowired lateinit var relay: OutboxRelay
+    @Autowired lateinit var jdbcForEvents: JdbcClient
+    @Autowired lateinit var jsonForEvents: ObjectMapper
+    @Autowired lateinit var settlementStore: SettlementStore
     @Autowired lateinit var closer: PerformanceCloser
     @Autowired lateinit var sweeper: SettlementSweeper
     @Autowired lateinit var seatHold: SeatHoldService
@@ -76,7 +80,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         closeWithEvent()
         // 사건이 다시 나가도(at-least-once) 회차당 유일 제약이 둘째를 막는다 — 예약 표를 따로 안 둔 이유다.
         jdbc.sql("update outbox set published_at = null where type = 'performance.closed' and aggregate_id = :id").param("id", performanceId).update()
-        relay.relay()
+        deliver()
 
         assertThat(settlementCount()).isOne()
     }
@@ -120,7 +124,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     fun cancelled_performance_settles_to_zero() {
         reserve(fixture.account("${PREFIX}buyer@test.local"), seats = 2)
         cancelService.cancel(performanceId, actorAccountId = null)
-        relay.relay()
+        deliver()
 
         settleNow()
 
@@ -179,7 +183,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     private fun closeWithEvent() {
         jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id").param("id", performanceId).update()
         closer.closeDue()
-        relay.relay()
+        deliver()
     }
 
     /** `settle_at` 을 지난 시각으로 당기고 집계한다 — 시계가 DB 라 기다릴 방법이 없다(`D8`) */
@@ -220,4 +224,10 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
             .param("id", performanceId).query(Long::class.java).single()
 
     data class Row(val settlementId: Long, val amount: Int, val status: String)
+
+    /**
+     * 안 나간 사건을 **브로커를 건너뛰고** 소비자에게 바로 건넨다(28).
+     * 롤백 레인이라 진짜 Kafka 소비자는 이 트랜잭션의 행을 못 본다 — 배선은 `KafkaRelayTest` 가 잰다.
+     */
+    private fun deliver(): Int = PendingEvents(jdbcForEvents, jsonForEvents).deliver(settlementStore::schedule)
 }

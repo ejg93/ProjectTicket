@@ -1,11 +1,14 @@
 package com.projectticket.ticket.notification
 
+import tools.jackson.databind.ObjectMapper
+import org.springframework.jdbc.core.simple.JdbcClient
 import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.outbox.AggregateType
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxRelay
+import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
 import com.projectticket.ticket.payment.RefundTransitionService
@@ -27,7 +30,8 @@ import java.util.UUID
  * 스케줄러는 테스트에서 꺼져 있다(`SchedulingConfig`) — 릴레이·발송 회차를 손으로 부른다.
  */
 class NotificationIdempotencyTest : ConcurrencyTestBase() {
-    @Autowired lateinit var relay: OutboxRelay
+    @Autowired lateinit var jdbcForEvents: JdbcClient
+    @Autowired lateinit var jsonForEvents: ObjectMapper
     @Autowired lateinit var sweeper: NotificationSweeper
     @Autowired lateinit var store: NotificationStore
     @Autowired lateinit var seatHold: SeatHoldService
@@ -54,7 +58,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     fun confirmation_becomes_one_mail_with_seats_and_tickets() {
         val reservationId = reserved(startsInDays = 8)
 
-        relay.relay()
+        deliver()
 
         val mail = mailOf(reservationId, "reservation.reserved")
         assertThat(mail.subject).isEqualTo("[예매 확정] 겨울 콘서트")
@@ -82,7 +86,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
         val reservationId = reserved(startsInDays = 8)
         refunds.request(accountId, reservationId)
 
-        relay.relay()
+        deliver()
 
         val mail = mailOf(reservationId, "reservation.cancelled")
         assertThat(mail.subject).isEqualTo("[예매 취소] 겨울 콘서트")
@@ -93,7 +97,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     @Test
     fun sweeping_sends_pending_mail_and_marks_it() {
         val reservationId = reserved(startsInDays = 8)
-        relay.relay()
+        deliver()
 
         assertThat(sweeper.sweep()).isEqualTo(1)
 
@@ -132,7 +136,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     @Test
     fun a_sent_mail_cannot_be_rewritten() {
         val reservationId = reserved(startsInDays = 8)
-        relay.relay()
+        deliver()
 
         // 본문은 이력이다. 나중에 문구를 고치면 「그때 무엇을 보냈나」가 거짓이 된다.
         assertThatThrownBy {
@@ -185,4 +189,10 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
             .param("id", reservationId).query(Long::class.java).single()
 
     data class Mail(val subject: String, val body: String, val status: String)
+
+    /**
+     * 안 나간 사건을 **브로커를 건너뛰고** 소비자에게 바로 건넨다(28).
+     * 롤백 레인이라 진짜 Kafka 소비자는 이 트랜잭션의 행을 못 본다 — 배선은 `KafkaRelayTest` 가 잰다.
+     */
+    private fun deliver(): Int = PendingEvents(jdbcForEvents, jsonForEvents).deliver(store::record)
 }

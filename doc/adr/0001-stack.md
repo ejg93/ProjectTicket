@@ -15,7 +15,7 @@
 | DB 접근 | **JdbcClient**(ProjectShop 동일) | JPA | 좌석 동시성은 SQL 을 직접 보는 것이 학습에 맞다. 낙관락은 ADR 로 비교만 한다 |
 | 좌석 최종 진실 | **PostgreSQL 조건부 UPDATE** | Redis 만으로 확정 | Redis 는 트래픽을 줄이는 자리, 확정은 DB 가 한다 |
 | 대기열 | Redis ZSET 대기 + 활성 토큰 TTL. 좌석 선점 5분 | Kafka 대기열 | 순서·입장 제어에 ZSET 이 맞고 참조 구현 전부가 이 방식이다 |
-| Kafka 시점 | **소비자가 둘이 되는 청크에서** 들인다. 그전엔 Spring 이벤트 + DB 아웃박스 | 처음부터 Kafka | 소비자 하나면 브로커가 값을 안 한다. 교체 자체가 ADR 한 편이다 |
+| Kafka 시점 | **들였다**(28, ADR 0007) — 소비자가 둘이 된 뒤다. 그전엔 Spring 이벤트 + DB 아웃박스 | 처음부터 Kafka | 소비자 하나면 브로커가 값을 안 한다. 교체 자체가 ADR 한 편이다 |
 | 인증 | ProjectShop 세션 방식 포팅 | JWT | 토큰은 대기열 토큰에서 따로 배운다. 겹치지 않게 |
 | 결제 | ProjectShop `MockPaymentGateway` 개조 | 실제 PG 샌드박스 | 운영 안 한다. 상태 전이·멱등성은 모의로도 연습된다 |
 | 인프라 | Docker Compose → `--scale app=3` + nginx → **kind k8s + Helm** | AWS·EKS | k8s 는 로컬이 무료고 채용에서 kind 냐 EKS 냐를 안 따진다. AWS 는 과금이라 안 한다 |

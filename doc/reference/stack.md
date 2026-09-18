@@ -18,6 +18,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
+| Kafka | 4.3.1 | `docker-compose.yml`(`apache/kafka`, KRaft). 사건 브로커(28, ADR 0007). 로컬은 **9094** — 9092 는 ProjectShop 것 |
 | nginx | 1.27-alpine | `docker-compose.yml`, `docker/nginx/nginx.conf`. 인스턴스 셋 앞의 문(33) |
 | Prometheus | v3.1.0 | `docker-compose.yml`. 수집기 — 앱은 `micrometer-registry-prometheus` 로 `/actuator/prometheus` 를 연다(30) |
 | Grafana | 11.5.0 | `docker-compose.yml`. 데이터 소스·대시보드는 `docker/grafana/provisioning/` 이 심는다 |
