@@ -382,6 +382,16 @@ git update-index --chmod=+x backend/gradlew
 
 `PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.
 
+
+### 커밋 레인이 남긴 행은 롤백 레인에 **보인다**
+
+방향을 헷갈리기 쉽다. 롤백 레인이 만든 것은 남이 못 보지만, **커밋 레인이 커밋한 것은 롤백 레인이 본다.**
+전역을 세는 단언(「릴레이가 1건 집었다」)이 그 자리에서 깨진다 — `OutboxRelayTest` 가 `ConsumerIdempotencyTest` 의
+안 나간 outbox 행까지 집었다(28·29 뒤로 생긴 자리).
+
+**로컬은 컨테이너를 재사용해서 안 보인다.** 지난 회차가 이미 치워 둔 탓이고, CI 의 새 컨테이너에서만 빨갛다.
+전역을 세지 말거나, 세야 하면 `@BeforeEach` 에서 남은 것을 옆으로 치운다.
+
 ### `initdb.d` 는 볼륨이 비었을 때만 돈다
 
 `docker-compose.yml` 의 `/docker-entrypoint-initdb.d` 는 데이터 디렉터리가 비어 있을 때 한 번만 실행된다. 파일을 넣어도 기존 볼륨에서는 아무 일이 안 나고 오류도 없다 — `docker compose down -v && up -d --wait`. **Testcontainers 는 이 경로를 안 태운다.**

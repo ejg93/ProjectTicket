@@ -3,6 +3,7 @@ package com.projectticket.ticket.outbox
 import com.projectticket.ticket.PostgresTestBase
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -20,6 +21,21 @@ class OutboxRelayTest : PostgresTestBase() {
 
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var relay: OutboxRelay
+
+    /**
+     * **커밋 레인이 남긴 사건을 이 테스트의 회차에서 뺀다.**
+     *
+     * 소비자 테스트(`ConsumerIdempotencyTest`)가 진짜 예매를 커밋하면 안 나간 outbox 행이 남고,
+     * 테스트 스케줄러가 꺼져 있어서 아무도 안 치운다 — 릴레이가 그것까지 집어 회차 수가 1 이 아니게 된다.
+     * 로컬은 컨테이너를 재사용해 지난 회차가 이미 치워 둔 탓에 안 보였고, CI 의 새 컨테이너에서 드러났다.
+     *
+     * **릴레이를 부르지 않고 표시만 한다.** 부르면 남의 사건이 진짜로 브로커에 나가 소비자가 행을 만든다.
+     * 롤백 레인이라 이 표시도 테스트가 끝나면 되돌아간다.
+     */
+    @BeforeEach
+    fun setOlderEventsAside() {
+        jdbc.sql("update outbox set published_at = now() where published_at is null").update()
+    }
 
     @Test
     fun relay_publishes_unpublished_events_and_marks_them() {
