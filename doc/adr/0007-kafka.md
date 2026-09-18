@@ -45,7 +45,7 @@ Spring 이벤트는 셋 다 못 준다 — 같은 스레드에서 순서대로 �
 | 값 | 봉투 JSON(`event_id`·`type`·`version`·`occurred_at`·`aggregate_*`·`payload`). **스키마 레지스트리를 안 쓴다** — 판 관리는 `D11` 의 `version` 필드가 한다 |
 | 소비자 그룹 | 소비자마다 하나(`notification`·`settlement`). 그래야 같은 사건을 둘 다 받는다 |
 | 전달 보장 | **at-least-once 그대로**(`D11`). 프로듀서 트랜잭션(exactly-once)을 안 쓴다 — 소비자가 이미 제약으로 멱등이라 값이 적고, 대가(성능·복잡도)가 크다 |
-| 오프셋 | 자동 커밋. 처리 실패의 재시도·DLQ 는 29 가 든다 |
+| 오프셋 | 자동 커밋. 실패는 재시도하고, 초과하면 DLT 로 보낸 **뒤에** 넘어간다(29) |
 | 로컬 포트 | `9094`. ProjectShop 의 Kafka 가 9092 를 쥐고 있다(`README`) |
 
 ## 대가

@@ -16,7 +16,10 @@ lane() {
 #
 # **다만 빠른 레인은 SpotBugs 를 안 돈다**(`gradlew test` 에 안 달려 있다). 그래서 이 경로가
 # 실제로 막는 것은 **push 앞 `--full`** 이고, 그 전까지는 「도장을 다시 받아야 한다」까지다.
-lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties
+#
+# `Dockerfile`·compose·nginx conf 는 `ComposeContractTest`(35)가 글자로 읽는다. 여기 없으면
+# 그 셋만 고친 커밋에서 도장이 안 바뀌고, 35 가 찾은 결함 둘을 막는 검사가 안 돈다.
+lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx
 lane frontend frontend/src frontend/e2e frontend/package.json frontend/package-lock.json frontend/tsconfig.json \
               frontend/next.config.ts frontend/eslint.config.mjs frontend/vitest.config.ts frontend/vitest.setup.ts \
               frontend/playwright.config.ts frontend/postcss.config.mjs

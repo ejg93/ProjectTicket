@@ -117,11 +117,11 @@ class QueueGateTest : PostgresTestBase() {
     }
 
     @Test
-    fun the_grace_window_does_not_hand_the_seat_out_twice() {
+    fun the_grace_window_does_not_hand_out_a_second_reservation() {
         val token = admit(buyer.id, performanceId)
         hold(seatIds.take(1), token).andExpect { status { isCreated() } }
 
-        // 창 안에서는 관문을 지나지만 좌석은 못 늘린다 — 계정당 한 석 제한(15)이 그 뒤에 선다.
+        // 창 안에서는 관문을 지나지만 선점은 하나뿐이다 — `reservation_live_hold_idx`(V8)가 둘째 선점을 막는다.
         hold(seatIds.drop(1).take(1), token).andExpect { status { isConflict() } }
     }
 

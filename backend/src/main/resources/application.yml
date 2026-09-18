@@ -37,7 +37,7 @@ spring:
       # 그룹은 소비자마다 `@KafkaListener` 가 적는다(ADR 0007). 여기 기본값을 두면 둘이 한 그룹이 된다.
       auto-offset-reset: earliest
     listener:
-      # 처리 실패의 재시도·DLQ 는 29 다. 지금은 소비자가 예외를 삼키고 오프셋이 넘어간다.
+      # 소비자는 예외를 던지고 `ConsumerErrorHandling`(29)이 받는다 — 2초 간격 3회 뒤 `<토픽>.DLT`.
       ack-mode: batch
 
   session:

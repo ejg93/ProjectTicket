@@ -2,7 +2,6 @@ package com.projectticket.ticket.notification
 
 import com.projectticket.ticket.outbox.EventTopics
 import com.projectticket.ticket.outbox.OutboxRelay
-import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
@@ -23,8 +22,6 @@ class ReservationNotificationListener(
     private val store: NotificationStore,
     private val json: ObjectMapper,
 ) {
-
-    private val log = LoggerFactory.getLogger(ReservationNotificationListener::class.java)
 
     /** 그룹이 정산과 다르다(ADR 0007) — 같은 그룹이면 사건 하나를 둘 중 하나만 받는다 */
     @KafkaListener(topics = [EventTopics.RESERVATION, EventTopics.PERFORMANCE], groupId = GROUP)

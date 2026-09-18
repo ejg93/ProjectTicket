@@ -134,7 +134,9 @@ class AdmissionService(
          * 반납한 토큰이 관문을 더 지날 수 있는 창(23a). 재시도가 이 안에 오면 저장된 201 을 받는다.
          * 45초는 흔한 읽기 타임아웃(30초)보다 길고, 사람이 화면을 다시 여는 시간보다는 짧다.
          *
-         * 이 창 동안 그 사람은 관문을 지날 수 있지만 좌석은 못 늘린다 — 계정당 한 석 제한(15)이 먼저 막는다.
+         * 창 동안 그 사람은 관문을 지날 수 있다. 그래도 **회차당 4매 상한**(15, [com.projectticket.ticket.reservation.SeatHoldService])을
+         * 못 넘는다 — 살아있는 선점이 있으면 `reservation_live_hold_idx`(V8)가 둘째 선점을 막고,
+         * 이미 확정까지 갔으면 그 좌석도 상한에 센다. 창이 늘리는 것은 **기회이지 매수가 아니다.**
          */
         val RETRY_GRACE: Duration = Duration.ofSeconds(45)
 
@@ -195,7 +197,9 @@ class AdmissionService(
         /**
          * 선점 성공 뒤의 반납(23a) — 활성에서 빼고, 계정 키를 지우고, **토큰 키는 줄이기만 한다.**
          *
-         * 남은 TTL 이 유예보다 클 때만 줄인다. 같은 키로 여러 번 재시도해도 창이 뒤로 안 밀린다.
+         * **창은 한 번만 열린다.** 이 스크립트가 `KEYS[3]`(계정→토큰)을 지우고, [releaseAfterHold] 는 그 키를 못 찾으면 곧장 돌아간다 —
+         * 재시도가 몇 번 오든 두 번째로 여기 오지 않는다. `if ttl > grace` 는 그 위의 안전장치다:
+         * 계정 키가 남은 채 다시 불려도 이미 짧아진 TTL 을 되돌리지 않는다.
          */
         private val RELEASE_AFTER_HOLD = DefaultRedisScript<Long>(
             """

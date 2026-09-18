@@ -2,7 +2,6 @@ package com.projectticket.ticket.settlement
 
 import com.projectticket.ticket.outbox.EventTopics
 import com.projectticket.ticket.outbox.OutboxRelay
-import org.slf4j.LoggerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
@@ -18,8 +17,6 @@ class SettlementListener(
     private val store: SettlementStore,
     private val json: ObjectMapper,
 ) {
-
-    private val log = LoggerFactory.getLogger(SettlementListener::class.java)
 
     /**
      * **그룹이 알림과 다르다**(ADR 0007) — 같은 사건을 둘 다 받으려면 그래야 한다. 같은 그룹이면 하나만 받는다.
