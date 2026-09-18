@@ -77,6 +77,7 @@ class SecurityConfig {
                     .requestMatchers(*PUBLIC_PATHS.toTypedArray()).permitAll()
                     // 경로 접두로 역할을 가른다(`D5`). **필터라 컨트롤러 밖이다** — 기획사 입구가 늘어도 빠뜨릴 자리가 없다.
                     .requestMatchers(ORGANIZER_PREFIX).hasAuthority(AccountRole.ORGANIZER.authority)
+                    .requestMatchers(ADMIN_PREFIX).hasAuthority(AccountRole.ADMIN.authority)
                     .anyRequest().authenticated()
             }
             .formLogin { it.disable() }
@@ -208,6 +209,9 @@ class SecurityConfig {
         /** 로그인 없이 되는 경로. 공연 목록·좌석 현황 조회는 그 청크(10)가 여기에 더한다 */
         /** 기획사 전용 접두. 여기서 막힌 403 은 `organizer-forbidden` 이다(`ProblemAccessDeniedHandler`) */
         const val ORGANIZER_PREFIX = "/api/organizer/**"
+
+        /** 관리자 전용 접두(5b). 역할을 컨트롤러가 다시 안 센다 — 입구가 늘어도 빠뜨릴 자리가 없다 */
+        const val ADMIN_PREFIX = "/api/admin/**"
 
         val PUBLIC_PATHS = listOf(
             "/api/health",

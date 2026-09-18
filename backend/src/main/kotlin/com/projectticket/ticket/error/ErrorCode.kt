@@ -22,6 +22,9 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 가입
     EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "이미 가입된 이메일이다"),
 
+    // 계정 관리(5b). 탈퇴한 계정도 **없는 것**이다 — 관리자에게도 마찬가지다(`D5` 「403 이냐 404 냐」).
+    ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "account-not-found", "그런 계정이 없다"),
+
     // 동의. 형식은 맞는데 값이 규칙에 안 맞는 자리라 422 다(`D5`).
     UNKNOWN_CONSENT_ITEM(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-consent-item", "모르는 동의 항목이다"),
     REQUIRED_CONSENT_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "required-consent-missing", "필수 동의 항목이다"),
