@@ -166,7 +166,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 30 | 지표·대시보드 | Micrometer → Prometheus, Grafana 대시보드(선점 성공률·대기열 길이·응답 시간). compose 추가. **축**: `D10`. **강제 지점**: 테스트(지표 이름이 문서와 같다). **건드리는 자리**: `docker-compose.yml`, `observability/`, `docker/grafana/`. **닫힘**: `MetricNamesTest` | 13·21 |
+| 30 | 지표·대시보드 | Micrometer → Prometheus, Grafana 대시보드(선점 성공률·대기열 길이·응답 시간). compose 추가. **축**: `D10`. **강제 지점**: 테스트(지표 이름이 문서와 같다). **건드리는 자리**: `docker-compose.yml`, `observability/`, `docker/grafana/`. **닫힘**: `MetricNamesTest` — 완료(`observability/TicketMetrics` 에 이름 열하나, 여덟 자리가 기록한다. `MetricNamesTest` 가 `D10` 표와 대조하고 **부르는 자리가 있는지**도 본다. compose 에 `prometheus` v3.1.0·`grafana` 11.5.0, 데이터 소스·대시보드는 파일로 심는다. 패널 여섯. 입장 Lua 가 기다린 시간을 같이 돌려주게 고쳤다) | 완료 |
 | 31 | k6 시나리오 | 동시 1만 접속·좌석 1천 경쟁. 결과를 `doc/notes/load-1.md` 에. **축**: 측정. **강제 지점**: 없다. **건드리는 자리**: 신설 `load/`. **닫힘**: 리포트에 p95·성공 좌석 수·오류율이 있다 | 23·30 |
 | 32 **[Fable]** | `D13` 성능 목표 | 31 의 측정값으로 목표를 정한다. **축**: 측정값. **강제 지점**: 없다 — 문서. `35` 가 검증. **건드리는 자리**: 신설 `performance-goals.md`. **닫힘**: 수치 셋(p95·처리량·오류율) | 31 |
 | 33 | 다중 인스턴스 | `docker compose up --scale app=3` + nginx. **첫 검사는 세션이 인스턴스를 넘어가나**(20a). 그다음 스케줄러 셋(스윕·타임아웃·종료·입장)이 Redis 락으로 하나만 도나. **축**: `D4`·ADR 0004. **강제 지점**: 테스트(세션 공유·스케줄러 단일 실행). **건드리는 자리**: `docker-compose.yml`, `docker/nginx/`, 스케줄러, `application.yml`(`forward-headers-strategy: native` + 신뢰 대역 루프백 — 안 켜면 `acted_ip` 가 프록시 IP 가 된다, `D9`). **닫힘**: `SharedSessionTest` + `SchedulerSingleRunTest` | 20a·22·30 |
