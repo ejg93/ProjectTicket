@@ -114,6 +114,10 @@ class SharedSessionTest {
             "--spring.datasource.url=${postgres.jdbcUrl}",
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
+            // 마이그레이션은 자기 연결을 연다(4a — 앱 연결은 제한된 역할을 입는다). 그 연결도 같이 일러 줘야 한다.
+            "--spring.flyway.url=${postgres.jdbcUrl}",
+            "--spring.flyway.user=${postgres.username}",
+            "--spring.flyway.password=${postgres.password}",
             "--spring.data.redis.host=${redis.host}",
             "--spring.data.redis.port=${redis.getMappedPort(6379)}",
         )

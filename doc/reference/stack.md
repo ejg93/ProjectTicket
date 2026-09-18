@@ -294,6 +294,17 @@ Testcontainers 2.x 에는 Redis 전용 모듈이 없어서 `GenericContainer` �
 `logback-spring.xml` 이 `logs/ticket.log` 를 상대 경로로 여는데, 이미지가 비루트 사용자로 돌면 `/app` 이 root 것이라 기동이 죽는다 —
 증상은 Logback 스택 트레이스와 무한 재시작이다(33 에서 겪었다). `Dockerfile` 이 `mkdir -p /app/logs && chown` 을 한다.
 
+### `DataSource` 빈을 하나 더 만들면 기본 자동설정이 꺼진다
+
+Boot 의 `DataSourceAutoConfiguration` 은 `@ConditionalOnMissingBean(DataSource)` 다 — **타입으로 본다.**
+파기 전용 풀을 빈으로 하나 만들었더니 기본 DataSource 가 아예 안 생기고 **앱 전체가 그 연결을 썼다**(4a 에서 겪었다).
+연결을 가르고 싶으면 기본 빈도 같이 직접 정의하거나, 아예 **같은 연결에서 `set local role`** 로 가른다(지금 방식).
+
+### 실패한 트랜잭션은 그 뒤 문장을 전부 거절한다
+
+`current transaction is aborted, commands ignored until end of transaction block`. 한 테스트에서 **거절을 두 번 재려면**
+저장점이 필요하다 — `TransactionTemplate` 에 `PROPAGATION_NESTED` 를 주면 실패가 저장점까지만 되돌아가고 `SET LOCAL` 도 같이 풀린다.
+
 ### detekt 1.23 은 JDK 25 에서 안 돈다
 
 묶여 있는 IntelliJ 유틸이 `25.0.1` 이라는 판 문자열을 못 읽어 `IllegalArgumentException: 25.0.1` 로 선다.

@@ -38,6 +38,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * `db` 태그가 레인을 가른다(`build.gradle.kts`). 이 바탕을 상속하면 느린 레인(`integrationTest`)으로 가고,
  * 빠른 레인(`test`)은 컨테이너를 한 번도 안 띄운다. 상속하지 않고 DB 를 쓰면 빠른 레인에서 곧바로 빨개진다.
  *
+ * **연결은 앱과 같은 역할(`ticket_app`)을 입는다**(4a) — 테스트가 운영보다 넓은 권한으로 돌면 권한 결함을 여기서 못 잡는다.
+ *
  * `@AutoConfigureMockMvc` 를 바탕에 두는 이유는 컨텍스트 캐시다 — 클래스마다 붙이면 같은 설정인데 컨텍스트가 갈린다.
  * Redis 도 같이 띄운다 — 세션이 거기 산다(ADR 0004, `20a`). fork 별 DB 분리는 그것이 필요한 청크(13)에서 더한다.
  */
@@ -97,6 +99,9 @@ abstract class PostgresTestBase {
         TransactionTemplate(auditTxManager)
             .apply { propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW }
             .executeWithoutResult {
+                // 연결은 `ticket_app` 역할을 입고 있다(4a) — 그 역할에는 감사를 지울 권한도, 트리거를 건너뛸 권한도 없다.
+                // **정리하는 동안만** 주인으로 돌아간다. `set local` 이라 이 트랜잭션이 끝나면 역할이 되돌아간다.
+                auditCleanup.sql("set local role none").update()
                 auditCleanup.sql("set local session_replication_role = 'replica'").update()
                 auditCleanup.sql("delete from audit_log").update()
             }

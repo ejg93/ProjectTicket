@@ -6,6 +6,9 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * 감사 로그가 고쳐지지 않는가.
@@ -17,14 +20,25 @@ import org.springframework.jdbc.core.simple.JdbcClient
 class AuditImmutabilityTest : PostgresTestBase() {
 
     @Autowired lateinit var jdbc: JdbcClient
+    @Autowired lateinit var transactionManager: PlatformTransactionManager
 
+    /**
+     * **권한이 먼저 막는다**(4a). 앱이 입는 역할에는 `update` 자체가 없어서 트리거까지 안 간다 —
+     * 그래서 트리거를 재려면 권한이 있는 자리에서 던져야 한다(`set local role none` — 그 트랜잭션 동안만 주인이다).
+     */
     @Test
     fun recorded_row_cannot_be_updated() {
         val id = insertRow()
 
         assertThatThrownBy {
-            jdbc.sql("update audit_log set event_type = 'tampered' where audit_log_id = :id").param("id", id).update()
-        }.hasMessageContaining("감사 로그는 고칠 수 없다")
+            attempt { jdbc.sql("update audit_log set event_type = 'tampered' where audit_log_id = :id").param("id", id).update() }
+        }.describedAs("앱 역할은 권한에서 막힌다").hasStackTraceContaining("permission denied")
+
+        assertThatThrownBy {
+            attempt(asOwner = true) {
+                jdbc.sql("update audit_log set event_type = 'tampered' where audit_log_id = :id").param("id", id).update()
+            }
+        }.describedAs("권한이 있어도 트리거가 막는다").hasStackTraceContaining("감사 로그는 고칠 수 없다")
     }
 
     @Test
@@ -32,8 +46,23 @@ class AuditImmutabilityTest : PostgresTestBase() {
         val id = insertRow()
 
         assertThatThrownBy {
-            jdbc.sql("delete from audit_log where audit_log_id = :id").param("id", id).update()
-        }.hasMessageContaining("보존 기간")
+            attempt(asOwner = true) { jdbc.sql("delete from audit_log where audit_log_id = :id").param("id", id).update() }
+        }.hasStackTraceContaining("보존 기간")
+    }
+
+    /**
+     * 실패를 보는 문장은 **저장점 안에서** 던진다. 한 번 실패한 트랜잭션은 그 뒤 문장을 전부 거절해서
+     * (`current transaction is aborted`) 같은 테스트의 다음 단언이 무엇을 재는지 알 수 없게 된다.
+     *
+     * @param asOwner 권한 뒤에 있는 트리거를 재려면 권한을 통과해야 한다. `set local` 이라 저장점이 풀리면 역할도 되돌아간다
+     */
+    private fun attempt(asOwner: Boolean = false, work: () -> Unit) {
+        TransactionTemplate(transactionManager)
+            .apply { propagationBehavior = TransactionDefinition.PROPAGATION_NESTED }
+            .executeWithoutResult {
+                if (asOwner) jdbc.sql("set local role none").update()
+                work()
+            }
     }
 
     @Test
@@ -47,7 +76,10 @@ class AuditImmutabilityTest : PostgresTestBase() {
             """,
         ).query(Long::class.java).single()
 
+        // 지우는 것은 파기 역할이다(4a). 앱 역할에는 그 권한이 없다.
+        jdbc.sql("set local role ticket_purge").update()
         val deleted = jdbc.sql("delete from audit_log where audit_log_id = :id").param("id", id).update()
+        jdbc.sql("set local role ticket_app").update()
         assertThat(deleted).isEqualTo(1)
     }
 
@@ -56,7 +88,7 @@ class AuditImmutabilityTest : PostgresTestBase() {
         insertRow()
 
         // 행 트리거는 truncate 에 안 걸린다. 한 줄씩 막으면서 통째로 비우는 것을 여는 것은 앞뒤가 안 맞는다.
-        assertThatThrownBy { jdbc.sql("truncate audit_log").update() }
+        assertThatThrownBy { attempt(asOwner = true) { jdbc.sql("truncate audit_log").update() } }
             .hasStackTraceContaining("truncate 할 수 없다")
     }
 

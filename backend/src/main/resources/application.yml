@@ -13,8 +13,16 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ticket}
     username: ${POSTGRES_USER:ticket}
     password: ${POSTGRES_PASSWORD:ticket}
+    hikari:
+      # **앱은 붙자마자 제한된 역할을 입는다**(4a). `audit_log` 를 고치거나 지울 권한이 이 역할에는 없다 —
+      # `V3` 의 보존 트리거는 표 주인이 끌 수 있어서 트리거만으로는 못 막는다(`D9`).
+      connection-init-sql: set role ticket_app
   flyway:
     locations: classpath:db/migration
+    # 마이그레이션은 **주인으로** 돈다. 위 역할을 입은 연결로는 DDL 을 못 해서 자기 연결을 따로 연다.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ticket}
+    user: ${POSTGRES_USER:ticket}
+    password: ${POSTGRES_PASSWORD:ticket}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
