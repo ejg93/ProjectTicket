@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional
  * **지운 뒤 같은 키가 다시 오면 새 요청으로 처리된다.** 그것이 맞다 — 그 시점에는 원래 예매가 이미
  * 확정이든 만료든 끝나 있어서, 좌석 쪽 제약(`reservation_live_hold_idx`)이 두 번째를 받아 낸다.
  *
+ * **배치 상한이 없다.** 한 회가 그 시점의 지난 키를 전부 한 트랜잭션에서 지운다 — 이 표가 오래 안 치워져 있었으니(`13b` 가 세운 자리다) 첫 회가 제일 크다.
+ * 로컬 규모에서는 문제가 아니고, 커지면 `limit` 를 건 반복으로 바꾼다(마무리 7차 독립 리뷰가 짚었다).
+ *
  * 락을 안 쓴다. [com.projectticket.ticket.outbox.OutboxCleaner] 와 같은 이유다 — 시각 조건이 붙은 `DELETE` 는
  * 두 대가 같이 돌아도 결과가 같고, 늦은 쪽이 0행을 지운다. 락은 정확성이 아니라 절약이라(33) 여기서는 아낄 것이 없다.
  */

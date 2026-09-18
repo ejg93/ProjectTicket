@@ -26,6 +26,9 @@ import org.junit.jupiter.api.Test
  * **마이그레이션을 판 순서로 읽고 `drop constraint` 를 반영한다.** `V17` 이 `performance_status_check` 를
  * 떨구고 `cancelled` 를 더한 판으로 다시 걸어서, 파일을 그냥 훑으면 낡은 목록이 같이 잡힌다.
  *
+ * **못 보는 모양**: 이름 없는 `check`·`= any (array[…])` 꼴로 값을 닫으면 파서가 못 잡고, 「짝이 없다」를 보는 쪽도 같은 파서를 써서 같이 조용하다.
+ * 오늘 마이그레이션의 `check` 는 전부 이름 붙은 꼴이라 새는 것이 없다(마무리 7차 독립 리뷰).
+ *
  * 빠른 레인이다 — 파일과 열거형만 읽는다.
  */
 class EnumConstraintTest {
@@ -86,6 +89,8 @@ class EnumConstraintTest {
         Files.walk(root.resolve("backend/src/main/resources/db/migration")).use { paths ->
             paths.asSequence()
                 .filter { it.fileName.toString().startsWith("V") && it.toString().endsWith(".sql") }
+                // `!!` 의 근거: 바로 위 filter 가 이름이 `V` 로 시작하는 것만 남겼고 마이그레이션 이름 규약이 `V<숫자>__` 다.
+                // 그 규약을 어긴 파일이 생기면 여기서 서는 것이 맞다 — 판 순서를 못 정하면 `drop` 반영이 뒤집힌다.
                 .sortedBy { VERSION.find(it.fileName.toString())!!.groupValues[1].toInt() }
                 .map(Files::readString)
                 .toList()

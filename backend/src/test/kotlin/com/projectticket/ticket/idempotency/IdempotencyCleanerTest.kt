@@ -58,6 +58,16 @@ class IdempotencyCleanerTest : PostgresTestBase() {
         assertThat(cleaner.cleanExpired()).isZero()
     }
 
+
+    @Test
+    fun the_retention_is_the_number_the_document_decided() {
+        // 위 셋은 전부 상수로 데이터를 넣어서 **상수를 48 로 바꿔도 초록이다**(마무리 7차 독립 리뷰).
+        // 값을 정한 것은 `D4` 라 그 숫자를 여기 박는다 — 고치려면 문서가 먼저고, 그때 이 줄이 선다.
+        assertThat(IdempotencyCleaner.RETENTION_HOURS)
+            .describedAs("`D4` 「멱등키 — 보관 24시간」이 정한 값이다")
+            .isEqualTo(24)
+    }
+
     private fun key(hoursAgo: Int): String {
         val value = "key-$hoursAgo-${System.nanoTime()}"
         jdbc.sql(
