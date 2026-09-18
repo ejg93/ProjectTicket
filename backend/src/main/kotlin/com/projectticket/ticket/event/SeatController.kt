@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -31,6 +32,15 @@ class SeatController(private val seatQuery: SeatQuery) {
             revalidated(HttpStatus.OK, etag).body(seatQuery.seatMap(performanceId))
         }
     }
+
+    /**
+     * 델타(`D20`). 첫 로드는 전체, 그 뒤 폴링은 이쪽이다 — 2천 석을 매번 보내는 대신 바뀐 좌석만 보낸다.
+     *
+     * `ETag` 를 안 단다. 바뀐 것만 담은 응답이라 **같은 `since` 로 또 물어도 같은 답이 아니다** — 재검증할 것이 없다.
+     */
+    @GetMapping("/changes")
+    fun changes(@PathVariable performanceId: Long, @RequestParam since: Long): SeatQuery.SeatChanges =
+        seatQuery.changes(performanceId, since)
 
     /** 304 에도 `ETag` 를 다시 싣는다 — RFC 9110 §15.4.5 는 200 에 실었을 헤더를 304 에도 보내라고 한다 */
     private fun revalidated(status: HttpStatus, etag: String): ResponseEntity.BodyBuilder =

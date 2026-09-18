@@ -2,6 +2,7 @@ package com.projectticket.ticket.reservation
 
 import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
@@ -19,7 +20,11 @@ import org.springframework.transaction.annotation.Transactional
  * 좌석은 만료된 **예매의 id** 로 고른다. `performance_seat.held_until < now()` 로 고르면 `paying` 예매의 좌석(여전히 `held`, 시각은 지남)까지 풀린다.
  */
 @Component
-class HoldSweeper(private val jdbc: JdbcClient, private val auditLog: AuditLog) {
+class HoldSweeper(
+    private val jdbc: JdbcClient,
+    private val auditLog: AuditLog,
+    private val seatVersions: SeatVersions,
+) {
 
     private val log = LoggerFactory.getLogger(HoldSweeper::class.java)
 
@@ -55,17 +60,23 @@ class HoldSweeper(private val jdbc: JdbcClient, private val auditLog: AuditLog) 
             return 0
         }
 
-        val released = jdbc.sql(
+        val releasedSeats = jdbc.sql(
             """
             update performance_seat
                set status = :available, held_until = null, reservation_id = null
              where status = :held and reservation_id in (:reservations)
+            returning performance_seat_id, performance_id
             """,
         )
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
             .param("held", PerformanceSeatStatus.HELD.code)
             .param("reservations", expired)
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+        val released = releasedSeats.size
+        // 좌석이 돌아온 것을 화면이 알아야 한다(`D20`). 커밋 뒤에 판이 오른다.
+        seatVersions.publishAfterCommit(releasedSeats, PerformanceSeatStatus.AVAILABLE)
 
         // 전이마다 감사 사건 하나(`D3` 「상태 이력」). 행위자가 없다 — 시간이 옮긴 것이다.
         expired.forEach { reservationId ->

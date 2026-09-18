@@ -223,6 +223,8 @@ class SecurityConfig {
             "/api/consent-items",
             // 좌석도는 로그인 전에 본다 — 자리를 보고 나서 로그인한다.
             "/api/performances/*/seats",
+            // 델타도 같은 그림이다(10a). 로그인 전에 좌석을 보고 나서 로그인한다.
+            "/api/performances/*/seats/changes",
         )
     }
 }

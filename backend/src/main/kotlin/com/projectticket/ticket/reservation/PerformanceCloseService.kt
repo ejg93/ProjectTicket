@@ -2,6 +2,7 @@ package com.projectticket.ticket.reservation
 
 import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -25,6 +26,7 @@ class PerformanceCloseService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
+    private val seatVersions: SeatVersions,
 ) {
 
     /** @return 닫았으면 만료시킨 예매 수, 남이 먼저 닫았거나 아직 마감 전이면 null */
@@ -61,17 +63,21 @@ class PerformanceCloseService(
             .filterNotNull()
 
         if (expired.isNotEmpty()) {
-            jdbc.sql(
+            val released = jdbc.sql(
                 """
                 update performance_seat
                    set status = :available, held_until = null, reservation_id = null
                  where status = :held and reservation_id in (:reservations)
+                returning performance_seat_id, performance_id
                 """,
             )
                 .param("available", PerformanceSeatStatus.AVAILABLE.code)
                 .param("held", PerformanceSeatStatus.HELD.code)
                 .param("reservations", expired)
-                .update()
+                .query(SeatVersions.Row::class.java)
+                .list()
+                .filterNotNull()
+            seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
 
             expired.forEach {
                 auditLog.record(AuditLog.Kind.OUTCOME, "reservation.expired", null, AuditLog.Target.of("reservation", it))

@@ -4,6 +4,7 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.CancelledBy
@@ -25,6 +26,7 @@ class RefundTransitionService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
+    private val seatVersions: SeatVersions,
 ) {
 
     /** ① 이 끝난 환불. [refundAmount] 만 PG 로 간다 */
@@ -76,13 +78,20 @@ class RefundTransitionService(
         val fee = RefundPolicy.fee(payment.amount, rate)
         val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, payment.amount - fee)
 
-        jdbc.sql(
-            "update performance_seat set status = :available, held_until = null, reservation_id = null where reservation_id = :id and status = :reserved",
+        val released = jdbc.sql(
+            """
+            update performance_seat set status = :available, held_until = null, reservation_id = null
+             where reservation_id = :id and status = :reserved
+            returning performance_seat_id, performance_id
+            """,
         )
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
             .param("reserved", PerformanceSeatStatus.RESERVED.code)
             .param("id", reservationId)
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+        seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
 
         // 취소 트랜잭션이 사건을 같이 커밋한다(`D11`). 감사와 이름이 같지만 목적이 다르다 — 이쪽은 소비자가 반응하려고 있는 계약이다.
         outbox.append(

@@ -4,6 +4,7 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
 import com.projectticket.ticket.reservation.CancelledBy
@@ -29,6 +30,7 @@ class PerformanceCancelService(
     private val jdbc: JdbcClient,
     private val auditLog: AuditLog,
     private val outbox: OutboxWriter,
+    private val seatVersions: SeatVersions,
 ) {
 
     private val log = LoggerFactory.getLogger(PerformanceCancelService::class.java)
@@ -115,18 +117,25 @@ class PerformanceCancelService(
         )
     }
 
-    private fun releaseSeats(performanceId: Long) =
-        jdbc.sql(
+    private fun releaseSeats(performanceId: Long): Int {
+        val released = jdbc.sql(
             """
             update performance_seat
                set status = :available, held_until = null, reservation_id = null
              where performance_id = :id and status in (:taken)
+            returning performance_seat_id, performance_id
             """,
         )
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
             .param("id", performanceId)
             .param("taken", listOf(PerformanceSeatStatus.HELD.code, PerformanceSeatStatus.RESERVED.code))
-            .update()
+            .query(SeatVersions.Row::class.java)
+            .list()
+            .filterNotNull()
+
+        seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
+        return released.size
+    }
 
     /**
      * **이번에 무른 예매**의 승인 결제에 전액 환불 행을 만든다(`D6` 「사유별」 — 구간과 무관하게 0%).

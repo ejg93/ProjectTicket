@@ -56,6 +56,9 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
     CANCEL_WINDOW_CLOSED(HttpStatus.CONFLICT, "cancel-window-closed", "관람일 당일이라 취소할 수 없다"),
 
+    // 좌석 읽기 모델(10a, `D20`). 변경 로그 밖을 물으면 410 — 화면이 그 코드로 전체를 다시 받는다.
+    SEAT_CHANGES_EXPIRED(HttpStatus.GONE, "seat-changes-expired", "그 판 이후의 변경은 남아 있지 않다"),
+
     // 대기열(21, `D12`). 닫힌 회차는 **있었는데 끝난 것**이라 410 이고, 없는 회차(404)와 가른다 —
     // 화면이 앞에서는 줄을 걷고 뒤에서는 잘못된 링크를 말한다.
     QUEUE_CLOSED(HttpStatus.GONE, "queue-closed", "회차가 닫혀 대기열이 없다"),

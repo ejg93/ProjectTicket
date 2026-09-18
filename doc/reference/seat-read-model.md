@@ -62,7 +62,7 @@ If-None-Match: "1842"
 | 키 | 타입 | 무엇 |
 |---|---|---|
 | `seat:ver:{performanceId}` | STRING(정수) | 현재 버전. 쓰기 트랜잭션이 커밋된 **뒤** `INCR` |
-| `seat:log:{performanceId}` | STREAM | 변경 로그. 항목 = `{version, id, s}`. `MAXLEN ~ 10000` |
+| `seat:log:{performanceId}` | STREAM | 변경 로그. 항목 = `{id, s}`, **스트림 id 가 곧 버전**(`{version}-{n}`) — `since` 로 자르는 것이 범위 조회 하나가 된다(10a). `MAXLEN ~ 10000` |
 | `seat:snap:{performanceId}:{version}` | STRING(JSON) | 그 버전의 전체 스냅샷. TTL 10초 |
 
 ### 쓰기 쪽이 하는 일
@@ -81,7 +81,7 @@ If-None-Match: "1842"
 
 ```
 전체 요청:
-  v = GET seat:ver         (없으면 0 — Redis 가 비었으면 DB 에서 max(updated_at) 로 대신한다)
+  v = GET seat:ver         (없으면 DB 의 max(updated_at) 으로 **씨를 뿌린다** — `SET NX`, 10a)
   If-None-Match == v      → 304
   snap = GET seat:snap:v  → 있으면 그대로
                           → 없으면 DB 에서 만들고 SET … EX 10, 돌려준다
@@ -104,7 +104,8 @@ If-None-Match: "1842"
 |---|---|
 | Redis 와 DB 가 어긋나면 | DB 가 이긴다. 스냅샷은 DB 에서 만들고 버전은 순서만 준다 |
 | 화면이 `A` 인데 선점이 0행이면 | 정상이다. 화면은 폴링 주기만큼 늦다. 선점 응답이 `seat-taken` 이면 화면이 그 좌석을 `H` 로 바꾼다(41) |
-| 버전이 뒤로 가나 | 안 간다. `INCR` 뿐이다. Redis 가 비어 0 이 되면 클라이언트의 `since` 가 크므로 410 → 전체 재로드 |
+| 버전이 뒤로 가나 | 안 간다. `INCR` 뿐이고, 키가 없으면 **DB 의 `max(updated_at)` 으로 씨를 뿌린 뒤** 올린다(10a). 1 부터 시작하면 클라이언트의 옛 `since` 가 더 커서 「변경 없음」으로 읽히고 그 화면은 영영 안 따라온다 |
+| 생 SQL 로 좌석을 고치면 | 화면이 모른다. 판을 올리는 자리는 **서비스의 `afterCommit`** 뿐이다 — DB 가 진실이지만 순서는 Redis 가 센다 |
 | 스냅샷이 오래된 버전을 담나 | 키에 버전이 들어 있어 못 섞인다 |
 
 ## 크기와 비용 (추정 — 31 이 잰다)

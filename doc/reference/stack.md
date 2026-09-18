@@ -285,6 +285,12 @@ Testcontainers 2.x 에는 Redis 전용 모듈이 없어서 `GenericContainer` �
 `spring.session.redis.repository-type: indexed` 면 저장소가 뜰 때 Redis 에 `CONFIG SET notify-keyspace-events` 를 보낸다(만료 세션을 색인에서 걷어내려고).
 `CONFIG` 를 막아 둔 Redis 에서는 기동이 실패한다. 그때는 `ConfigureRedisAction.NO_OP` 을 빈으로 두고 서버 쪽 설정을 손으로 켠다.
 
+### Lua 는 큰 정수를 지수 표기로 접는다
+
+Redis 스크립트 안에서 `1789699665760900 .. ''` 같은 잇기를 하면 `1.7896996657609e+15` 가 된다 — Lua 5.1 의 수가 double 이고 기본 서식이 `%.14g` 라서다.
+좌석 판·스트림 id 처럼 **정수를 문자열로 만들 때는 `string.format('%d', n)`** 을 쓴다. 안 쓰면 파싱이 `NumberFormatException` 으로 죽고,
+그 값이 스트림 id 면 애초에 XADD 가 거절한다(`10a` 에서 겪었다).
+
 ### Gradle 은 Test 태스크를 up-to-date 로 건너뛴다
 
 입력이 같으면 두 번째 실행은 안 돈다. 숫자를 내는 측정(`gradlew measure`)은 그러면 **지난 표를 이번 것으로 읽게 된다** — `outputs.upToDateWhen { false }` 로 늘 돌린다(19 에서 두 번째 실행이 첫 표와 같아서 알았다).
