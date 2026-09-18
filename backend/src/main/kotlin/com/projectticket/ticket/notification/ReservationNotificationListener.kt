@@ -10,11 +10,11 @@ import tools.jackson.databind.ObjectMapper
 /**
  * 첫 아웃박스 소비자(26). 릴레이가 발행한 봉투를 받아 알림 행을 만든다.
  *
- * **예외를 삼킨다.** [NotificationStore] 의 `REQUIRES_NEW` 가 트랜잭션을 가르지만, 그 프록시가 예외를 위로 던지면
- * 릴레이가 그것을 받아 자기 트랜잭션을 롤백한다 — 경계와 예외 처리가 **둘 다** 있어야 「소비자가 발행자를 안 멈춘다」(`D11`)가 성립한다.
+ * **예외를 안 삼킨다**(29 부터). 28 까지는 삼켰는데 — 그때는 재시도할 자리가 없어서 삼키지 않으면 발행자가 멈췄다 —
+ * 이제 브로커가 사이에 있어서 던지는 것이 맞다: `ConsumerErrorHandling` 이 세 번 다시 시도하고 그래도 안 되면 `.DLT` 로 보낸다.
+ * 「소비자 하나의 결함이 발행자를 안 멈춘다」(`D11`)는 이제 그 손잡이가 지킨다.
  *
- * 삼킨 것은 `WARN` 이다(`D10` — 지금은 도는데 이상한 것). 오프셋이 이미 넘어가서 **그 알림은 다시 안 온다** —
- * 재시도·DLQ 는 29 가 든다. 지금 그것을 넣으면 소비자가 하나뿐인데 재시도 표가 하나 는다(`CLAUDE.md` 대전제 3).
+ * 다시 시도해도 되는 이유는 **멱등이라서**다 — `(event_id, account_id)` 유일 제약이 두 번째 시도를 0행으로 끝낸다.
  *
  * 빈이 둘인 이유는 자기 호출이다 — 같은 클래스 안에서 부르면 프록시를 안 지나 `REQUIRES_NEW` 가 통째로 무시된다(`stack.md`).
  */
@@ -29,12 +29,8 @@ class ReservationNotificationListener(
     /** 그룹이 정산과 다르다(ADR 0007) — 같은 그룹이면 사건 하나를 둘 중 하나만 받는다 */
     @KafkaListener(topics = [EventTopics.RESERVATION, EventTopics.PERFORMANCE], groupId = GROUP)
     fun on(message: String) {
-        val envelope = json.readValue(message, OutboxRelay.Envelope::class.java)
-        try {
-            store.record(envelope)
-        } catch (e: RuntimeException) {
-            log.warn("알림을 못 만들었다 event_id={} type={} 이유={}", envelope.eventId, envelope.type.code, e.javaClass.simpleName, e)
-        }
+        // **던진다**(29). 삼키면 재시도도 DLT 도 안 돈다 — 그 사건은 조용히 사라진다.
+        store.record(json.readValue(message, OutboxRelay.Envelope::class.java))
     }
 
     companion object {

@@ -46,6 +46,11 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
 
     @BeforeEach
     fun setUp() {
+        // **남이 커밋해 둔 알림을 치운다.** 28 뒤로 커밋 레인 테스트의 Kafka 소비자가 진짜 행을 남기고,
+        // 컨테이너를 재사용하면 지난 실행 것까지 쌓인다 — 스윕은 전체를 훑으므로 그것들이 이 테스트의 수를 흔든다.
+        // 이 트랜잭션 안의 삭제라 끝나면 되돌아간다(`stack.md` — 롤백 레인).
+        jdbc.sql("delete from notification").update()
+
         fixture = EventFixture(jdbc)
         accountId = fixture.account("${PREFIX}mailbox@test.local")
         eventId = fixture.event(fixture.organizer("${PREFIX}org"), "겨울 콘서트")

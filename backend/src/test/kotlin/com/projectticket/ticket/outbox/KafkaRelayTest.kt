@@ -2,6 +2,7 @@ package com.projectticket.ticket.outbox
 
 import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.Waits
+import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import org.assertj.core.api.Assertions.assertThat
@@ -41,7 +42,10 @@ class KafkaRelayTest : ConcurrencyTestBase() {
 
         assertThat(relay.relay()).isPositive()
 
-        val delivered = Waits.value("봉투가 도착") { spy.received.firstOrNull { it.envelope.eventId == eventId } }
+        // 파티션이 셋이라(29) 소비자가 붙는 데 시간이 더 걸린다. 시한을 넉넉히 둔다.
+        val delivered = Waits.value("봉투가 도착", Duration.ofSeconds(40)) {
+            spy.received.firstOrNull { it.envelope.eventId == eventId }
+        }
         assertThat(delivered.envelope.type).isEqualTo(EventType.RESERVATION_RESERVED)
         assertThat(delivered.envelope.aggregateType).isEqualTo(AggregateType.RESERVATION)
         assertThat(delivered.envelope.payload["reservation_id"]).isEqualTo(AGGREGATE.toInt())
@@ -56,8 +60,8 @@ class KafkaRelayTest : ConcurrencyTestBase() {
         relay.relay()
 
         // 같은 그룹이면 사건 하나를 둘 중 하나만 받는다. 알림과 정산이 **각자** 받으려면 그룹이 달라야 한다(ADR 0007).
-        Waits.until("첫 그룹이 받는다") { spy.received.any { it.envelope.eventId == eventId } }
-        Waits.until("둘째 그룹도 받는다") { spy.otherGroup.any { it.eventId == eventId } }
+        Waits.until("첫 그룹이 받는다", Duration.ofSeconds(40)) { spy.received.any { it.envelope.eventId == eventId } }
+        Waits.until("둘째 그룹도 받는다", Duration.ofSeconds(40)) { spy.otherGroup.any { it.eventId == eventId } }
     }
 
     private fun insertEvent(): UUID {
