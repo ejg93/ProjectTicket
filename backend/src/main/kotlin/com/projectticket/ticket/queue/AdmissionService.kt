@@ -6,6 +6,7 @@ import java.util.Base64
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 문을 여는 쪽(`D12` 「입장」). 줄 앞에서 정원이 허락하는 만큼 빼내 토큰을 발급한다.
@@ -18,7 +19,10 @@ import org.springframework.stereotype.Service
  * 그 자리에서 반납받아야 정원이 돈다.
  */
 @Service
-class AdmissionService(private val redis: StringRedisTemplate) {
+class AdmissionService(
+    private val redis: StringRedisTemplate,
+    private val objectMapper: ObjectMapper,
+) {
 
     private val random = SecureRandom()
 
@@ -49,9 +53,30 @@ class AdmissionService(private val redis: StringRedisTemplate) {
     fun tokenFor(performanceId: Long, accountId: Long): String? =
         redis.opsForValue().get(QueueKeys.admissionByAccount(performanceId, accountId))
 
+    /**
+     * 토큰이 가리키는 것. 없거나 만료면 null — 관문(23)이 이 값으로 계정·회차를 대조한다.
+     * 만료를 여기서 안 센다. TTL 이 키를 지워서 **없는 것과 만료된 것이 같은 답**이다.
+     */
+    fun find(token: String): Admission? =
+        redis.opsForValue().get(QueueKeys.admission(token))
+            ?.let { objectMapper.readValue(it, Admission::class.java) }
+
+    /**
+     * 자리를 반납한다. 선점에 성공했거나(23) 줄을 떠났을 때(24) 부른다 —
+     * **정원이 돌아야 뒷사람이 들어온다.** 반납이 없으면 TTL 10분 동안 빈 의자가 잠긴다.
+     */
+    fun release(performanceId: Long, accountId: Long) {
+        val token = tokenFor(performanceId, accountId) ?: return
+        redis.opsForZSet().remove(QueueKeys.active(performanceId), token)
+        redis.delete(listOf(QueueKeys.admission(token), QueueKeys.admissionByAccount(performanceId, accountId)))
+    }
+
     /** 무작위 32바이트. 추측으로 남의 자리를 못 쓴다(`D9`) */
     private fun newToken(): String =
         ByteArray(TOKEN_BYTES).also(random::nextBytes).let(Base64.getUrlEncoder().withoutPadding()::encodeToString)
+
+    /** 토큰에 박힌 것(`D12`). 관문이 셋을 대조한다 — 토큰 하나로 남의 계정·다른 회차를 못 산다 */
+    data class Admission(val accountId: Long, val performanceId: Long, val issuedAt: Long)
 
     companion object {
         /** 활성 정원 C — 시작값 2,000(ADR 0003). 「들어왔는데 안 사는 사람」이 쌓이는 것을 막는다. 31 이 조정한다 */

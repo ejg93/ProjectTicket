@@ -51,6 +51,10 @@ class QueueRankTest : PostgresTestBase() {
         performanceId = fixture.performance(eventId, hallId)
         openService.open(performanceId, actorAccountId = null)
 
+        // **앞에 한 명을 세워 둔다.** 줄이 비어 있으면 진입이 곧 입장이라(`D12` 「항상 켠다」) 순번이라는 것이 안 생긴다 —
+        // 순번을 재는 이 테스트들은 「이미 줄이 있는」 상황을 본다.
+        redis.opsForZSet().add(QueueKeys.waiting(performanceId), "head", 0.0)
+
         first = fixture.account("${PREFIX}1@test.local")
         second = fixture.account("${PREFIX}2@test.local")
         third = fixture.account("${PREFIX}3@test.local")
@@ -58,9 +62,9 @@ class QueueRankTest : PostgresTestBase() {
 
     @Test
     fun ranks_follow_entry_order() {
-        assertThat(queue.enter(performanceId, first).rank).isEqualTo(1L)
-        assertThat(queue.enter(performanceId, second).rank).isEqualTo(2L)
-        assertThat(queue.enter(performanceId, third).rank).isEqualTo(3L)
+        assertThat(queue.enter(performanceId, first).rank).isEqualTo(2L)
+        assertThat(queue.enter(performanceId, second).rank).isEqualTo(3L)
+        assertThat(queue.enter(performanceId, third).rank).isEqualTo(4L)
     }
 
     @Test
@@ -69,18 +73,18 @@ class QueueRankTest : PostgresTestBase() {
         queue.enter(performanceId, second)
 
         // 새로고침이 이 모양이다. 진입 시각을 다시 쓰면 뒤로 밀린다.
-        assertThat(queue.enter(performanceId, first).rank).isEqualTo(1L)
-        assertThat(queue.position(performanceId, second).rank).isEqualTo(2L)
-        // 한 사람이 줄에 두 번 서지도 않는다 — member 가 계정이라 그렇다.
-        assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(2)
+        assertThat(queue.enter(performanceId, first).rank).isEqualTo(2L)
+        assertThat(queue.position(performanceId, second).rank).isEqualTo(3L)
+        // 한 사람이 줄에 두 번 서지도 않는다 — member 가 계정이라 그렇다(앞에 세워 둔 하나까지 셋).
+        assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(3)
     }
 
     @Test
     fun eta_comes_from_the_admission_rate() {
         assertThat(queue.enter(performanceId, first).etaSeconds).isEqualTo(1L)
 
-        // 앞에 한 초치(20명)를 채운다. 21번째는 둘째 초에 들어간다 — 올림이라 1이 아니라 2다.
-        repeat(QueueService.ADMIT_PER_SECOND.toInt() - 1) { index ->
+        // 앞을 한 초치(20명)로 채운다. 21번째는 둘째 초에 들어간다 — 올림이라 1이 아니라 2다.
+        repeat(QueueService.ADMIT_PER_SECOND.toInt() - 2) { index ->
             redis.opsForZSet().add(QueueKeys.waiting(performanceId), "filler-$index", index.toDouble())
         }
         val entered = queue.enter(performanceId, second)
@@ -125,7 +129,7 @@ class QueueRankTest : PostgresTestBase() {
             .andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("waiting") }
-                jsonPath("$.rank") { value(1) }
+                jsonPath("$.rank") { value(2) }
                 jsonPath("$.eta_seconds") { value(1) }
             }
     }

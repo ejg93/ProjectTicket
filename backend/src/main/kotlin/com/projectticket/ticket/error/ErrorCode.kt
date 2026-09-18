@@ -58,6 +58,12 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     QUEUE_CLOSED(HttpStatus.GONE, "queue-closed", "회차가 닫혀 대기열이 없다"),
     NOT_IN_QUEUE(HttpStatus.NOT_FOUND, "not-in-queue", "줄에 서 있지 않다"),
 
+    // 관문(23). 429 는 「지금은 안 되지만 나중엔 된다」고, 줄을 안 선 사람은 403(「너는 안 된다」)이 아니다(`D12`).
+    ADMISSION_REQUIRED(HttpStatus.TOO_MANY_REQUESTS, "admission-required", "대기열을 지나야 한다"),
+    ADMISSION_MISMATCH(HttpStatus.FORBIDDEN, "admission-mismatch", "다른 계정·회차의 입장권이다"),
+    // Redis 가 죽으면 관문을 **닫는다**. 열어 두면 대기열이 막으려던 폭발이 그대로 DB 로 간다(`D12` 「장애」).
+    QUEUE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "queue-unavailable", "지금은 예매를 받을 수 없다"),
+
     // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "idempotency-key-reused", "같은 멱등키로 다른 요청이 왔다"),

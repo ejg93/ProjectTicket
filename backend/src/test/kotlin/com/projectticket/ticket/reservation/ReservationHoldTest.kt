@@ -5,6 +5,9 @@ import com.projectticket.ticket.auth.AccountRole
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
+import com.projectticket.ticket.queue.AdmissionService
+import com.projectticket.ticket.queue.QueueGateFilter
+import com.projectticket.ticket.queue.QueueService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -33,6 +36,8 @@ class ReservationHoldTest : PostgresTestBase() {
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var json: ObjectMapper
     @Autowired lateinit var openService: PerformanceOpenService
+    @Autowired lateinit var queue: QueueService
+    @Autowired lateinit var admission: AdmissionService
 
     private lateinit var fixture: EventFixture
     private lateinit var buyer: TicketUser
@@ -185,7 +190,20 @@ class ReservationHoldTest : PostgresTestBase() {
             contentType = MediaType.APPLICATION_JSON
             content = json.writeValueAsString(mapOf("seat_ids" to seats))
             if (key != null) header("Idempotency-Key", key)
+            admissionToken(performance)?.let { header(QueueGateFilter.ADMISSION_HEADER, it) }
         }
+
+    /**
+     * 관문(23)을 지날 입장권. 줄이 비어 있으면 진입이 곧 입장이다(`D12` 「항상 켠다」).
+     *
+     * 성공한 선점은 토큰을 반납하므로 요청마다 새로 받는다. 판매 중이 아닌 회차는 줄 자체가 없어서 null 이고,
+     * 그 요청은 관문이 아니라 선점 서비스가 거절한다 — 그것을 재는 테스트들이 여기 있다.
+     */
+    private fun admissionToken(performance: Long): String? =
+        runCatching {
+            queue.enter(performance, buyer.id)
+            admission.tokenFor(performance, buyer.id)
+        }.getOrNull()
 
     /** DB 에 실제 계정이 있어야 한다 — 예매가 계정을 외래키로 잡는다 */
     private fun principal(email: String): TicketUser =

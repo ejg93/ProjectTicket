@@ -69,6 +69,7 @@ class SecurityConfig {
         entryPoint: ProblemEntryPoint,
         accessDeniedHandler: ProblemAccessDeniedHandler,
         csrfTokenRepository: CsrfTokenRepository,
+        securedFilters: List<SecuredApiFilter>,
     ): SecurityFilterChain {
         http
             .authorizeHttpRequests { auth ->
@@ -101,6 +102,9 @@ class SecurityConfig {
                 SecurityContextHolderFilter::class.java,
             )
             .addFilterAfter(AbsoluteSessionTimeoutFilter(), SecurityContextHolderFilter::class.java)
+        // 인가 뒤에 도는 업무 필터들([SecuredApiFilter]) — 지금은 대기열 관문(23) 하나다.
+        // 앞에 두면 로그인 안 한 사람이 401 대신 429 를 받는다: 줄을 서라는 말은 로그인한 사람에게만 뜻이 있다(`D12`).
+        securedFilters.forEach { http.addFilterAfter(it, AuthorizationFilter::class.java) }
         return http.build()
     }
 

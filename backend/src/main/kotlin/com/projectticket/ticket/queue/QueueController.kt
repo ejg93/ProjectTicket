@@ -1,7 +1,9 @@
 package com.projectticket.ticket.queue
 
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -22,8 +24,15 @@ class QueueController(private val queue: QueueService) {
     fun enter(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): QueueService.Position =
         queue.enter(performanceId, user.id)
 
-    /** 화면이 2초마다 부른다(ADR 0003). 토큰은 아직 안 준다 — 22 가 이 응답에 더한다 */
+    /** 화면이 2초마다 부른다(ADR 0003). **이 호출이 하트비트를 겸한다**(24) — 따로 보내는 경로가 없다 */
     @GetMapping("/{performanceId}")
     fun position(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): QueueService.Position =
         queue.position(performanceId, user.id)
+
+    /** 이탈(24). 204 다 — 돌려줄 것이 없다(`D5`). 줄에 없어도 204 다: 끝난 상태가 같다 */
+    @DeleteMapping("/{performanceId}")
+    fun leave(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): ResponseEntity<Void> {
+        queue.leave(performanceId, user.id)
+        return ResponseEntity.noContent().build()
+    }
 }

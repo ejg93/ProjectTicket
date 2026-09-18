@@ -48,8 +48,8 @@ class AdmissionTest : PostgresTestBase() {
 
     @Test
     fun admits_from_the_front_and_empties_the_line() {
-        queue.enter(performanceId, first)
-        queue.enter(performanceId, second)
+        queueUp(first)
+        queueUp(second)
 
         assertThat(admission.admit(performanceId)).isEqualTo(2)
         assertThat(admission.tokenFor(performanceId, first)).isNotNull()
@@ -61,7 +61,7 @@ class AdmissionTest : PostgresTestBase() {
 
     @Test
     fun the_token_names_the_account_and_the_performance() {
-        queue.enter(performanceId, first)
+        queueUp(first)
         admission.admit(performanceId)
 
         val token = requireNotNull(admission.tokenFor(performanceId, first))
@@ -75,7 +75,7 @@ class AdmissionTest : PostgresTestBase() {
 
     @Test
     fun the_token_expires_on_its_own() {
-        queue.enter(performanceId, first)
+        queueUp(first)
         admission.admit(performanceId)
         val token = requireNotNull(admission.tokenFor(performanceId, first))
 
@@ -88,7 +88,7 @@ class AdmissionTest : PostgresTestBase() {
     @Test
     fun a_full_house_admits_nobody() {
         fillActive(AdmissionService.CAPACITY, expiresInMillis = 60_000)
-        queue.enter(performanceId, first)
+        queueUp(first)
 
         assertThat(admission.admit(performanceId)).isZero()
         // 줄에 그대로 남아야 한다. 빼놓고 안 들이면 그 사람은 사라진다.
@@ -100,7 +100,7 @@ class AdmissionTest : PostgresTestBase() {
     fun expired_tokens_give_the_capacity_back() {
         // 정원을 이미 죽은 토큰으로 채운다. 1단계가 이것을 걷어내지 않으면 줄이 영원히 안 준다.
         fillActive(AdmissionService.CAPACITY, expiresInMillis = -60_000)
-        queue.enter(performanceId, first)
+        queueUp(first)
 
         assertThat(admission.admit(performanceId)).isEqualTo(1)
         assertThat(redis.opsForZSet().size(QueueKeys.active(performanceId))).isEqualTo(1)
@@ -134,15 +134,25 @@ class AdmissionTest : PostgresTestBase() {
 
     @Test
     fun polling_hands_over_the_token() {
+        // 앞에 한 명을 세워 둔다. 줄이 비어 있으면 진입이 곧 입장이라 「기다리는 상태」가 안 나온다.
+        queueUp(second)
         queue.enter(performanceId, first)
         assertThat(queue.position(performanceId, first).state).isEqualTo(QueueService.Position.WAITING)
 
         // 스케줄러가 문을 연다. 화면은 폴링으로 그 사실을 안다 — 따로 알리는 경로가 없다(ADR 0003).
-        assertThat(scheduler.admitDue()).isEqualTo(1)
+        assertThat(scheduler.admitDue()).isEqualTo(2)
 
         val after = queue.position(performanceId, first)
         assertThat(after.state).isEqualTo(QueueService.Position.ADMITTED)
         assertThat(after.admissionToken).isNotBlank()
+    }
+
+    /**
+     * 줄에 직접 세운다. [QueueService.enter] 는 줄이 비면 그 자리에서 입장시키므로(`D12` 「항상 켠다」)
+     * 입장 자체를 재는 여기서는 진입 경로를 안 쓴다.
+     */
+    private fun queueUp(accountId: Long) {
+        redis.opsForZSet().add(QueueKeys.waiting(performanceId), accountId.toString(), accountId.toDouble())
     }
 
     /** 활성 집합을 채운다. `expiresInMillis` 가 음수면 이미 죽은 토큰이다 */
