@@ -294,6 +294,12 @@ Testcontainers 2.x 에는 Redis 전용 모듈이 없어서 `GenericContainer` �
 `logback-spring.xml` 이 `logs/ticket.log` 를 상대 경로로 여는데, 이미지가 비루트 사용자로 돌면 `/app` 이 root 것이라 기동이 죽는다 —
 증상은 Logback 스택 트레이스와 무한 재시작이다(33 에서 겪었다). `Dockerfile` 이 `mkdir -p /app/logs && chown` 을 한다.
 
+### 최소 15자면 유출 목록이 거의 안 걸린다
+
+SecLists 의 `10k-most-common` 10,001개 중 **15자를 넘는 것은 하나뿐**이다(`films+pic+galeries`).
+길이 규칙이 이미 그 목록을 막고 있어서, 블록리스트가 실제로 잡는 것은 **흔한 것을 늘려 만든 것**이다 —
+`passwordpassword`·`123456789012345`. 그래서 목록은 대조용이자 **반복 검사의 사전**으로 쓴다(`3b`).
+
 ### `DataSource` 빈을 하나 더 만들면 기본 자동설정이 꺼진다
 
 Boot 의 `DataSourceAutoConfiguration` 은 `@ConditionalOnMissingBean(DataSource)` 다 — **타입으로 본다.**
