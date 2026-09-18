@@ -36,12 +36,32 @@ docker run --rm -i --network projectticket_default \
 
 ## 다시 돌릴 때
 
-좌석은 한 번 잡히면 다음 회차 실행에서 전부 `409` 다. 같은 조건으로 다시 재려면 좌석을 되돌린다:
+좌석은 한 번 잡히면 다음 회차 실행에서 전부 `409` 다. 같은 조건으로 다시 재려면 예매를 지운다 —
+**`performance_seat` 를 먼저 풀어야 한다.** `performance_seat.reservation_id` 가 `reservation` 을 가리켜서
+예매를 먼저 지우면 외래키에 걸린다(`ticket` → `reservation_seat` 도 같은 이유로 순서가 있다).
 
 ```bash
-docker exec -i ticket-db psql -U ticket -d ticket -c \
-  "update performance_seat set status='available', held_until=null, reservation_id=null where performance_id=1;"
+docker exec -i ticket-db psql -U ticket -d ticket -v ON_ERROR_STOP=1 -c "
+update performance_seat set status='available', held_until=null, reservation_id=null where performance_id=1;
+delete from ticket where reservation_seat_id in (select reservation_seat_id from reservation_seat where reservation_id in (select reservation_id from reservation where performance_id=1));
+delete from reservation_seat where reservation_id in (select reservation_id from reservation where performance_id=1);
+delete from payment where reservation_id in (select reservation_id from reservation where performance_id=1);
+delete from notification;
+delete from reservation where performance_id=1;
+delete from idempotency_key;"
 ```
 
-**되돌린 뒤 Redis 의 좌석 판은 안 맞는다**(`D20` — 판은 서비스가 올린다). 화면을 같이 볼 것이면
-`docker exec ticket-redis redis-cli del seat:ver:1 seat:log:1` 도 같이 한다.
+**되돌린 뒤 Redis 의 좌석 판은 안 맞는다**(`D20` — 판은 서비스가 올린다). 줄과 같이 지운다:
+
+```bash
+docker exec ticket-redis redis-cli del seat:ver:1 seat:log:1 queue:1
+```
+
+## 대수가 실제로 갈렸나 본다
+
+부하를 돌린 뒤 **인스턴스마다** 센다. 한 대에 몰려 있으면 문이 안 나눈 것이다(35).
+
+```bash
+for i in 1 2 3; do docker exec projectticket-app-$i \
+  curl -s http://localhost:8080/actuator/prometheus | grep ^seat_hold_latency_seconds_count; done
+```

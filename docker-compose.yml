@@ -102,7 +102,8 @@ services:
       # 가상 스레드 켜고 끄고를 재려고 바깥에서 준다(35a). 기본은 끈 쪽 — 켠 값은 측정이 정한다.
       SPRING_THREADS_VIRTUAL_ENABLED: ${SPRING_THREADS_VIRTUAL_ENABLED:-false}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      # 준비됐나를 묻는다(35a) — 살아 있나가 아니라. DB·Redis 가 끊기면 이 대는 문 뒤에서 빠진다.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness | grep -q UP"]
       interval: 10s
       timeout: 3s
       retries: 10

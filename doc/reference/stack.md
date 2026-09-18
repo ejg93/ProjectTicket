@@ -386,6 +386,16 @@ git update-index --chmod=+x backend/gradlew
 
 `docker-compose.yml` 의 `/docker-entrypoint-initdb.d` 는 데이터 디렉터리가 비어 있을 때 한 번만 실행된다. 파일을 넣어도 기존 볼륨에서는 아무 일이 안 나고 오류도 없다 — `docker compose down -v && up -d --wait`. **Testcontainers 는 이 경로를 안 태운다.**
 
+### nginx `upstream` 은 이름을 기동 때 한 번만 푼다
+
+`server app:8080;` 은 compose 가 `--scale` 로 대수를 늘려도 **첫 A 레코드 하나만** 쥔다 — 셋을 띄우고 한 대가 다 받는다(35 가 부하에서 찾았다).
+매 요청에 다시 풀려면 `resolver 127.0.0.11` 을 두고 `proxy_pass` 의 호스트를 변수로 적는다. 대가는 `upstream` 블록(keepalive·죽은 대 건너뛰기)을 못 쓰는 것이다.
+
+### JRE 이미지에는 `wget` 도 `curl` 도 없다
+
+`eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
+Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
+
 ### 화면 쪽 — 39 뒤에 걸린다
 
 | 자리 | 사실 |
