@@ -8,6 +8,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import com.projectticket.ticket.queue.AdmissionScheduler
+import com.projectticket.ticket.queue.QueueSweeper
+import com.projectticket.ticket.reservation.HoldSweepScheduler
+import com.projectticket.ticket.reservation.PerformanceCloser
 import org.springframework.data.redis.core.StringRedisTemplate
 
 /**
@@ -23,6 +27,10 @@ class SchedulerSingleRunTest : PostgresTestBase() {
 
     @Autowired lateinit var lock: SchedulerLock
     @Autowired lateinit var redis: StringRedisTemplate
+    @Autowired lateinit var holdSweeps: HoldSweepScheduler
+    @Autowired lateinit var closer: PerformanceCloser
+    @Autowired lateinit var admissions: AdmissionScheduler
+    @Autowired lateinit var queueSweeps: QueueSweeper
 
     @Test
     fun only_one_of_three_instances_runs() {
@@ -77,6 +85,30 @@ class SchedulerSingleRunTest : PostgresTestBase() {
         assertThat(result).isEqualTo("끝")
         // 무조건 DEL 했으면 남이 일하는 중에 락이 사라지고, 그 뒤로는 전부가 같이 돈다.
         assertThat(redis.opsForValue().get("lock:$NAME")).isEqualTo("남의-토큰")
+    }
+
+    @Test
+    fun every_scheduler_entry_actually_runs_through_the_lock() {
+        // **입구를 부르지 않으면 감싼 고리가 도는지 모른다.** 33 의 결함이 실제로 그 자리에 있었다 —
+        // 스케줄러 입구가 같은 객체의 `@Transactional` 함수를 자기 호출해서 스케줄러 경로만 트랜잭션 없이 돌았다(`stack.md`).
+        // 여기서는 네 입구가 **부를 수 있고 락을 지나는지**를 본다. 몇 건을 처리했나는 다른 테스트가 잰다.
+        assertThat(holdSweeps.sweepDue()).isNotNegative()
+        assertThat(closer.closeDueExclusively()).isNotNegative()
+        assertThat(admissions.admitDueExclusively()).isNotNegative()
+        assertThat(queueSweeps.sweepDueExclusively()).isNotNegative()
+
+        // 남이 쥐고 있으면 **아무 일도 안 하고 0** 이다 — 그것이 인스턴스 셋에서 한 대만 도는 이유다.
+        listOf(
+            HoldSweepScheduler.LOCK_NAME,
+            PerformanceCloser.LOCK_NAME,
+            AdmissionScheduler.LOCK_NAME,
+            QueueSweeper.LOCK_NAME,
+        ).forEach { redis.opsForValue().set("lock:$it", "남의-토큰") }
+
+        assertThat(holdSweeps.sweepDue()).isZero()
+        assertThat(closer.closeDueExclusively()).isZero()
+        assertThat(admissions.admitDueExclusively()).isZero()
+        assertThat(queueSweeps.sweepDueExclusively()).isZero()
     }
 
     private companion object {

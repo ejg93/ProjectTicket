@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.core.env.Environment
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
@@ -33,6 +34,16 @@ import org.springframework.test.web.servlet.get
 class ReadinessTest : PostgresTestBase() {
 
     @Autowired lateinit var mvc: MockMvc
+    @Autowired lateinit var environment: Environment
+
+    @Test
+    fun the_configured_group_is_the_one_that_ships() {
+        // 이 테스트 클래스가 그룹 구성을 덮어쓰기 때문에(아래 `@SpringBootTest`), **설정 파일 쪽도 따로 본다** —
+        // 안 보면 `application.yml` 에서 `db` 를 빼도 이 클래스는 전부 초록이다.
+        val configured = environment.getProperty("management.endpoint.health.group.readiness.include", "")
+
+        assertThat(configured).contains("db").contains("redis")
+    }
 
     @Test
     fun readiness_watches_the_things_we_need_to_serve() {

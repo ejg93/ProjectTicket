@@ -41,7 +41,8 @@ class SignupService(
         if (blocklist.mentionsAccount(command.password, command.email)) {
             throw TicketException(
                 ErrorCode.VALIDATION_FAILED,
-                "이메일에서 딴 비밀번호다",
+                // **이유를 응답에 안 싣는다**(`D9`) — 형식 제약과 같은 태도다. 무엇이 걸렸는지는 로그에만 남는다.
+                "비밀번호가 규칙에 맞지 않는다",
                 mapOf("errors" to listOf(mapOf("field" to "password", "message" to "흔하거나 규칙적인 비밀번호다. 다른 것을 쓴다"))),
             )
         }

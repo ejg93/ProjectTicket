@@ -1,13 +1,11 @@
 package com.projectticket.ticket.reservation
 
 import com.projectticket.ticket.audit.AuditLog
-import com.projectticket.ticket.SchedulerLock
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.observability.TicketMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -27,7 +25,6 @@ class HoldSweeper(
     private val auditLog: AuditLog,
     private val seatVersions: SeatVersions,
     private val metrics: TicketMetrics,
-    private val lock: SchedulerLock,
 ) {
 
     private val log = LoggerFactory.getLogger(HoldSweeper::class.java)
@@ -39,13 +36,6 @@ class HoldSweeper(
      *
      * @return 만료시킨 예매 수
      */
-    /**
-     * 스케줄러 입구(33). **락은 여기 바깥 고리에만 있다** — [sweep] 은 손으로도 부르는 자리라 락을 안 든다.
-     * 못 잡으면 아무 일도 안 한다: 이미 남이 같은 일을 하고 있다.
-     */
-    @Scheduled(fixedDelayString = SWEEP_INTERVAL)
-    fun sweepDue(): Int = lock.runExclusively(LOCK_NAME) { sweep() } ?: 0
-
     @Transactional
     fun sweep(): Int {
         val expired = jdbc.sql(
@@ -98,9 +88,6 @@ class HoldSweeper(
     }
 
     companion object {
-        /** 락 이름. 인스턴스가 셋이어도 이 이름 하나를 두고 다툰다(33) */
-        const val LOCK_NAME = "hold-sweeper"
-
         /** ADR 0003 — 30초. 「5분 선점이 5분 30초까지 남을 수 있다」는 뜻이고 화면의 카운트다운이 덮는다(`D7`) */
         const val SWEEP_INTERVAL = "PT30S"
     }

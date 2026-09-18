@@ -85,6 +85,9 @@ class PerformanceCancelService(
 
         if (affected.isNotEmpty()) {
             releaseSeats(performanceId)
+            // **예매 수로 센다**(`D10` — `reservation.cancelled` 는 예매 단위다). 좌석 수로 세면 관객 취소(1건)와
+            // 회차 취소(좌석 수)가 같은 카운터에서 단위가 달라진다.
+            metrics.reservationCancelled(CancelledBy.ORGANIZER.code, affected.size)
             refundInFull(affected)
             affected.forEach {
                 auditLog.record(AuditLog.Kind.OUTCOME, "reservation.cancelled", actorAccountId, AuditLog.Target.of("reservation", it))
@@ -136,7 +139,6 @@ class PerformanceCancelService(
             .filterNotNull()
 
         seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
-        metrics.reservationCancelled(CancelledBy.ORGANIZER.code, released.size)
         return released.size
     }
 
