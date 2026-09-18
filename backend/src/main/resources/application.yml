@@ -6,6 +6,9 @@ ticket:
 spring:
   application:
     name: ticket-backend
+  lifecycle:
+    # 종료를 기다려 주는 상한(35a). 선점 트랜잭션 하나가 이보다 오래 걸리면 그 자체가 신호다.
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ticket}
     username: ${POSTGRES_USER:ticket}
@@ -53,11 +56,23 @@ management:
         include: health,prometheus
   endpoint:
     health:
+      # k8s·compose 가 두 질문을 따로 한다(35a): 「살아 있나」와 「지금 트래픽을 받아도 되나」.
+      # 살아 있는데 DB 가 끊긴 상태는 **재시작이 아니라 트래픽 차단**이 답이라 그룹을 가른다.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,redis
+        liveness:
+          include: livenessState
       # 인증된 요청에만 상세를 준다. always 면 아무나 DB 연결 상태·컴포넌트 목록을 본다(OWASP A05).
       # 살아 있나만 보는 것은 상세 없이도 되고, 자세히 볼 때는 /api/health 가 있다.
       show-details: when-authorized
 
 server:
+  # **받던 요청을 끝내고 죽는다**(35a). 바로 끊으면 선점 트랜잭션이 중간에 잘려서 사용자는 실패를 보는데
+  # 좌석은 잡힌 채로 스윕을 기다린다. 롤링 배포(36)와 `--scale` 변경이 이 설정 위에서 돈다.
+  shutdown: graceful
   # `PORT` 는 호스팅이 주입하는 이름이다. 둘 다 없으면 로컬 기본값.
   port: ${SERVER_PORT:${PORT:8080}}
   # 프록시 뒤에 선다(33). 안 켜면 감사의 `acted_ip` 가 전부 nginx IP 가 되고(`D9`) 로그인 실패 카운터(3a)도 한 IP 로 뭉친다.

@@ -67,6 +67,8 @@ services:
       # 부하 시험(31)은 데모 데이터가 필요하다: `SPRING_PROFILES_ACTIVE=local docker compose up -d`.
       # 비워 두면 시드가 안 돈다 — 기본은 데이터가 없는 쪽이다.
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      # 가상 스레드 켜고 끄고를 재려고 바깥에서 준다(35a). 기본은 끈 쪽 — 켠 값은 측정이 정한다.
+      SPRING_THREADS_VIRTUAL_ENABLED: ${SPRING_THREADS_VIRTUAL_ENABLED:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
       interval: 10s
