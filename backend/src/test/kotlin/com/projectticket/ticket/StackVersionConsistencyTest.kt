@@ -27,6 +27,7 @@ class StackVersionConsistencyTest {
     fun test_libraries_match_the_build_file() {
         assertThat(gradle).contains("org.testcontainers:testcontainers-bom:${tableVersion("Testcontainers")}")
         assertThat(gradle).contains("com.tngtech.archunit:archunit-junit6:${tableVersion("ArchUnit")}")
+        assertThat(gradle).contains("id(\"dev.detekt\") version \"${tableVersion("detekt")}\"")
     }
 
     @Test

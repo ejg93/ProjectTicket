@@ -1,6 +1,7 @@
 package com.projectticket.ticket.payment
 
 import com.projectticket.ticket.idempotency.IdempotencyService
+import com.projectticket.ticket.observability.elapsedMillis
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -94,7 +95,7 @@ class PaymentService(
         log.info(
             "mock-pg approve reservation_id={} ms={} result={}",
             paying.reservationId,
-            (System.nanoTime() - started) / 1_000_000,
+            elapsedMillis(started),
             verdict?.let { if (it.approved) "approved" else "declined" } ?: "no_response",
         )
         return verdict

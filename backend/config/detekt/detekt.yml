@@ -1,0 +1,67 @@
+# detekt 설정(47). 기본 규칙 위에 **우리가 다르게 정한 것만** 적는다(`buildUponDefaultConfig`).
+#
+# 문턱은 「새 검출 0건」이다(`D18`). 기준선 파일은 안 만든다 — 눌러 둔 목록은 아무도 다시 안 본다.
+# 규칙을 끄거나 문턱을 올릴 때는 **근거를 여기 같이 적는다.** 근거 없이 끈 규칙은 다음 사람이 되돌릴 수가 없다.
+
+config:
+  validation: true
+
+style:
+  MaxLineLength:
+    # 기본 120 은 이 저장소에서 **코드가 아니라 주석을 자른다** — 한 줄에 「무엇을·왜」를 담는 문체(`CLAUDE.md` 「글 작성 규칙」)라
+    # 120 을 넘는 줄이 1,175줄이고 그 대부분이 KDoc 이다. 200 을 넘는 줄은 13줄뿐이라 그것만 손으로 접는다.
+    maxLineLength: 200
+  ReturnCount:
+    # 가드 절을 쓴다 — 못 하는 경우를 먼저 돌려보내고 본문을 평평하게 둔다(`coding-rules.md`).
+    # 기본 2 는 그 문체를 금지하는 값이다.
+    max: 6
+  ThrowsCount:
+    # 입력 검증이 여러 이유로 거절한다 — **이유마다 다른 `type`** 을 주는 것이 `D5` 의 계약이고,
+    # 선점 하나가 일곱 가지로 거절된다(남의 좌석·닫힌 회차·상한 초과·중복 선점…). 뭉치면 화면이 무엇을 말할지 못 정한다.
+    max: 8
+  UnusedParameter:
+    # 프레임워크가 서명을 정하는 자리가 있다 — `@ExceptionHandler` 는 예외를 받아야 하고 안 쓰는 경우가 있다.
+    ignoreAnnotated: ["ExceptionHandler"]
+  MagicNumber:
+    # 테스트의 숫자는 **그 자체가 설명**이다(154_000원·4석·30일). 상수로 빼면 무엇을 재는지가 한 겹 멀어진다.
+    excludes: ["**/test/**"]
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+    ignoreAnnotation: true
+
+exceptions:
+  TooGenericExceptionCaught:
+    # **경계에서 `RuntimeException` 을 잡는 것이 우리 규약이다** — 스케줄러·릴레이·필터가 한 건의 실패로 뒤를 막지 않게 한다
+    # (`coding-rules.md` 「예외」, `D11`). 규약과 싸우는 규칙은 끈다. 잡은 자리마다 **왜 잡는지는 주석이 있다.**
+    active: false
+  SwallowedException:
+    # 우리가 삼키는 것은 셋뿐이고 전부 **다른 말로 바꾸려고** 잡는다 — 중복 키를 409 로, 인증 실패를 같은 문구로(`D9`),
+    # 없는 행을 null 로. 원인을 그대로 올리면 그 자리에서 계약이 깨진다.
+    ignoredExceptionTypes:
+      - InterruptedException
+      - MalformedURLException
+      - NumberFormatException
+      - ParseException
+      - DuplicateKeyException
+      - EmptyResultDataAccessException
+      - AuthenticationException
+      - RuntimeException
+      # 우리 계약으로 바꾸려고 잡는 둘 — 잠금 경합은 409 `idempotency-in-progress` 로, PG 무응답은 상태 조회로(`D4`).
+      - CannotAcquireLockException
+      - TimedOut
+
+complexity:
+  LongMethod:
+    # SQL 문자열이 줄 수를 먹는다. 우리 서비스는 한 트랜잭션을 한 함수에 담고 그 안에 SQL 이 통째로 들어간다 —
+    # 60 줄 기준은 SQL 을 쪼개게 만들고, 쪼갠 SQL 은 읽기가 더 어렵다.
+    allowedLines: 120
+  TooManyFunctions:
+    # 표 하나를 만지는 서비스가 그 표의 일을 다 든다(`NotificationStore`). 억지로 가르면 트랜잭션 경계가 흩어진다.
+    allowedFunctionsPerClass: 20
+    allowedFunctionsPerFile: 20
+
+naming:
+  FunctionParameterNaming:
+    # 테스트가 한글 이름을 쓰는 자리가 있다 — 읽는 사람이 한국어 화자다(`CLAUDE.md`).
+    excludes: ["**/test/**"]

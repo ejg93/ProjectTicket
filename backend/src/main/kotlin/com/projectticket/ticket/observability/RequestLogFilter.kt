@@ -47,7 +47,7 @@ class RequestLogFilter : OncePerRequestFilter() {
                 request.method,
                 request.requestURI,
                 thrown?.let { "실패(${it.javaClass.simpleName})" } ?: response.status,
-                (System.nanoTime() - startedAt) / 1_000_000,
+                elapsedMillis(startedAt),
             )
         }
     }

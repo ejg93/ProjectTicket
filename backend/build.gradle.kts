@@ -8,6 +8,9 @@ plugins {
 	// Kotlin 은 기본이 final 이라 이 플러그인 없이는 프록시가 안 만들어진다.
 	kotlin("plugin.spring") version "2.3.21"
 	jacoco
+	// 정적 분석(47). ProjectShop 의 SpotBugs 자리다 — 그쪽은 Java 바이트코드를 보고 이쪽은 Kotlin 소스를 본다.
+	// **2.0 알파를 쓴다**: 1.23.8 은 묶인 IntelliJ 유틸이 JDK 25 의 `25.0.1` 을 못 읽어 그냥 선다(`stack.md`).
+	id("dev.detekt") version "2.0.0-alpha.6"
 	id("org.springframework.boot") version "4.1.1"
 	id("io.spring.dependency-management") version "1.1.7"
 }
@@ -113,6 +116,26 @@ val measure = tasks.register<Test>("measure") {
 tasks.test {
 	useJUnitPlatform { excludeTags("db") }
 }
+
+// 문턱은 「새 검출 0건」이다(`D18`). 기준선 파일을 안 만든다 — 눌러 둔 목록은 아무도 다시 안 본다.
+detekt {
+	config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+	// 기본 규칙 위에 우리 설정만 얹는다. 처음부터 다시 쓰면 새 규칙이 생겨도 안 켜진다.
+	buildUponDefaultConfig = true
+	// 빌드를 세운다. 경고로 두면 그 줄은 아무도 안 읽는다(`D18` 「게이트가 만든 신호」).
+	ignoreFailures = false
+}
+
+// **detekt 는 자기가 빌드된 Kotlin 으로만 돈다.** 우리 판(2.3.21)과 다르면 「not supported」로 그냥 선다 —
+// 그래서 분석기가 쓰는 의존만 그쪽 판에 묶는다(detekt 문서가 정한 방법). 우리 코드가 컴파일되는 판은 그대로다.
+configurations.named("detekt") {
+	resolutionStrategy.eachDependency {
+		if (requested.group == "org.jetbrains.kotlin") {
+			useVersion("2.4.10")
+		}
+	}
+}
+
 
 // `gradlew build` 가 두 레인을 다 돈다. 빠른 레인만 보고 push 하면 DB 결함이 CI 에서야 드러난다.
 tasks.check {

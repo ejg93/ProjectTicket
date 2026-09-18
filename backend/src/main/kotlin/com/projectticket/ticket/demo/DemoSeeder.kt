@@ -75,7 +75,7 @@ class DemoSeeder(
         )
 
         val now = OffsetDateTime.now()
-        return listOf(14L, 21L).mapIndexed { offset, days ->
+        return PERFORMANCE_DAY_OFFSETS.mapIndexed { offset, days ->
             val performanceId = eventService.createPerformance(
                 accountId,
                 eventId,
@@ -151,6 +151,9 @@ class DemoSeeder(
         const val DEMO_PASSWORD = "demo-password-1234"
 
         const val AUDIENCE_COUNT = 4
+
+        /** 데모 회차 둘의 관람일 간격. 날짜를 갈라 둬야 취소·환불 구간(`D6`)을 손으로 밟아 볼 수 있다 */
+        private val PERFORMANCE_DAY_OFFSETS = listOf(14L, 21L)
 
         private const val ROWS_PER_SECTION = 20
         private const val SEATS_PER_ROW = 25

@@ -1,5 +1,6 @@
 package com.projectticket.ticket.payment
 
+import com.projectticket.ticket.observability.elapsedMillis
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -33,7 +34,7 @@ class RefundService(private val gateway: MockPaymentGateway, private val transit
 
         val started = System.nanoTime()
         val refunded = gateway.refund(requested.refundId.toString(), requested.refundAmount)
-        log.info("mock-pg refund refund_id={} ms={} amount={}", requested.refundId, (System.nanoTime() - started) / 1_000_000, requested.refundAmount)
+        log.info("mock-pg refund refund_id={} ms={} amount={}", requested.refundId, elapsedMillis(started), requested.refundAmount)
 
         val done = transitions.complete(requested.refundId, refunded.refundNumber)
         return Result(
