@@ -33,6 +33,7 @@ class AuthController(
     private val sessionAuthenticationStrategy: SessionAuthenticationStrategy,
     private val securityContextRepository: SecurityContextRepository,
     private val auditLog: AuditLog,
+    private val loginAttempts: LoginAttemptService,
     logoutHandlers: List<LogoutHandler>,
 ) {
 
@@ -59,12 +60,20 @@ class AuthController(
      */
     @PostMapping("/login")
     fun logIn(@Valid @RequestBody request: LoginRequest, http: HttpServletRequest, response: HttpServletResponse): LoginResponse {
+        // **대조 앞에서 막는다**(`3a`). 뒤에서 보면 막힌 계정에도 bcrypt 를 계속 돌려서, 그 비용이 곧 공격자의 도구가 된다.
+        // 시간 차가 새지 않는 이유는 막힌 사람이 **자기가 두드려서** 막힌 쪽이라 이미 아는 사실이어서다.
+        if (loginAttempts.isBlocked(request.email, http.remoteAddr)) {
+            recordLoginFailure(http, "blocked")
+            throw TicketException(ErrorCode.LOGIN_FAILED)
+        }
+
         val authentication = try {
             authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(request.email, request.password),
             )
         } catch (e: AuthenticationException) {
             // 없는 계정·틀린 비밀번호가 같은 문구로 나간다(`D9`). 가르면 계정 존재를 흘린다.
+            loginAttempts.recordFailure(request.email, http.remoteAddr)
             recordLoginFailure(http, "bad_credentials")
             throw TicketException(ErrorCode.LOGIN_FAILED)
         }
@@ -74,9 +83,13 @@ class AuthController(
         if (!user.active) {
             // **여기는 계정이 밝혀졌다.** 아래 「이메일을 안 담는다」는 누구인지 모르는 실패에 걸리는 말이고,
             // 아는 계정의 실패를 익명으로 남기면 「이 계정에 시도가 몇 번 왔나」에 답할 수 없다.
+            loginAttempts.recordFailure(request.email, http.remoteAddr)
             recordLoginFailure(http, "suspended", user.id)
             throw TicketException(ErrorCode.LOGIN_FAILED)
         }
+
+        // 맞는 비밀번호를 댔다. 다음 사람을 위해 카운터를 지운다 — 안 지우면 오타 넷을 낸 사람이 다음 실수에 막힌다.
+        loginAttempts.reset(request.email, http.remoteAddr)
 
         // 로그인 앞에서 기존 세션을 버린다. `changeSessionId()` 는 생성 시각을 안 바꿔서 절대 만료(12h)가 익명 세션 시각부터 세게 된다.
         http.getSession(false)?.invalidate()
