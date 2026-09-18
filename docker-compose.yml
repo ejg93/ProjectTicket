@@ -64,6 +64,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticket}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # 부하 시험(31)은 데모 데이터가 필요하다: `SPRING_PROFILES_ACTIVE=local docker compose up -d`.
+      # 비워 두면 시드가 안 돈다 — 기본은 데이터가 없는 쪽이다.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
       interval: 10s
