@@ -58,9 +58,9 @@ class QueueRankTest : PostgresTestBase() {
 
     @Test
     fun ranks_follow_entry_order() {
-        assertThat(queue.enter(performanceId, first).rank).isEqualTo(1)
-        assertThat(queue.enter(performanceId, second).rank).isEqualTo(2)
-        assertThat(queue.enter(performanceId, third).rank).isEqualTo(3)
+        assertThat(queue.enter(performanceId, first).rank).isEqualTo(1L)
+        assertThat(queue.enter(performanceId, second).rank).isEqualTo(2L)
+        assertThat(queue.enter(performanceId, third).rank).isEqualTo(3L)
     }
 
     @Test
@@ -69,23 +69,23 @@ class QueueRankTest : PostgresTestBase() {
         queue.enter(performanceId, second)
 
         // 새로고침이 이 모양이다. 진입 시각을 다시 쓰면 뒤로 밀린다.
-        assertThat(queue.enter(performanceId, first).rank).isEqualTo(1)
-        assertThat(queue.position(performanceId, second).rank).isEqualTo(2)
+        assertThat(queue.enter(performanceId, first).rank).isEqualTo(1L)
+        assertThat(queue.position(performanceId, second).rank).isEqualTo(2L)
         // 한 사람이 줄에 두 번 서지도 않는다 — member 가 계정이라 그렇다.
         assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(2)
     }
 
     @Test
     fun eta_comes_from_the_admission_rate() {
-        assertThat(queue.enter(performanceId, first).etaSeconds).isEqualTo(1)
+        assertThat(queue.enter(performanceId, first).etaSeconds).isEqualTo(1L)
 
         // 앞에 한 초치(20명)를 채운다. 21번째는 둘째 초에 들어간다 — 올림이라 1이 아니라 2다.
         repeat(QueueService.ADMIT_PER_SECOND.toInt() - 1) { index ->
             redis.opsForZSet().add(QueueKeys.waiting(performanceId), "filler-$index", index.toDouble())
         }
         val entered = queue.enter(performanceId, second)
-        assertThat(entered.rank).isEqualTo(21)
-        assertThat(entered.etaSeconds).isEqualTo(2)
+        assertThat(entered.rank).isEqualTo(21L)
+        assertThat(entered.etaSeconds).isEqualTo(2L)
     }
 
     @Test
@@ -124,6 +124,7 @@ class QueueRankTest : PostgresTestBase() {
         mvc.post("/api/queue/$performanceId") { with(user(principal)); with(csrf()) }
             .andExpect {
                 status { isOk() }
+                jsonPath("$.state") { value("waiting") }
                 jsonPath("$.rank") { value(1) }
                 jsonPath("$.eta_seconds") { value(1) }
             }

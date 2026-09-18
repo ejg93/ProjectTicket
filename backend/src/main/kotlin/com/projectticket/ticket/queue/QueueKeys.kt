@@ -17,6 +17,16 @@ object QueueKeys {
     /** 활성 토큰. member = token, score = 만료 시각(ms). 쓰는 것은 22 다 */
     fun active(performanceId: Long): String = "queue:$performanceId:active"
 
+    /** 발급된 토큰 하나. 값은 `{account_id, performance_id, issued_at}` 이고 관문(23)이 그것을 대조한다 */
+    fun admission(token: String): String = "$ADMISSION_PREFIX$token"
+
+    /** 그 계정의 현재 토큰. 재진입이 자리를 안 잃는 것은 이 키 덕이다 */
+    fun admissionByAccount(performanceId: Long, accountId: Long): String =
+        "${admissionByAccountPrefix(performanceId)}$accountId"
+
+    /** 입장 스크립트가 계정마다 키를 만들어야 해서 접두로 넘긴다(`AdmissionService`) */
+    fun admissionByAccountPrefix(performanceId: Long): String = "admit:by-account:$performanceId:"
+
     /**
      * 회차 하나가 쓰는 키 전부.
      *
@@ -25,4 +35,7 @@ object QueueKeys {
      */
     fun ofPerformance(performanceId: Long): List<String> =
         listOf(waiting(performanceId), seen(performanceId), active(performanceId))
+
+    /** 토큰 키의 접두. 스크립트가 이름을 만들 때 쓴다 */
+    const val ADMISSION_PREFIX = "admit:"
 }

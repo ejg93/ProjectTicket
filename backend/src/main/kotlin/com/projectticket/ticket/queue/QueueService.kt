@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service
 class QueueService(
     private val redis: StringRedisTemplate,
     private val jdbc: JdbcClient,
+    private val admission: AdmissionService,
 ) {
 
     /**
@@ -26,6 +27,9 @@ class QueueService(
      */
     fun enter(performanceId: Long, accountId: Long): Position {
         requireOpen(performanceId)
+        // 이미 들어온 사람을 다시 줄에 세우면 방금 얻은 자리를 스스로 버린다 — 새로고침이 그 모양이다(`D12`).
+        admission.tokenFor(performanceId, accountId)?.let { return Position.admitted(it) }
+
         val rank = redis.execute(ENTER, listOf(QueueKeys.waiting(performanceId)), accountId.toString())
         // 방금 넣은 member 의 순번이라 없을 수가 없다. 없으면 스크립트가 바뀐 것이다.
         return position(checkNotNull(rank) { "진입 직후 순번이 없다: performance_id=$performanceId" })
@@ -34,6 +38,9 @@ class QueueService(
     /** 폴링(2초)이 부르는 자리(`D12`). 하트비트 기록은 24 가 여기에 더한다 */
     fun position(performanceId: Long, accountId: Long): Position {
         requireOpen(performanceId)
+        // 입장한 사람은 줄에서 빠져 있다(`ZPOPMIN`). 토큰을 먼저 보지 않으면 방금 들어온 사람이 404 를 받는다.
+        admission.tokenFor(performanceId, accountId)?.let { return Position.admitted(it) }
+
         val rank = redis.opsForZSet().rank(QueueKeys.waiting(performanceId), accountId.toString())
             ?: throw TicketException(
                 ErrorCode.NOT_IN_QUEUE,
@@ -54,7 +61,7 @@ class QueueService(
 
     /** 순번은 1부터, 예상 대기는 입장 속도로 나눈 올림 초다. R 이 설정값이라 근사다(`D12`) */
     private fun position(rank: Long): Position =
-        Position(rank = rank + 1, etaSeconds = (rank + ADMIT_PER_SECOND) / ADMIT_PER_SECOND)
+        Position.waiting(rank = rank + 1, etaSeconds = (rank + ADMIT_PER_SECOND) / ADMIT_PER_SECOND)
 
     /**
      * 판매 중인 회차에만 줄이 선다. 닫힌 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`),
@@ -73,14 +80,34 @@ class QueueService(
         }
     }
 
-    /** `rank` 는 0부터다. 화면이 쓰는 값은 [Position.rank] 로 1부터 센다 */
-    data class Position(val rank: Long, val etaSeconds: Long)
+    /**
+     * 줄의 대답. **무엇이 들었는지는 [state] 가 정한다**(사용자 선택) — 대기 중에는 순번이, 입장 뒤에는 토큰이 온다.
+     * 입장한 사람에게 `rank = 0` 을 주지 않는다: 0 이 「줄 맨 앞」인지 「이미 들어감」인지를 화면이 다시 판단해야 한다(`D14`).
+     */
+    data class Position(
+        val state: String,
+        val rank: Long? = null,
+        val etaSeconds: Long? = null,
+        val admissionToken: String? = null,
+    ) {
+        companion object {
+            const val WAITING = "waiting"
+            const val ADMITTED = "admitted"
+
+            /** `rank` 는 1부터다 */
+            fun waiting(rank: Long, etaSeconds: Long): Position =
+                Position(WAITING, rank = rank, etaSeconds = etaSeconds)
+
+            /** 선점 요청에 이 토큰을 `X-Admission-Token` 으로 싣는다(23) */
+            fun admitted(token: String): Position = Position(ADMITTED, admissionToken = token)
+        }
+    }
 
     companion object {
         private const val OPEN = "open"
 
-        /** 입장 속도 R — 100명 / 5초(ADR 0003 시작값). 31 이 재서 올린다 */
-        const val ADMIT_PER_SECOND = 20L
+        /** 입장 속도 R. 값은 [AdmissionService] 가 정한다 — 들이는 쪽과 예상 대기가 갈리면 화면이 거짓말을 한다 */
+        const val ADMIT_PER_SECOND = AdmissionService.ADMIT_PER_SECOND
 
         /**
          * 진입 한 번을 원자로 만든다 — 시각을 Redis 가 주고(`TIME`), `NX` 로 첫 자리를 지키고, 순번까지 한 번에 답한다.

@@ -37,8 +37,8 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 ## 흐름
 
 ```
-관객 ─POST /api/queue/{perf}─> ZADD NX  ──> {rank, eta}      ① 진입·재진입 (순번 유지)
-관객 ─GET  /api/queue/{perf}─> ZRANK    ──> {rank, eta, token?}   ② 폴링 2초 (43)
+관객 ─POST /api/queue/{perf}─> ZADD NX  ──> waiting {rank, eta}   ① 진입·재진입 (순번 유지)
+관객 ─GET  /api/queue/{perf}─> ZRANK    ──> waiting | admitted     ② 폴링 2초 (43)
                                  + HSET seen                    ③ 하트비트는 폴링이 겸한다
 스케줄러 ─5초마다─> Lua: 만료 정리 → 빈자리 = C - 활성 → 앞에서 min(빈자리, 100) 을 ZPOPMIN → 토큰 발급
 관객 ─POST /api/reservations + X-Admission-Token─> 관문 → 선점(13) → 성공하면 토큰 삭제(정원 반납)
@@ -47,7 +47,17 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 ### 진입과 재진입
 
 `ZADD NX queue:{perf} <now> <accountId>` — 이미 있으면 score 를 안 바꾼다. **새로고침해도 순번이 그대로**인 이유가 이 한 글자다.
-응답은 `{rank, eta_seconds}`. 이미 입장했으면(`admit:by-account` 가 있으면) 토큰을 다시 준다 — 브라우저를 껐다 켜도 자리를 안 잃는다.
+이미 입장했으면(`admit:by-account` 가 있으면) 줄에 다시 안 세우고 토큰을 다시 준다 — 브라우저를 껐다 켜도 자리를 안 잃는다.
+
+**응답은 상태로 갈린다**(사용자 선택, 21·22):
+
+```
+대기: {"state":"waiting","rank":312,"eta_seconds":16}
+입장: {"state":"admitted","admission_token":"…"}
+```
+
+입장한 사람에게 `rank: 0` 을 주지 않는다 — 0 이 「줄 맨 앞」인지 「이미 들어감」인지를 화면이 토큰으로 다시 판단하게 된다(`D14` 「빈 값에 뜻을 싣지 않는다」).
+순번을 물었는데 줄에도 없고 토큰도 없으면 404 `not-in-queue` 다.
 
 ### 순번과 예상 대기
 
