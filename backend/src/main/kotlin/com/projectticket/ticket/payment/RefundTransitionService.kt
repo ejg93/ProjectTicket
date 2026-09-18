@@ -119,6 +119,37 @@ class RefundTransitionService(
         return TicketException(ErrorCode.INVALID_TRANSITION, "취소할 수 없는 상태다: $status", mapOf("from" to status, "action" to "cancel"))
     }
 
+    /**
+     * 승인이 늦어 좌석을 못 준 결제에 전액 환불 행을 만든다(`17b` ⓑ).
+     *
+     * 16 은 PG 취소만 보내고 **행을 안 만들었다** — 돈은 돌아갔는데 우리 표에는 그 사실이 없어서
+     * 정산(27)과 조회가 「승인된 결제인데 예매가 없다」를 설명하지 못한다.
+     *
+     * 관객 잘못이 아니라 전액이다(`D6`) — 율 0·수수료 0. 스윕이 이 행을 PG 로 보낸다.
+     *
+     * **`not exists` 로 멱등이다.** 두 번 돌아도 둘째는 0행이고, 뚫려도 결제당 하나라는 유일 제약이 받는다.
+     */
+    @Transactional
+    fun queueLatePayments(): List<Long> =
+        jdbc.sql(
+            """
+            insert into refund (payment_id, reason, days_before, tier_rate, fee_amount, refund_amount)
+            select p.payment_id, :reason, 0, 0, 0, p.amount
+              from payment p
+              join reservation r on r.reservation_id = p.reservation_id
+             where p.status = :approved
+               and r.status = :expired
+               and not exists (select 1 from refund rf where rf.payment_id = p.payment_id)
+            returning refund_id
+            """,
+        )
+            .param("reason", REASON_PAYMENT_LATE)
+            .param("approved", PaymentStatus.APPROVED.code)
+            .param("expired", ReservationStatus.EXPIRED.code)
+            .query(Long::class.java)
+            .list()
+            .filterNotNull()
+
     /** ③ 환불이 나갔다. 조건부라 두 번 와도 둘째는 0행이다 */
     @Transactional
     fun complete(refundId: Long, refundNumber: String): Boolean =
@@ -182,6 +213,9 @@ class RefundTransitionService(
     data class ApprovedPayment(val paymentId: Long, val amount: Int)
 
     companion object {
+        /** `refund.reason` — 승인이 늦어 좌석을 못 준 결제(`17b` ⓑ). 관객 잘못이 아니라 전액이다 */
+        const val REASON_PAYMENT_LATE = "payment_late"
+
         /** `refund.reason` — 관객 취소. `performance_cancelled` 는 17a, `payment_late` 는 17b 가 든다 */
         const val REASON_AUDIENCE = "audience"
     }
