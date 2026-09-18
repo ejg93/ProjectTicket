@@ -91,7 +91,7 @@ class ReservationLimitTest : ConcurrencyTestBase() {
     @Test
     fun expired_hold_frees_the_limit() {
         val expired = hold(seatIds.take(4))
-        jdbc.sql("update reservation set status = 'expired', expired_at = now() where reservation_id = :id").param("id", expired).update()
+        jdbc.sql("update reservation set status = 'expired', expired_at = now(), cancelled_by = 'expired' where reservation_id = :id").param("id", expired).update()
         jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where reservation_id = :id").param("id", expired).update()
 
         // 좌석이 돌아간 예매는 매수에 안 센다. 세면 한 번 놓친 사람이 그 회차를 영영 못 산다.

@@ -6,6 +6,7 @@ import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -64,12 +65,13 @@ class PerformanceCancelService(
             jdbc.sql(
                 """
                 update reservation
-                   set status = :cancelled, cancelled_at = now(), paying_until = null
+                   set status = :cancelled, cancelled_at = now(), paying_until = null, cancelled_by = :by
                  where reservation_id in (:ids) and status in (:live)
                 returning reservation_id
                 """,
             )
                 .param("cancelled", ReservationStatus.CANCELLED.code)
+                .param("by", CancelledBy.ORGANIZER.code)
                 .param("ids", locked)
                 .param("live", LIVE_STATUSES)
                 .query(Long::class.java)

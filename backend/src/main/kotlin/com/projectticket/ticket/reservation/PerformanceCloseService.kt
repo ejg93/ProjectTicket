@@ -47,12 +47,13 @@ class PerformanceCloseService(
         val expired = jdbc.sql(
             """
             update reservation
-               set status = :expired, expired_at = now(), paying_until = null
+               set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by
              where performance_id = :id and status in (:live)
             returning reservation_id
             """,
         )
             .param("expired", ReservationStatus.EXPIRED.code)
+            .param("by", CancelledBy.EXPIRED.code)
             .param("id", performanceId)
             .param("live", LIVE_STATUSES)
             .query(Long::class.java)

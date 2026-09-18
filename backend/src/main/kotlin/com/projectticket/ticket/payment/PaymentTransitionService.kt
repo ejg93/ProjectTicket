@@ -6,6 +6,7 @@ import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import com.projectticket.ticket.reservation.TicketService
 import org.slf4j.LoggerFactory
@@ -215,11 +216,12 @@ class PaymentTransitionService(
         val expired = jdbc.sql(
             """
             update reservation
-               set status = :expired, expired_at = now(), paying_until = null
+               set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by
              where reservation_id = :id and status = :paying
             """,
         )
             .param("expired", ReservationStatus.EXPIRED.code)
+            .param("by", CancelledBy.EXPIRED.code)
             .param("paying", ReservationStatus.PAYING.code)
             .param("id", reservationId)
             .update()

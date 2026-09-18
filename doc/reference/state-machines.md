@@ -48,6 +48,9 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 `held_until` 은 그대로다 — 결제 시도가 선점을 연장하지 않는다.
 
 **끝 상태는 `reserved`·`cancelled`·`expired` 다.** `expired`·`cancelled` 에서 나가는 전이는 없다.
+
+**`cancelled`·`expired` 로 갈 때는 `cancelled_by` 를 같이 쓴다**(26a) — `audience`·`organizer`·`expired` 셋이고 전이 트리거가 요구한다.
+상태만으로는 관객이 먼저 무른 것과 회차 취소로 물린 것이 안 갈리는데, 앞쪽은 수수료를 뗀 부분 환불이라 알림·정산·조회가 말을 다르게 해야 한다.
 다시 사려면 새 예매다.
 
 ### 좌석과의 대응

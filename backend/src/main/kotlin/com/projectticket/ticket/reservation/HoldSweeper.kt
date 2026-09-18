@@ -36,13 +36,14 @@ class HoldSweeper(private val jdbc: JdbcClient, private val auditLog: AuditLog) 
         val expired = jdbc.sql(
             """
             update reservation
-               set status = :expired, expired_at = now(), paying_until = null
+               set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by
              where status = :held and held_until < now()
                 or status = :paying and paying_until < now()
             returning reservation_id
             """,
         )
             .param("expired", ReservationStatus.EXPIRED.code)
+            .param("by", CancelledBy.EXPIRED.code)
             .param("held", ReservationStatus.HELD.code)
             .param("paying", ReservationStatus.PAYING.code)
             .query(Long::class.java)

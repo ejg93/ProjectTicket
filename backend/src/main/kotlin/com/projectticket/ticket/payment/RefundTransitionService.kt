@@ -6,6 +6,7 @@ import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
@@ -47,7 +48,7 @@ class RefundTransitionService(
         val cancelled = jdbc.sql(
             """
             update reservation r
-               set status = :cancelled, cancelled_at = now()
+               set status = :cancelled, cancelled_at = now(), cancelled_by = :by
               from performance p
              where p.performance_id = r.performance_id
                and r.reservation_id = :id and r.account_id = :account and r.status = :reserved
@@ -55,6 +56,7 @@ class RefundTransitionService(
             """,
         )
             .param("cancelled", ReservationStatus.CANCELLED.code)
+            .param("by", CancelledBy.AUDIENCE.code)
             .param("reserved", ReservationStatus.RESERVED.code)
             .param("id", reservationId)
             .param("account", accountId)

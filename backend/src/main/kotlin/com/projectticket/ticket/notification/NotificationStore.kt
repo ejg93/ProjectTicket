@@ -1,6 +1,7 @@
 package com.projectticket.ticket.notification
 
 import com.projectticket.ticket.outbox.EventType
+import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.outbox.OutboxRelay
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
@@ -103,11 +104,12 @@ class NotificationStore(private val jdbc: JdbcClient) {
               from reservation r
               left join payment pm on pm.reservation_id = r.reservation_id and pm.status = 'approved'
               left join refund rf on rf.payment_id = pm.payment_id
-             where r.performance_id = :id and r.status = 'cancelled'
+             where r.performance_id = :id and r.status = 'cancelled' and r.cancelled_by = :by
              group by r.account_id
              order by r.account_id
             """,
-        ).param("id", performanceId).query(CancelledLine::class.java).list().filterNotNull()
+        ).param("id", performanceId).param("by", CancelledBy.ORGANIZER.code)
+            .query(CancelledLine::class.java).list().filterNotNull()
             .forEach {
                 val (subject, body) = NotificationTemplates.performanceCancelled(performance, it.refundAmount)
                 insert(envelope, it.accountId, subject, body)
