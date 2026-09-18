@@ -13,6 +13,12 @@ RUN ./gradlew --no-daemon bootJar -x test
 FROM eclipse-temurin:25-jre
 WORKDIR /app
 
+# healthcheck 가 쓸 도구. **JRE 이미지에는 `wget` 도 `curl` 도 없다** — 33 에서 그것을 모르고 `wget` 을 적었다가
+# 컨테이너가 계속 unhealthy 였다(앱은 멀쩡했다). 35 에서 드러나 여기서 고친다.
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y curl \
+ && rm -rf /var/lib/apt/lists/*
+
 # root 로 안 돌린다(`D9`). 컨테이너가 뚫려도 호스트 볼륨을 함부로 못 쓴다.
 # 로그 디렉터리를 미리 만들어 준다 — logback 이 `logs/ticket.log` 를 여는데 `/app` 은 root 것이라 그냥 두면 기동이 죽는다.
 RUN useradd --system --create-home --uid 10001 ticket \

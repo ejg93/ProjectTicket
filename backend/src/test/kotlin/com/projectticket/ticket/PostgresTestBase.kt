@@ -24,6 +24,7 @@ import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.GenericContainer
+import org.testcontainers.kafka.KafkaContainer
 import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
@@ -41,7 +42,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer
  * **연결은 앱과 같은 역할(`ticket_app`)을 입는다**(4a) — 테스트가 운영보다 넓은 권한으로 돌면 권한 결함을 여기서 못 잡는다.
  *
  * `@AutoConfigureMockMvc` 를 바탕에 두는 이유는 컨텍스트 캐시다 — 클래스마다 붙이면 같은 설정인데 컨텍스트가 갈린다.
- * Redis 도 같이 띄운다 — 세션이 거기 산다(ADR 0004, `20a`). fork 별 DB 분리는 그것이 필요한 청크(13)에서 더한다.
+ * Redis 와 Kafka 도 같이 띄운다 — 세션이 Redis 에 살고(ADR 0004) 사건이 Kafka 로 나간다(ADR 0007).
+ * fork 별 DB 분리는 그것이 필요한 청크(13)에서 더한다.
  */
 @SpringBootTest(properties = ["ticket.scheduling.enabled=false"])
 @AutoConfigureMockMvc
@@ -120,6 +122,14 @@ abstract class PostgresTestBase {
          * 테스트에서만 bcrypt 비용을 4 로 낮춘다. 운영은 그대로 10 이다(`SecurityConfig`).
          * `DelegatingPasswordEncoder` 를 그대로 쓴다 — 저장값에 `{bcrypt}` 접두가 붙어서 접두를 안 읽는 인코더로 바꾸면 시드 계정 로그인이 깨진다.
          */
+        /**
+         * 사건 브로커(28, ADR 0007). 소비자가 Kafka 리스너라 **브로커가 없으면 릴레이도 소비도 못 잰다.**
+         * `apache/kafka` 이미지는 KRaft 한 프로세스라 주키퍼가 없다 — 컨테이너 하나로 끝난다.
+         */
+        @Bean
+        @ServiceConnection
+        fun kafka(): KafkaContainer = KafkaContainer("apache/kafka:4.3.1").withReuse(true)
+
         /**
          * 세션 저장소(ADR 0004). `@ServiceConnection(name = "redis")` 가 호스트·포트를 꽂는다 — 이름을 적어야 한다.
          * 이미지 이름으로 알아보는 길은 `GenericContainer<Nothing>` 에서 안 먹는다(실제로 빈을 못 찾았다).

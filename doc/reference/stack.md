@@ -18,6 +18,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
+| Kafka | 4.3.1 | `docker-compose.yml`(`apache/kafka`, KRaft). 사건 브로커(28, ADR 0007). 로컬은 **9094** — 9092 는 ProjectShop 것 |
 | nginx | 1.27-alpine | `docker-compose.yml`, `docker/nginx/nginx.conf`. 인스턴스 셋 앞의 문(33) |
 | Prometheus | v3.1.0 | `docker-compose.yml`. 수집기 — 앱은 `micrometer-registry-prometheus` 로 `/actuator/prometheus` 를 연다(30) |
 | Grafana | 11.5.0 | `docker-compose.yml`. 데이터 소스·대시보드는 `docker/grafana/provisioning/` 이 심는다 |
@@ -381,9 +382,29 @@ git update-index --chmod=+x backend/gradlew
 
 `PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.
 
+
+### 커밋 레인이 남긴 행은 롤백 레인에 **보인다**
+
+방향을 헷갈리기 쉽다. 롤백 레인이 만든 것은 남이 못 보지만, **커밋 레인이 커밋한 것은 롤백 레인이 본다.**
+전역을 세는 단언(「릴레이가 1건 집었다」)이 그 자리에서 깨진다 — `OutboxRelayTest` 가 `ConsumerIdempotencyTest` 의
+안 나간 outbox 행까지 집었다(28·29 뒤로 생긴 자리).
+
+**로컬은 컨테이너를 재사용해서 안 보인다.** 지난 회차가 이미 치워 둔 탓이고, CI 의 새 컨테이너에서만 빨갛다.
+전역을 세지 말거나, 세야 하면 `@BeforeEach` 에서 남은 것을 옆으로 치운다.
+
 ### `initdb.d` 는 볼륨이 비었을 때만 돈다
 
 `docker-compose.yml` 의 `/docker-entrypoint-initdb.d` 는 데이터 디렉터리가 비어 있을 때 한 번만 실행된다. 파일을 넣어도 기존 볼륨에서는 아무 일이 안 나고 오류도 없다 — `docker compose down -v && up -d --wait`. **Testcontainers 는 이 경로를 안 태운다.**
+
+### nginx `upstream` 은 이름을 기동 때 한 번만 푼다
+
+`server app:8080;` 은 compose 가 `--scale` 로 대수를 늘려도 **첫 A 레코드 하나만** 쥔다 — 셋을 띄우고 한 대가 다 받는다(35 가 부하에서 찾았다).
+매 요청에 다시 풀려면 `resolver 127.0.0.11` 을 두고 `proxy_pass` 의 호스트를 변수로 적는다. 대가는 `upstream` 블록(keepalive·죽은 대 건너뛰기)을 못 쓰는 것이다.
+
+### JRE 이미지에는 `wget` 도 `curl` 도 없다
+
+`eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
+Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ### 화면 쪽 — 39 뒤에 걸린다
 

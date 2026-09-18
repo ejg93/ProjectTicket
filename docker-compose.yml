@@ -45,6 +45,37 @@ services:
       timeout: 3s
       retries: 10
 
+  # 사건 브로커(28, ADR 0007). KRaft 라 주키퍼가 없다 — 한 프로세스가 브로커와 컨트롤러를 같이 한다.
+  # **9092 가 아니라 9094 를 연다** — ProjectShop 의 Kafka 가 그 포트를 쥐고 있다(README).
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: ticket-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      # 컨테이너 안에서는 `kafka:9092`, 호스트에서는 `localhost:9094` 로 같은 브로커를 본다.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_PORT:-9094}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # 브로커 한 대다(ADR 0007 「지금 안 하는 것」). 복제 계수를 1 로 안 내리면 내부 토픽이 안 만들어진다.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "${KAFKA_PORT:-9094}:9094"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   # 앱(33). **`container_name` 이 없다** — 이름을 박으면 `--scale app=3` 이 「이름이 이미 있다」로 죽는다.
   # 포트도 안 연다: 밖에서 들어오는 문은 nginx 하나다.
   app:
@@ -64,13 +95,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticket}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:9092
       # 부하 시험(31)은 데모 데이터가 필요하다: `SPRING_PROFILES_ACTIVE=local docker compose up -d`.
       # 비워 두면 시드가 안 돈다 — 기본은 데이터가 없는 쪽이다.
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       # 가상 스레드 켜고 끄고를 재려고 바깥에서 준다(35a). 기본은 끈 쪽 — 켠 값은 측정이 정한다.
       SPRING_THREADS_VIRTUAL_ENABLED: ${SPRING_THREADS_VIRTUAL_ENABLED:-false}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      # 준비됐나를 묻는다(35a) — 살아 있나가 아니라. DB·Redis 가 끊기면 이 대는 문 뒤에서 빠진다.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness | grep -q UP"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -120,5 +153,6 @@ services:
 volumes:
   db-data:
   redis-data:
+  kafka-data:
   prometheus-data:
   grafana-data:

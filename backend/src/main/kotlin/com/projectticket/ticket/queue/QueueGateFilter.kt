@@ -25,6 +25,9 @@ import org.springframework.web.filter.OncePerRequestFilter
  *
  * 성공한 선점은 토큰을 **반납한다**(`D12` 「토큰」). 좌석을 잡았으면 문지기는 볼일이 끝났고, 반납해야 정원이 돈다.
  * 실패는 반납하지 않는다 — 남이 먼저 잡은 좌석을 골랐을 뿐이라 TTL 안에서 다른 좌석을 고를 수 있어야 한다.
+ *
+ * **반납이 곧 토큰 삭제는 아니다**(23a). 정원은 즉시 돌려주되 토큰 키는 잠깐 남겨 둔다 —
+ * 응답을 못 받은 클라이언트가 같은 멱등키로 다시 오는 길을 관문이 막으면 `D4` 의 재시도 계약이 안 닿는다.
  */
 @Component
 class QueueGateFilter(
@@ -65,9 +68,9 @@ class QueueGateFilter(
 
         chain.doFilter(request, response)
 
-        // 선점이 만들어졌을 때만 반납한다(201, `D5`).
+        // 선점이 만들어졌을 때만 반납한다(201, `D5`). 재시도가 지나갈 창은 서비스가 정한다(23a).
         if (response.status == CREATED) {
-            admission.release(performanceId, user.id)
+            admission.releaseAfterHold(performanceId, user.id)
         }
     }
 

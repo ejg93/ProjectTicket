@@ -73,13 +73,38 @@ class AdmissionService(
             ?.let { objectMapper.readValue(it, Admission::class.java) }
 
     /**
-     * 자리를 반납한다. 선점에 성공했거나(23) 줄을 떠났을 때(24) 부른다 —
+     * 자리를 반납하고 토큰도 지운다. 줄을 떠났을 때(24) 부른다 —
      * **정원이 돌아야 뒷사람이 들어온다.** 반납이 없으면 TTL 10분 동안 빈 의자가 잠긴다.
      */
     fun release(performanceId: Long, accountId: Long) {
         val token = tokenFor(performanceId, accountId) ?: return
         redis.opsForZSet().remove(QueueKeys.active(performanceId), token)
         redis.delete(listOf(QueueKeys.admission(token), QueueKeys.admissionByAccount(performanceId, accountId)))
+    }
+
+    /**
+     * 선점에 성공한 뒤 반납한다(23a). [release] 와 달리 **토큰 키를 안 지우고 [RETRY_GRACE] 로 줄이기만 한다.**
+     *
+     * 지우면 계약이 깨진다 — 응답을 못 받은 클라이언트가 같은 멱등키로 다시 오면 관문이 429 로 끊고,
+     * `D4` 가 약속한 「저장된 본문을 그대로 돌려준다」가 관문 뒤에 있어 안 닿는다. 데이터는 안 깨지지만 계약이 어긋난다.
+     *
+     * **정원은 그대로 즉시 돈다.** 정원은 활성 집합이 세는 것이고 토큰 키는 관문이 대조하는 것뿐이라, 둘은 다른 자리다.
+     *
+     * 창을 넘긴 재시도는 줄에 다시 선다. 거기까지 덮으려면 관문이 멱등 저장소를 읽어야 하는데,
+     * 그러면 대기열 층이 예매 층을 읽고 관문을 지나는 **모든** 요청에 조회가 하나 는다 — 그 값은 안 치른다.
+     */
+    fun releaseAfterHold(performanceId: Long, accountId: Long) {
+        val token = tokenFor(performanceId, accountId) ?: return
+        redis.execute(
+            RELEASE_AFTER_HOLD,
+            listOf(
+                QueueKeys.active(performanceId),
+                QueueKeys.admission(token),
+                QueueKeys.admissionByAccount(performanceId, accountId),
+            ),
+            token,
+            RETRY_GRACE.toMillis().toString(),
+        )
     }
 
     /** 무작위 32바이트. 추측으로 남의 자리를 못 쓴다(`D9`) */
@@ -104,6 +129,16 @@ class AdmissionService(
 
         /** 선점 5분 + 결제 여유(ADR 0003). 선점보다 짧으면 좌석을 쥔 채로 토큰이 죽는다 */
         val TOKEN_TTL: Duration = Duration.ofMinutes(10)
+
+        /**
+         * 반납한 토큰이 관문을 더 지날 수 있는 창(23a). 재시도가 이 안에 오면 저장된 201 을 받는다.
+         * 45초는 흔한 읽기 타임아웃(30초)보다 길고, 사람이 화면을 다시 여는 시간보다는 짧다.
+         *
+         * 창 동안 그 사람은 관문을 지날 수 있다. 그래도 **회차당 4매 상한**(15, [com.projectticket.ticket.reservation.SeatHoldService])을
+         * 못 넘는다 — 살아있는 선점이 있으면 `reservation_live_hold_idx`(V8)가 둘째 선점을 막고,
+         * 이미 확정까지 갔으면 그 좌석도 상한에 센다. 창이 늘리는 것은 **기회이지 매수가 아니다.**
+         */
+        val RETRY_GRACE: Duration = Duration.ofSeconds(45)
 
         private const val TOKEN_BYTES = 32
 
@@ -157,6 +192,27 @@ class AdmissionService(
             return count .. '|' .. table.concat(waits, ',')
             """.trimIndent(),
             String::class.java,
+        )
+
+        /**
+         * 선점 성공 뒤의 반납(23a) — 활성에서 빼고, 계정 키를 지우고, **토큰 키는 줄이기만 한다.**
+         *
+         * **창은 한 번만 열린다.** 이 스크립트가 `KEYS[3]`(계정→토큰)을 지우고, [releaseAfterHold] 는 그 키를 못 찾으면 곧장 돌아간다 —
+         * 재시도가 몇 번 오든 두 번째로 여기 오지 않는다. `if ttl > grace` 는 그 위의 안전장치다:
+         * 계정 키가 남은 채 다시 불려도 이미 짧아진 TTL 을 되돌리지 않는다.
+         */
+        private val RELEASE_AFTER_HOLD = DefaultRedisScript<Long>(
+            """
+            redis.call('ZREM', KEYS[1], ARGV[1])
+            redis.call('DEL', KEYS[3])
+            local grace = tonumber(ARGV[2])
+            local ttl = redis.call('PTTL', KEYS[2])
+            if ttl > grace then
+                redis.call('PEXPIRE', KEYS[2], grace)
+            end
+            return ttl
+            """.trimIndent(),
+            Long::class.java,
         )
     }
 }

@@ -1,11 +1,13 @@
 package com.projectticket.ticket.payment
 
+import tools.jackson.databind.ObjectMapper
+import org.springframework.jdbc.core.simple.JdbcClient
 import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
-import com.projectticket.ticket.outbox.OutboxRelay
+import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.reservation.PerformanceCloser
 import com.projectticket.ticket.reservation.SeatHoldService
 import org.assertj.core.api.Assertions.assertThat
@@ -25,7 +27,9 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
 
     @Autowired lateinit var cancelService: PerformanceCancelService
     @Autowired lateinit var refundSweeper: RefundSweeper
-    @Autowired lateinit var relay: OutboxRelay
+    @Autowired lateinit var jdbcForEvents: JdbcClient
+    @Autowired lateinit var jsonForEvents: ObjectMapper
+    @Autowired lateinit var notifications: com.projectticket.ticket.notification.NotificationStore
     @Autowired lateinit var closer: PerformanceCloser
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
@@ -107,7 +111,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         reserve(stayed, seats = 1, from = 1)
 
         cancelService.cancel(performanceId, actorAccountId = null)
-        relay.relay()
+        deliver()
 
         // 둘 다 `cancelled` 지만 무른 것이 다르다(26a). 먼저 무른 사람은 수수료를 뗀 부분 환불을 받았는데
         // 「전액·수수료 없음」이라고 말하면 거짓말이고, 그 편지는 이미 나간 뒤라 못 주워 담는다.
@@ -149,7 +153,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         reserve(second, seats = 1, from = 1)
         cancelService.cancel(performanceId, actorAccountId = null)
 
-        relay.relay()
+        deliver()
 
         // 사건은 하나고 수신자가 둘이다(`D11`) — 소비자가 예매자를 표에서 읽는다.
         assertThat(eventCount()).isOne()
@@ -260,4 +264,10 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         jdbc.sql("select body from notification where event_type = 'performance.cancelled' limit 1").query(String::class.java).single()
 
     data class Refund(val reason: String, val daysBefore: Int, val feeAmount: Int, val refundAmount: Int, val status: String)
+
+    /**
+     * 안 나간 사건을 **브로커를 건너뛰고** 소비자에게 바로 건넨다(28).
+     * 롤백 레인이라 진짜 Kafka 소비자는 이 트랜잭션의 행을 못 본다 — 배선은 `KafkaRelayTest` 가 잰다.
+     */
+    private fun deliver(): Int = PendingEvents(jdbcForEvents, jsonForEvents).deliver(notifications::record)
 }

@@ -1,8 +1,8 @@
 package com.projectticket.ticket.outbox
 
 import org.slf4j.LoggerFactory
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -29,13 +29,13 @@ import java.util.UUID
 class OutboxRelay(
     private val jdbc: JdbcClient,
     private val json: ObjectMapper,
-    private val events: ApplicationEventPublisher,
+    private val kafka: KafkaTemplate<String, String>,
 ) {
 
     private val log = LoggerFactory.getLogger(OutboxRelay::class.java)
 
     /**
-     * 발행되는 것. 지금은 Spring 이벤트로 나가고 28 이 Kafka 로 갈아끼운다 — **소비자는 이 타입만 알면 된다**(`aggregate_*` 가 파티션 키가 된다).
+     * 발행되는 것. Kafka 로 나간다(28, ADR 0007) — 값은 이 봉투의 JSON 이고 키는 `aggregate_id` 다.
      *
      * @param payload 카탈로그가 정한 필드(`D11`). 소비자는 이 안의 식별자로 표를 다시 읽는다 — 사건은 「무슨 일이 났나」고 지금 상태는 표가 안다
      */
@@ -69,7 +69,15 @@ class OutboxRelay(
             return 0
         }
 
-        rows.forEach { events.publishEvent(envelopeOf(it)) }
+        // **보내고 나서 표시한다.** 표시부터 하면 보내기가 실패했을 때 그 사건이 영영 안 나간다 —
+        // 반대로 보내고 죽으면 같은 사건이 다시 나가고, 그것은 소비자가 멱등이라 받아 낸다(at-least-once, `D11`).
+        rows.map(::envelopeOf).forEach { envelope ->
+            kafka.send(
+                EventTopics.of(envelope.aggregateType),
+                EventTopics.keyOf(envelope.aggregateId),
+                json.writeValueAsString(envelope),
+            ).join()
+        }
 
         jdbc.sql("update outbox set published_at = now() where outbox_id in (:ids)")
             .param("ids", rows.map { it.outboxId })

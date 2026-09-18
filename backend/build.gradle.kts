@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.PathSensitivity
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -53,6 +54,8 @@ dependencies {
 	// 세션을 톰캣 메모리가 아니라 Redis 에 둔다(ADR 0004). 스타터가 Lettuce 와 `spring-session-data-redis` 를 같이 끌고 온다 —
 	// `spring-boot-starter-data-redis` 를 따로 안 넣는다. 두 번 적으면 한쪽만 올라가는 날이 온다.
 	implementation("org.springframework.boot:spring-boot-starter-session-data-redis")
+	// 사건을 나르는 브로커(28, ADR 0007). 소비자가 둘이 된 뒤에 들였다 — 하나일 땐 함수 호출과 다르지 않다.
+	implementation("org.springframework.boot:spring-boot-starter-kafka")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.flywaydb:flyway-database-postgresql")
@@ -76,6 +79,7 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.testcontainers:testcontainers-postgresql")
+	testImplementation("org.testcontainers:testcontainers-kafka")
 	// Redis 는 Testcontainers 2.x 에 전용 모듈이 없다. 코어의 `GenericContainer` 로 띄우므로 코어를 직접 적는다.
 	testImplementation("org.testcontainers:testcontainers")
 	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
@@ -115,6 +119,14 @@ val measure = tasks.register<Test>("measure") {
 
 tasks.test {
 	useJUnitPlatform { excludeTags("db") }
+
+	// `ComposeContractTest` 가 이 셋을 글자로 읽는다(35). 입력으로 안 걸면 Kotlin 이 그대로일 때
+	// Gradle 이 `UP-TO-DATE` 로 건너뛰어서, compose·conf 만 고친 커밋에서 그 검사가 안 돈다.
+	inputs.files(
+		rootProject.file("../docker-compose.yml"),
+		rootProject.file("../docker/nginx/nginx.conf"),
+		rootProject.file("Dockerfile"),
+	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // 문턱은 「새 검출 0건」이다(`D18`). 기준선 파일을 안 만든다 — 눌러 둔 목록은 아무도 다시 안 본다.

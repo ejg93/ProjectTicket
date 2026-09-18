@@ -28,6 +28,7 @@ docker compose ps        # db·redis 가 healthy
 |---|---|---|
 | Postgres | `localhost:5432`(또는 `.env` 의 `POSTGRES_PORT`) | |
 | Redis | `localhost:6379`(또는 `REDIS_PORT`) | 세션·대기열·좌석 판 |
+| Kafka | `localhost:9094`(또는 `KAFKA_PORT`) | 사건 브로커(28). **9092 는 ProjectShop 것**이라 9094 다 |
 | Prometheus | `http://localhost:9090` | 앱의 `/actuator/prometheus` 를 5초마다 긁는다(30) |
 | Grafana | `http://localhost:3001` | 대시보드 「ProjectTicket — 예매」가 심겨 있다. 익명 열람 |
 
