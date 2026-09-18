@@ -199,7 +199,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
 | 46 | codeql·claude-review·e2e 워크플로 | ProjectShop 셋 이식. Kotlin 은 CodeQL `java-kotlin`. **축**: `D18`. **강제 지점**: CI. **건드리는 자리**: `.github/workflows/`. **닫힘**: 세 잡 초록 | 2·39 |
-| 47 | detekt | SpotBugs 자리에 detekt. **축**: `D18`. **강제 지점**: 빌드 실패. **건드리는 자리**: `build.gradle.kts`, `config/detekt/`. **닫힘**: `gradlew detekt` 초록 | 1 |
+| 47 | detekt | 완료 — `dev.detekt` 2.0.0-alpha.6(1.23 은 JDK 25 에서 안 돈다, `stack.md`), `backend/config/detekt/detekt.yml`, `check` 에 붙어 CI 가 같이 돈다. 첫 측정 262건 → 문턱 다섯을 근거와 함께 올리고 규칙 하나를 끄고(우리 예외 규약과 충돌) 나머지 열하나를 고쳤다. 곁가지로 `observability/Elapsed.kt`. `D18` 에 게이트·문턱·처분 행 | 완료 |
 | P3 | `api-guidelines.md` 이식 | 완료 — 실물 기준 재작성. 경로 표 22줄, 오류 `type` 계약 30개(새 것 17), 열거값 소문자(DB 와 한 단어). 선점은 `/api/performances/{id}/reservations` — 관문이 회차 id 를 경로에서 읽는다 | 완료 |
 | P4 | `testing-strategy.md` 이식 | 완료 — 실물 기준 재작성. 레인 셋(`measure` 는 `build` 밖), `ConcurrencyTestBase` 규칙 다섯, 「승자 하나」를 응답·DB 넷으로, 정렬 지운 대조 테스트, 만료 테스트는 지난 행을 직접 넣는다 | 완료 |
 | P7 | `time-rules.md` 이식 | 완료 — 실물 기준 재작성. **시계는 DB**(`now()`), 관람일 N일 전 = KST 달력일 차(`at time zone` 없으면 0~9시 취소가 전날로), 박제 표 다섯 | 완료 |
