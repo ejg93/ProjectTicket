@@ -142,11 +142,11 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 21 | 대기열 진입·순번 **[종료 시 키 삭제도]** | Redis ZSET(score=진입 시각) 회차 단위. `POST /api/queue/{performanceId}` → 순번·예상 대기. Redis Testcontainers. **축**: `D12`(이 청크가 초안을 쓴다). **강제 지점**: 테스트(순번 단조). **건드리는 자리**: 신설 `queue/`, `doc/reference/queue-design.md`. **닫힘**: `QueueRankTest` | 13 |
+| 21 | 대기열 진입·순번 **[종료 시 키 삭제도]** | Redis ZSET(score=진입 시각) 회차 단위. `POST /api/queue/{performanceId}` → 순번·예상 대기. 테스트 Redis 는 `20a` 가 `PostgresTestBase` 에 들였다. **축**: `D12`(이 청크가 초안을 쓴다). **강제 지점**: 테스트(순번 단조). **건드리는 자리**: 신설 `queue/`, `doc/reference/queue-design.md`. **닫힘**: `QueueRankTest` | 13 |
 | 22 | 입장 스케줄러·활성 토큰 | N초마다 앞 M명을 활성 집합으로 옮기고 토큰(TTL) 발급. **축**: `D12`. **강제 지점**: TTL + 테스트(만료 토큰 거부). **건드리는 자리**: `queue/AdmissionScheduler`. **닫힘**: `AdmissionTest` | 21 |
 | 23 | 대기열 관문 | 활성 토큰 없이 예매 API 를 부르면 429/403. 필터. **축**: `D9`(토큰 위조·재사용). **강제 지점**: 필터 + 테스트. **건드리는 자리**: `queue/QueueGateFilter`. **닫힘**: `QueueGateTest.no_token_rejected` | 22 |
 | 24 | 이탈·새로고침 | 하트비트 없으면 제거, 새로고침해도 순번 유지. **축**: `D12`. **강제 지점**: TTL. **건드리는 자리**: `queue/`. **닫힘**: `QueueHeartbeatTest` | 22 |
-| 20a | 세션 저장소 Redis | Spring Session Data Redis + `SpringSessionBackedSessionRegistry`. 로그인 코드는 그대로. 정지·탈퇴가 인스턴스를 넘어 세션을 끊는다. **축**: ADR 0004. **강제 지점**: 테스트(컨텍스트 둘이 같은 세션 쿠키를 인정한다). **건드리는 자리**: `SecurityConfig`, `build.gradle.kts`, `application.yml`. **닫힘**: `SharedSessionTest.login_on_one_context_is_seen_by_another` | 21 |
+| 20a | 세션 저장소 Redis | 완료 — `spring-boot-starter-session-data-redis`, `spring.session.data.redis.repository-type: indexed`(계정으로 세션을 찾아야 `5a`·`5b` 가 된다). `SessionRegistryImpl` → `SpringSessionBackedSessionRegistry`, `RegisterSessionAuthenticationStrategy`·`HttpSessionEventPublisher` 를 걷었다(등록이 빈 함수고 정리는 Redis 가 한다). **쿠키 직렬화기를 코드로 내렸다**(`SecurityConfig.cookieSerializer`) — Boot 자동설정이 MockMvc 컨텍스트를 war 배포로 보고 이름을 `SESSION` 으로 떨궈서 테스트와 운영이 갈렸다. `PostgresTestBase` 가 Redis 컨테이너(`@ServiceConnection(name = "redis")`)와 `@BeforeEach flushDb()` 를 든다. `LoginFlowTest` 넷을 쿠키·저장소 기반으로 고쳤다. 닫힘: `SharedSessionTest`(둘 — 로그인이 넘어간다·로그아웃이 같이 끊는다) | 완료 |
 | 5a | 탈퇴·파기 | `DELETE /api/me`(세션 전부 끊기·`deleted_at`), 30일 뒤 파기 배치(이메일·이름·해시 null, 동의 cascade 는 물리 삭제 때), 감사 3년 파기. **축**: `D9` + 개인정보보호법 제21조. **강제 지점**: 트리거(`deleted_at` 계정 로그인 불가 — 있음) + 배치 테스트. **건드리는 자리**: `account/WithdrawalService`·`AccountPurgeBatch`. **닫힘**: `AccountPurgeTest.pii_nulled_after_grace` | 4·20a |
 | 5b | 관리자 정지·해제 | `admin` 전용 `POST /api/admin/accounts/{id}/suspend`, 정지 즉시 그 계정 세션 전부 만료, 감사. **축**: `D9`. **강제 지점**: 테스트(정지 직후 다른 컨텍스트의 세션이 401). **건드리는 자리**: `account/AdminController`. **닫힘**: `SuspendTest.other_session_cut_immediately` | 20a |
 
