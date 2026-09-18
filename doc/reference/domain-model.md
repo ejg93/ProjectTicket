@@ -20,7 +20,7 @@
 | `performance_seat` | **회차별 좌석 상태.** OPEN 때 `seat` 를 복제하고 등급·가격을 박제. `status`·`held_until`·`reservation_id`(**포인터** — 지금 이 좌석을 쥔 예매) | performance | performance 와 함께 |
 | `reservation` | 예매. 상태(`held→paying→reserved→cancelled`, `→expired`, `D3`)·계정·회차·합계·`held_until`·`paying_until`·멱등키 | account | 영구(거래 기록) |
 | `reservation_seat` | **기록** — 이 예매가 잡은 좌석과 그때 가격. 선점 때 한 번 쓰고 안 고친다(`D4`) | reservation | reservation 과 함께 |
-| `idempotency_key` | 계정별 멱등키와 저장된 응답. 24시간(`D4`) | account | 24시간 뒤 삭제 |
+| `idempotency_key` | 계정별 멱등키와 저장된 응답. 24시간(`D4`) | account | 24시간 뒤 삭제(`IdempotencyCleaner`, `13b`) |
 | `payment` | 모의 결제. 예매 하나에 하나 | reservation | 영구 |
 | `refund` | 환불. 수수료·환불액·사유 | payment | 영구 |
 | `ticket` | 발권. 외부 노출 번호, 예매 좌석 하나에 하나 | reservation_seat | 영구 |
