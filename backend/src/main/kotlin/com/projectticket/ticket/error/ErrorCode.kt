@@ -53,6 +53,11 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
     CANCEL_WINDOW_CLOSED(HttpStatus.CONFLICT, "cancel-window-closed", "관람일 당일이라 취소할 수 없다"),
 
+    // 대기열(21, `D12`). 닫힌 회차는 **있었는데 끝난 것**이라 410 이고, 없는 회차(404)와 가른다 —
+    // 화면이 앞에서는 줄을 걷고 뒤에서는 잘못된 링크를 말한다.
+    QUEUE_CLOSED(HttpStatus.GONE, "queue-closed", "회차가 닫혀 대기열이 없다"),
+    NOT_IN_QUEUE(HttpStatus.NOT_FOUND, "not-in-queue", "줄에 서 있지 않다"),
+
     // 멱등키(`D4`). 같은 키가 아직 처리 중이면 409, 같은 키에 다른 본문이면 422.
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "idempotency-key-reused", "같은 멱등키로 다른 요청이 왔다"),

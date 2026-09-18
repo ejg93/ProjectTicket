@@ -140,6 +140,7 @@
 | **`admission-required`** | 429 | 활성 토큰이 없다. 대기열로 | `rank`, `eta_seconds` | 23 |
 | **`admission-mismatch`** | 403 | 토큰이 다른 계정·회차 것 | | 23 |
 | **`queue-closed`** | 410 | 회차가 닫혀 대기열이 없다 | | 21 |
+| **`not-in-queue`** | 404 | 순번을 물었는데 줄에 없다 | | 21 |
 | **`queue-unavailable`** | 503 | Redis 가 죽어 관문이 닫혔다 | `Retry-After` 헤더 | 23 |
 | **`seat-changes-expired`** | 410 | `since` 가 변경 로그 밖이다. 전체를 다시 받아라 | `version` | 10a |
 | **`idempotency-in-progress`** | 409 | 같은 키가 처리 중 | | 13 |

@@ -1,5 +1,6 @@
 package com.projectticket.ticket.reservation
 
+import com.projectticket.ticket.queue.QueueService
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
@@ -15,7 +16,11 @@ import org.springframework.stereotype.Component
  * 어차피 `held` 라 닫을 때 만료되고, 좌석은 돌아간다.
  */
 @Component
-class PerformanceCloser(private val jdbc: JdbcClient, private val closeService: PerformanceCloseService) {
+class PerformanceCloser(
+    private val jdbc: JdbcClient,
+    private val closeService: PerformanceCloseService,
+    private val queue: QueueService,
+) {
 
     private val log = LoggerFactory.getLogger(PerformanceCloser::class.java)
 
@@ -36,7 +41,13 @@ class PerformanceCloser(private val jdbc: JdbcClient, private val closeService: 
         var expired = 0
         due.forEach { performanceId ->
             try {
-                closeService.close(performanceId)?.let { closed++; expired += it }
+                closeService.close(performanceId)?.let {
+                    closed++
+                    expired += it
+                    // 줄을 걷는 것은 **커밋 뒤**다(`D12`). close() 가 트랜잭션 경계라 여기는 이미 그 밖이고,
+                    // 안에서 지우면 롤백된 종료가 남의 줄을 날린다 — Redis 에는 되돌릴 방법이 없다.
+                    queue.drop(performanceId)
+                }
             } catch (e: RuntimeException) {
                 // 고르고 나서 닫기까지 기획사가 취소했거나 남이 먼저 닫았을 수 있다. 회차 하나를 실패로 만들어 나머지를 안 막는다 —
                 // DB 예외만 잡으면 사건 기록·감사에서 난 것이 루프를 끊는다.
