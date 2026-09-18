@@ -58,8 +58,8 @@ class SharedSessionTest {
             .sql("delete from account where email = :email").param("email", EMAIL).update()
         instanceA.close()
         instanceB.close()
-        redis.stop()
-        postgres.stop()
+        // 컨테이너는 안 멈춘다. 재사용이 켜져 있으면 Spring 컨텍스트들이 붙어 쓰는 그 컨테이너라,
+        // 여기서 멈추면 뒤에 도는 테스트가 쓰던 DB 를 뺏긴다.
     }
 
     @Test
