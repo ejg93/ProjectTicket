@@ -16,7 +16,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
 | Gradle | 9.7.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
-| Redis | 7-alpine | `docker-compose.yml`. 코드는 아직 안 쓴다 — `20a`·`21` 부터 |
+| Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
 | ArchUnit | 1.5.0 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
@@ -274,6 +274,17 @@ CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사
 `Containers` 가 `@TestConfiguration` 이라 **컨텍스트가 갈리면 컨테이너도 따로 뜬다.** 컨텍스트 캐시 키는 애너테이션으로 갈리므로 `ConcurrencyTestBase` 가 `PostgresTestBase` 와 애너테이션을 똑같이 맞춘다(`@AutoConfigureMockMvc` 까지) — `@Transactional` 만 캐시 키에 안 들어간다.
 재사용을 켜면 갈린 컨텍스트도 같은 컨테이너에 붙는다.
 
+### `GenericContainer` 는 `@ServiceConnection` 에 이름을 적어야 한다
+
+이미지 이름(`redis:7-alpine`)만으로 알아보는 길이 Kotlin 의 `GenericContainer<Nothing>` 에서는 안 먹었다 — `@ServiceConnection(name = "redis")` 로 적어야 붙는다.
+안 적으면 기동이 `ConnectionDetailsNotFoundException` 으로 죽고, 문구가 「You may need to add a 'name'」이라 그대로 따르면 된다(`20a` 에서 겪었다).
+Testcontainers 2.x 에는 Redis 전용 모듈이 없어서 `GenericContainer` 를 쓸 수밖에 없다.
+
+### Spring Session 색인은 기동 때 Redis 설정을 바꾼다
+
+`spring.session.redis.repository-type: indexed` 면 저장소가 뜰 때 Redis 에 `CONFIG SET notify-keyspace-events` 를 보낸다(만료 세션을 색인에서 걷어내려고).
+`CONFIG` 를 막아 둔 Redis 에서는 기동이 실패한다. 그때는 `ConfigureRedisAction.NO_OP` 을 빈으로 두고 서버 쪽 설정을 손으로 켠다.
+
 ### Gradle 은 Test 태스크를 up-to-date 로 건너뛴다
 
 입력이 같으면 두 번째 실행은 안 돈다. 숫자를 내는 측정(`gradlew measure`)은 그러면 **지난 표를 이번 것으로 읽게 된다** — `outputs.upToDateWhen { false }` 로 늘 돌린다(19 에서 두 번째 실행이 첫 표와 같아서 알았다).
@@ -326,7 +337,7 @@ git update-index --chmod=+x backend/gradlew
 
 ### Redis 는 테스트 롤백이 안 되돌린다
 
-`PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. Redis 를 쓰는 테스트(21 부터)는 `@BeforeEach` 에서 자기 키를 지운다.
+`PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.
 
 ### `initdb.d` 는 볼륨이 비었을 때만 돈다
 
@@ -367,7 +378,7 @@ git update-index --chmod=+x backend/gradlew
 | 대상 | 언제 |
 |---|---|
 | Next.js 버전·패키지 매니저 | 39 |
-| Redis 클라이언트(Lettuce·Redisson) | `20a`·`21`. 스케줄러 락은 33(Redisson, ADR 0003) |
+| Redisson(스케줄러 락·좌석 락) | 33, ADR 0003. Lettuce 는 `20a` 가 스타터로 들였다 |
 | 품질 게이트 도구(detekt·CodeQL·SpotBugs) | `P10`(46·47). ProjectShop 의 SpotBugs·find-sec-bugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봤다 — 그 판단은 그때 다시 |
 | Kafka | 28, ADR 0007 |
 

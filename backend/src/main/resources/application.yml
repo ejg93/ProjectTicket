@@ -12,6 +12,18 @@ spring:
     password: ${POSTGRES_PASSWORD:ticket}
   flyway:
     locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  session:
+    data:
+      redis:
+        # 계정으로 세션을 찾을 수 있어야 한다(`SpringSessionBackedSessionRegistry`). 기본값(`default`)의 저장소는 세션 id 로만 찾아서
+        # 정지·탈퇴(5a·5b)가 그 계정의 세션을 못 고른다. 이 값이면 기동 때 Redis 에 `CONFIG SET notify-keyspace-events` 를 건다.
+        repository-type: indexed
+        # 대기열·좌석 캐시와 같은 Redis 라 접두로 가른다(21 뒤).
+        namespace: ticket:session
   # JSON 속성을 snake_case 로 내린다(D5). Kotlin 필드는 camelCase 로 두고 직렬화할 때만 바뀐다.
   # DB 컬럼명과 JSON 필드명이 같아져서 로그·쿼리·응답을 같은 단어로 검색할 수 있다.
   jackson:
@@ -49,7 +61,8 @@ server:
   port: ${SERVER_PORT:${PORT:8080}}
   servlet:
     session:
-      # 무활동 만료. 절대 만료 12시간은 서블릿에 설정 자리가 없어서 코드로 넣는다(AbsoluteSessionTimeoutFilter).
+      # 무활동 만료. Spring Session 이 이 값과 아래 쿠키 설정을 그대로 쓴다 — 저장소만 Redis 로 바뀌고 계약은 그대로다(ADR 0004).
+      # 절대 만료 12시간은 서블릿에 설정 자리가 없어서 코드로 넣는다(AbsoluteSessionTimeoutFilter).
       timeout: 30m
       cookie:
         name: TICKETSESSION
