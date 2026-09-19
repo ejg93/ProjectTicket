@@ -133,6 +133,9 @@ tasks.test {
 		rootProject.file("../doc/reference/event-catalog.md"),
 		rootProject.file("../doc/reference/state-machines.md"),
 		rootProject.file("../.github/workflows/ci.yml"),
+		rootProject.file("../.github/workflows/codeql.yml"),
+		rootProject.file("../.github/workflows/claude-review.yml"),
+		rootProject.file("../doc/reference/quality-gates.md"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
