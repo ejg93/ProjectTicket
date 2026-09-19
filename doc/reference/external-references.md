@@ -182,7 +182,7 @@ ISO 8601 과 IANA tz 가 전부다. 한국은 서머타임이 없어 `Asia/Seoul
 | 2026-08-05 · 08-14 | ProjectShop 에서 링크를 열어 확인했다(RFC 9457 현행, OWASP 2025 판, NIST Rev 4, W3C Level 2 초안) |
 | 2026-09-15 | `P11` — 티켓 도메인에 맞춰 다시 썼다. **링크를 다시 열지는 않았다.** 다음 `/inspection` 이 연다 |
 | 2026-09-19 | `I5`(점검 5차) — **요건이 코드에 박혔나**를 봤다(가로 · 표준). 링크는 다시 안 열었다 — 그것은 「바깥 근거」 줄이고 `I5-1` 이 선다 |
-| 2026-09-19 | `I5-1` — 여섯을 열었다: OWASP Top 10 2025(**308 로 옮겨져 링크를 고쳤다**), NIST 800-63B Rev 4(최종, 15자·블록리스트 `SHALL` 그대로), W3C Trace Context(Recommendation 2021-11-23 — Level 2 는 별도 문서라 문구를 고쳤다), Testcontainers 이슈 둘(**닫혔다**), Zalando(열린다, 제목이 「RESTful API and Event Guidelines」). **RFC 다섯·Stripe 여섯·Spring 셋·나머지 여덟은 아직 안 열었다** |
+| 2026-09-19 | `I5-1` — **열넷을 열었다.** 고친 셋: OWASP Top 10 2025 가 308 로 옮겨졌고(`top10.owasp.org/2025`), W3C Trace Context 는 그 URL 이 Recommendation(2021-11-23)이라 「Level 2 초안」 문구를 고쳤고, Testcontainers 이슈 둘은 닫혔다(`11212` → PR `11216`, `11235` 는 중복). 적힌 그대로인 것: NIST Rev 4(15자·블록리스트 `SHALL`), Zalando(열린다 — 제목이 「RESTful API and Event Guidelines」), **PostgreSQL 17 §13.2.1**(「`WHERE` 를 다시 평가한다」가 원문에 있다), Stripe 멱등(24시간·클라이언트가 만든다·V4 UUID 권장·다른 본문은 오류), CloudEvents(Graduated, 2024-01-25), SQL Style Guide(CC BY-SA 4.0, `id` 를 기본키 이름으로 쓰지 말라), SRE Book(SLI·SLO·SLA 정의), Transactional Outbox, Practical Test Pyramid(Ham Vocke), Money 패턴(반올림 손실 서술). **안 연 열넷**: RFC 다섯·Spring 셋·Stripe Connect 넷·법제처·DDD PDF |
 
 ## 이 문서를 고칠 때
 

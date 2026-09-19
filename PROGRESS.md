@@ -6,7 +6,7 @@
 
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
-| 진행중 청크 | `I5-1` — 바깥 근거 다시 열기. 여섯을 열었고 **RFC 다섯·Stripe 여섯·Spring 셋·법제처·martinfowler 둘·sre.google·sqlstyle.guide·cloudevents·DDD PDF·microservices.io 가 남았다** | `external-references.md` |
+| 진행중 청크 | `I5-1` — 바깥 근거 다시 열기. 열넷을 열었고 **RFC 다섯·Spring 셋·Stripe Connect 넷·법제처·DDD PDF 가 남았다** | `external-references.md` |
 | 다음 첫 손 | 점검 여섯 줄을 다 봤고 `46a`(CodeQL·claude-review)까지 쳤다. **`46a` 의 CI 초록은 push 뒤에 본다.** 미착수는 화면(`39`~`45`)·배포(`36`~`38`·`48`)·`46b`·`P9`·`P10`·`I5-1` | `PLAN.md` 8장 |
 | PR | `#19` 머지됨. 이 가지에는 `I3`·`I3-1`·`I3-2`·`I4`·`I4-1` — PR 은 아직 없다 | 마무리 때 연다 |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
