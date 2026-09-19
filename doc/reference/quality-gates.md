@@ -28,7 +28,7 @@
 |---|---|---|---|---|
 | 컴파일 | 1 타입 | 로컬·CI | Kotlin 널 타입과 `when` 의 값 누락. `-Xjsr305=strict` 라 스프링의 널 어노테이션도 타입이 된다 | — |
 | 마이그레이션 제약 | 2 제약 | 기동·테스트 | `V1`~`V20` 의 `check`·`not null`·`references`·유일·전이 트리거. 점검 1차가 108 개를 셌다 | `I1` 2026-09-15 |
-| CodeQL | 4 테스트 | CI(`codeql.yml`, push·주 1회) | 파일을 넘어가는 데이터 흐름 — 사용자 입력이 SQL·셸까지 가나. `actions` 는 `build-mode: none`, `java-kotlin` 은 **`manual`**(Kotlin 은 `none` 으로 못 읽는다) — `46a`. 아직 필수 검사 목록에 없다 | — |
+| CodeQL | 4 테스트 | CI(`codeql.yml`, push·주 1회) | 파일을 넘어가는 데이터 흐름 — 사용자 입력이 SQL·셸까지 가나. `actions` 는 `build-mode: none`, `java-kotlin` 은 **`manual`**(Kotlin 은 `none` 으로 못 읽는다) — `46a`. `javascript-typescript` 는 화면이 생기며 켰다(`39`, `build-mode: none`). **Kotlin 레인만 힙을 키운다**(`-Pkotlin.daemon.jvmargs=-Xmx4g`, `46a-1`) — 추출기가 컴파일러 안에서 돌아 기본 힙을 넘긴다. 아직 필수 검사 목록에 없다 | — |
 | Claude Review | 5 문서 | CI(`claude-review.yml`, PR) | **아무것도 못 막는다** — 조언이다. 막는 것은 「이번 회차에 코멘트를 남겼나」 하나고, 그것이 없으면 5~7분이 게이트도 조언도 아니게 된다(`46a`) | — |
 | `ArchitectureTest` | 4 테스트 | `gradlew test`(빠른 레인) | `D14` 의 계층·예외·의존. **패키지 순환도 본다** — `auth ↔ queue` 가 실제로 걸려서 `SecuredApiFilter` 로 뒤집었다(`20a`) | `20a` 2026-09-17 |
 | `EnumConstraintTest` | 4 테스트 | 〃 | 열거형과 DB 의 닫힌 값 목록이 갈리는 것(`I2-1`). 한쪽에만 더한 값은 **그 값이 실제로 흐를 때까지** 안 보인다. **열거형이 없는 목록 다섯은 못 지킨다** — 그 자리는 목록에 박아 두는 것까지다 | `I2-1` 2026-09-18 — DB 에만 `bounced` 를 더하니 짚었다 |
@@ -41,7 +41,11 @@
 | `EventTopicTest` | 4 테스트 | 〃 | 토픽 상수와 `EventTopics.of` 가 갈리는 것(마무리 6차). `@KafkaListener` 의 `topics` 가 상수여야 해서 두 벌이 생긴다 | — |
 | `EventCatalogTest` | 4 테스트 | 〃 | `D11` 카탈로그와 `EventType` 이 갈리는 것 | — |
 | `SchedulerSingleRunTest` | 4 테스트 | `gradlew integrationTest` | 스케줄러가 인스턴스마다 도는 것(`33`). **입구를 손으로 적어 부른다** — 새 입구가 늘어도 여기는 초록이라, 락을 안 건 입구를 자동으로 찾지는 못한다 | `33` 2026-09-18 — 마무리 6차가 `HoldSweeper` 의 자기 호출을 여기서 잡았다 |
-| 나머지 테스트 | 4 테스트 | `gradlew build` | backend 330 중 `build` 가 도는 것 — 빠른 레인과 컨테이너 레인이다. `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 아직 없다(`39` 뒤) | — |
+| `tsc --noEmit` · `next build` | **1 타입** | `verify.sh`(빠른·느린) · CI | 화면이 서버 응답을 **받은 그대로**(snake_case) 읽는지까지 타입이 든다(`39`). 응답 모양이 바뀌면 화면이 컴파일에서 선다 | — |
+| eslint 입구 규칙 | 4 테스트 | `npm run lint`(로컬·CI) | `api.ts`·`api-session.ts` 밖의 `fetch` 와 `next/headers`(`39`). **문서에만 있던 `D16` 규칙을 여기서 내렸다** — 우회하면 CSRF·오류 변환을 안 거친 응답이 화면에 닿는다 | — |
+| `screen-text.test.ts` | 4 테스트 | `npm test` | 화면 문구의 **반말**(`D17`). `doc-lint.sh` 의 거울이다 — 그쪽은 개발자 글의 존댓말을 막는다. 주석이 평서형이라 정규식으로는 못 재고 AST 로 걷는다 | — |
+| axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | — |
+| 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 343 중 `build` 가 도는 것 — 빠른 레인과 컨테이너 레인이다. `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 29(`39`~`42`) | — |
 | detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다 | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength` |
 | `doc-lint.sh` | 4 테스트 | **편집 직후 훅** + CI `docs` 잡 | 개발자 글의 존댓말과 표 파편. 고치는 순간 걸려서 커밋까지 안 간다 | — |
 | `verify.sh` 도장 | 4 테스트 | **Stop 훅**(빠른) · **push 훅**(`--full`) | 안 돌려 보고 청크를 닫거나 미는 것. 레인 지문이 `origin/main` 과 다르면 그 레인을 돌리고 도장을 찍는다 | 마무리 6차 2026-09-18 — 도장 없이 밀려다 막혔다 |
@@ -125,7 +129,7 @@ Spring 어노테이션을 풀어 요청 파라미터부터 `Runtime.exec` 까지
 | SpotBugs | **새 검출 0건** | `2e` 100건 중 실물 0. 제외 넷을 적고 `ignoreFailures = false`. `2e-1` 이 find-sec-bugs 를 얹어 둘이 늘었고 **둘 다 오탐이라 제외가 다섯**이다 |
 | 테스트 | 실패 0 | — |
 | gitleaks | 검출 0 | 아직 안 나왔다 |
-| CodeQL | **새 경보 0건** | 첫 측정을 아직 안 했다(`46a` 가 잡을 세웠고 이 PR 이 처음 돈다). 문턱은 그 수를 보고 `P10` 이 적는다 |
+| CodeQL | **새 경보 0건** | **첫 측정이 나왔다**(`46a-1`, run `35443023092`): `java-kotlin` 규칙 76개·결과 0, `actions` 규칙 17개·결과 0, `javascript-typescript` 는 `39` 에서 켜 초록. 0 을 문턱으로 굳힐지 확장 팩으로 볼 것을 늘릴지는 `P10` 이 적는다 |
 | `npm audit` | **high 이상 0건** | `2e-3` 첫 측정 0(info~critical 전부). 처음 나오는 것부터 처분한다 |
 | CI 전체 | 초록 | 빨가면 다음 청크보다 먼저 친다(`CLAUDE.md`) |
 | dependabot 갱신 PR | **minor·patch 는 CI 초록이면 자동 머지. 메이저는 사람** | `2f` 첫 회차(2026-09-05): PR 열 중 초록 일곱을 전부 머지하고 메이저 셋을 닫았다. **사람이 한 것이 초록을 보고 누른 것뿐**이라 그 손을 뺐다(`2f-3`) **첫 실물** #31(2026-09-10) — `github-actions` 가 머지했다. 사람은 rebase 한 번 |
