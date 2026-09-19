@@ -11,7 +11,7 @@
 | PR | `#20` 머지됨(`014cf24`, 청크 열여섯). 이 가지에는 `P10`·`P9` | |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
-| GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(네 잡 필수). 그 뒤로는 `work/<날짜>` + PR | |
+| GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(**일곱 잡 필수** — CI 넷 + CodeQL 셋, `P10`). 그 뒤로는 `work/<날짜>` + PR | |
 | 로컬 포트 | ProjectShop 컨테이너가 5432·6379 를 쥐고 있어 `.env` 는 5433·6380 | `README.md` |
 | 기준 문서 | **21개 전부 완료.** 마지막 둘(D16·D17)은 `P9`, `D18` 머리말은 `P10` 이 닫았다 | — |
 | 이식 원본 | `C:\workspace\ProjectShop` 읽기 전용. 가져온 것·안 가져온 것은 ADR 0002 | |

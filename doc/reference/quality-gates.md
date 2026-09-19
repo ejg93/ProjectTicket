@@ -42,7 +42,7 @@
 | eslint 입구 규칙 | 4 테스트 | `npm run lint`(로컬·CI) | `api.ts`·`api-session.ts` 밖의 `fetch` 와 `next/headers`(`39`). **문서에만 있던 `D16` 규칙을 여기서 내렸다** — 우회하면 CSRF·오류 변환을 안 거친 응답이 화면에 닿는다 | — |
 | `screen-text.test.ts` | 4 테스트 | `npm test` | 화면 문구의 **반말**(`D17`). `doc-lint.sh` 의 거울이다 — 그쪽은 개발자 글의 존댓말을 막는다. 주석이 평서형이라 정규식으로는 못 재고 AST 로 걷는다 | — |
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | — |
-| 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 344 중 `build` 가 도는 것 — 빠른 레인과 컨테이너 레인이다. `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
+| 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
 | detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다 | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength` |
 | `npm audit --audit-level=high` | 4 테스트 | CI(`frontend` 잡) | 화면 의존성의 알려진 취약점(`39`). `moderate` 이하는 알리기만 한다 | — |
 | `doc-lint.sh` | 4 테스트 | **편집 직후 훅** + CI `docs` 잡 | 개발자 글의 존댓말과 표 파편. 고치는 순간 걸려서 커밋까지 안 간다 | — |
