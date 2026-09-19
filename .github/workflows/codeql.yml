@@ -58,7 +58,7 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
           # **질의 묶음을 안 넓힌다.** 기본값으로 첫 측정을 하고 그 수가 `D18` 의 문턱을 정한다 —
           # 재기 전에 넓히면 무엇이 는 것인지 안 갈린다. ProjectShop 은 `JdbcClient` 를 싱크로
-          # 더하는 확장 팩을 뒀다(`Q` 줄) — 여기도 첫 측정 뒤에 같은 판단을 한다.
+          # 더하는 확장 팩을 뒀다(`Q` 줄) — 여기도 같은 판단을 하는데 그 자리는 `P10` 이다(첫 측정값이 문턱을 정한다).
 
       - uses: github/codeql-action/analyze@v4
         with:

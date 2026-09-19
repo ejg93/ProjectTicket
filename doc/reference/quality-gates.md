@@ -39,7 +39,7 @@
 | `EventTopicTest` | 4 테스트 | 〃 | 토픽 상수와 `EventTopics.of` 가 갈리는 것(마무리 6차). `@KafkaListener` 의 `topics` 가 상수여야 해서 두 벌이 생긴다 | — |
 | `EventCatalogTest` | 4 테스트 | 〃 | `D11` 카탈로그와 `EventType` 이 갈리는 것 | — |
 | `SchedulerSingleRunTest` | 4 테스트 | `gradlew integrationTest` | 스케줄러가 인스턴스마다 도는 것(`33`). **입구를 손으로 적어 부른다** — 새 입구가 늘어도 여기는 초록이라, 락을 안 건 입구를 자동으로 찾지는 못한다 | `33` 2026-09-18 — 마무리 6차가 `HoldSweeper` 의 자기 호출을 여기서 잡았다 |
-| 나머지 테스트 | 4 테스트 | `gradlew build` | backend 318 중 `build` 가 도는 것 — 빠른 레인과 컨테이너 레인이다. `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 아직 없다(`39` 뒤) | — |
+| 나머지 테스트 | 4 테스트 | `gradlew build` | backend 330 중 `build` 가 도는 것 — 빠른 레인과 컨테이너 레인이다. `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 아직 없다(`39` 뒤) | — |
 | detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다 | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength` |
 | `doc-lint.sh` | 4 테스트 | **편집 직후 훅** + CI `docs` 잡 | 개발자 글의 존댓말과 표 파편. 고치는 순간 걸려서 커밋까지 안 간다 | — |
 | `verify.sh` 도장 | 4 테스트 | **Stop 훅**(빠른) · **push 훅**(`--full`) | 안 돌려 보고 청크를 닫거나 미는 것. 레인 지문이 `origin/main` 과 다르면 그 레인을 돌리고 도장을 찍는다 | 마무리 6차 2026-09-18 — 도장 없이 밀려다 막혔다 |
