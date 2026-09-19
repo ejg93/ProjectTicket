@@ -1,0 +1,92 @@
+# 알려진 취약 모양을 코드에서 찾는다(청크 `46a`).
+#
+# `ci.yml` 이 「돌렸나」를, `claude-review.yml` 이 「규약대로 쳤나」를 본다면
+# 이쪽은 **데이터 흐름**을 본다 — 사용자 입력이 SQL·셸까지 가나처럼 파일을 넘어가는 경로다.
+# detekt(`47`)와 다른 것을 본다: 그쪽은 한 파일 안의 모양이다.
+#
+# **저장소가 public 이라 무료다.** 비공개로 돌리면 유료가 된다.
+name: CodeQL
+
+on:
+  # `ci.yml` 과 같이 모든 가지에서 돈다. PR 은 마무리 때 한 번뿐이라 가지 제한을 두면
+  # 청크 다섯을 검사 없이 치고 마무리 PR 에서 처음 빨개진다.
+  push:
+
+  # **`pull_request:` 를 안 켠다.** 둘 다 있으면 같은 커밋을 두 번 검사한다 —
+  # 아래 `concurrency` 가 그것을 못 막는다: push 는 `refs/heads/…`, PR 은 `refs/pull/N/merge` 라
+  # **다른 그룹**이다. **이 잡은 아직 필수 검사가 아니다** — 넣으면 보호가 이름으로 맞추고 이벤트를 안 가려서 push 실행이 그 자리를 채운다.
+  # **fork PR 은 push 가 안 돈다** — 바깥에서 PR 을 받기 시작하면 이 줄을 되돌린다.
+
+  # 주 1회. 새 커밋이 없어도 **질의 묶음이 갱신되면 답이 달라진다.**
+  # 월요일 05시 KST — dependabot(같은 날)보다 앞에 둬서 갱신 PR 과 안 겹친다.
+  schedule:
+    - cron: '0 20 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # 결과를 Security 탭에 올리는 자리다. 이것만 쓰기다.
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      # 하나가 죽어도 나머지 언어는 본다. 둘이 서로 독립이다.
+      fail-fast: false
+      matrix:
+        include:
+          # **워크플로 파일도 대상이다.** 거기서 권한·시크릿을 다룬다.
+          - language: actions
+            build-mode: none
+          # **Kotlin 은 `none` 으로 못 읽는다**(PR #20 실측). `none` 은 Java 소스만 훑는데 이 저장소엔
+          # `.java` 가 0개라 `CodeQL detected code written in Java/Kotlin but could not process any of it`
+          # 으로 죽는다. 그래서 여기만 **`manual`** 이다 — 아래 step 이 컴파일까지만 돌린다(테스트는 `ci.yml` 몫).
+          - language: java-kotlin
+            build-mode: manual
+          # 화면이 생겨서 켰다(`39`). **`none` 으로 읽는다** — TypeScript 는 빌드 없이 소스를 훑고,
+          # `next build` 를 여기서 또 돌리면 `ci.yml` 이 하는 일을 두 번 한다.
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # **질의 묶음을 안 넓힌다.** 기본값으로 첫 측정을 하고 그 수가 `D18` 의 문턱을 정한다 —
+          # 재기 전에 넓히면 무엇이 는 것인지 안 갈린다. ProjectShop 은 `JdbcClient` 를 싱크로
+          # 더하는 확장 팩을 뒀다(`Q` 줄) — 여기도 같은 판단을 하는데 그 자리는 `P10` 이다(첫 측정값이 문턱을 정한다).
+
+      # `manual` 인 언어만 여기서 빌드한다. `actions` 는 빌드가 없다.
+      - if: matrix.build-mode == 'manual'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          # `build.gradle.kts` 의 툴체인·`ci.yml` 과 같은 값이다. 갈리면 Gradle 이 안 뜬다.
+          java-version: '25'
+
+      - if: matrix.build-mode == 'manual'
+        uses: gradle/actions/setup-gradle@v6
+
+      # **컴파일까지만이다.** 테스트는 `ci.yml` 이 돈다 — 여기서 또 돌리면 같은 것을 두 번 하고
+      # CodeQL 이 보는 것은 바이트코드라 테스트를 돌릴 이유가 없다.
+      #
+      # **힙을 키우는 것은 이 레인만이다**(`46a-1`). CodeQL 의 Kotlin 추출기는 별도 프로세스가 아니라
+      # **컴파일러 안에 붙어서** 돌아 같은 데몬의 힙을 같이 쓴다 — 기본값으로는 `compileKotlin` 이
+      # `GC overhead limit exceeded` 로 10분 만에 죽었다(run 35427637052). 같은 러너에서 `ci.yml` 의
+      # `./gradlew build` 는 초록이라 **코드가 무거운 것이 아니다.** 그래서 `gradle.properties` 로
+      # 저장소 전체에 걸지 않고 죽는 레인에만 준다.
+      - if: matrix.build-mode == 'manual'
+        run: ./gradlew classes testClasses -Pkotlin.daemon.jvmargs=-Xmx4g
+        working-directory: backend
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

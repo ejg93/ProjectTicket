@@ -92,11 +92,10 @@ class MockPaymentGateway {
     /** 시각을 앞에 둬서 재기동해도 안 겹친다 — 일련번호만 쓰면 다시 뜬 뒤 1번부터라 `payment_approval_number_key` 에 걸린다 */
     private fun issueApprovalNumber(): String = "M%d%04d".format(System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))
 
-    /** 하이픈과 공백은 사람이 읽으라고 넣은 것이라 걷어낸다. 길이는 ISO/IEC 7812 의 12~19 자리 */
+    /** 셈은 [CardNumbers] 가 든다. 여기 `require` 는 **우리 잘못을 잡는 그물**이다 — 입구가 이미 거른 값만 온다 */
     private fun digitsOf(cardNumber: String): String {
-        val digits = cardNumber.filter { it != ' ' && it != '-' }
-        require(digits.length in MIN_DIGITS..MAX_DIGITS && digits.all { it.isDigit() }) { "카드번호 형식이 아니다" }
-        return digits
+        require(CardNumbers.isWellShaped(cardNumber)) { "카드번호 형식이 아니다" }
+        return CardNumbers.digitsOf(cardNumber)
     }
 
     companion object {
@@ -107,8 +106,5 @@ class MockPaymentGateway {
         const val SILENT_LAST4 = "0001"
         const val DELAYED_LAST4 = "0002"
         const val DECLINE_REASON = "insufficient_funds"
-
-        private const val MIN_DIGITS = 12
-        private const val MAX_DIGITS = 19
     }
 }

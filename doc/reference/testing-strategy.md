@@ -12,7 +12,7 @@
 | 단위 | 순수 계산(수수료 구간, 순번→예상 대기) | 없음 | 없음 | 17·21 부터 |
 | 통합 | SQL, 제약·트리거, 스프링 배선, 응답 모양 | 컨테이너 DB | `PostgresTestBase` — 롤백 | 있다 |
 | **동시성** | **같은 좌석을 둘이 못 잡는다** | 컨테이너 DB, 커밋 | `ConcurrencyTestBase` — **롤백 없음**(12f) | 12f 부터 |
-| HTTP | 쿠키 왕복, 필터 순서, 실제 상태 코드 | 컨테이너 DB + 서블릿 | `HttpTestBase`(RANDOM_PORT) | 필요해질 때 |
+| HTTP | 쿠키 왕복, 필터 순서, 실제 상태 코드 | 컨테이너 DB + 서블릿 | 바탕이 없다 — `SharedSessionTest` 가 앱 둘을 직접 띄운다 | 33 부터 |
 | 화면 | 오류 `type` 에 따른 분기, 상태에 따른 표시 | jsdom | Vitest + Testing Library | 39 부터 |
 | E2E | 프록시·세션 쿠키·CSRF 가 실제로 오가나 | 브라우저 + 서버 둘 | Playwright | 42 부터 |
 
@@ -140,6 +140,8 @@ abstract class ConcurrencyTestBase
 
 `Thread.sleep` 으로 시간을 흘리지 않는다 — 5분을 기다릴 수 없고 5초로 줄이면 운영과 다른 값을 잰다.
 
+비동기가 끝나기를 **기다리는** 것은 다르다 — `Waits.until`·`Waits.value` 가 조건이 맞는 즉시 돌아온다. 고정 대기는 **없음을 재는 자리**에만 쓴다(`ConsumerIdempotencyTest` 의 `SETTLE_MS` — 둘째 행이 안 생기는 것은 기다려야만 보인다).
+
 ## 스냅샷 테스트 — 응답 계약
 
 좌석 현황(`D20`)처럼 **화면이 그대로 읽는 응답**은 형식을 파일로 굳힌다. 필드 하나가 빠지면 화면이 조용히 깨지는데 타입 검사가 못 잡는 자리다.
@@ -159,7 +161,8 @@ abstract class ConcurrencyTestBase
 |---|---|
 | `ErrorTypeScreenTest` | 화면이 분기하는 슬러그 ⊆ `ErrorCode` 의 슬러그 |
 | `ScreenLengthTest` | 화면 입력칸의 `maxLength` = 요청 `data class` 의 `@Size(max)` |
-| `StateMachineDocTest`(13) | 코드의 전이표 = `state-machines.md` 의 전이표 |
+| `StateMachineDocTest`(`I3-1`) | `state-machines.md` 의 전이표 = 전이 트리거가 허용하는 짝 |
+| `AppDbConstraintTest`(`I4-1`) | 요청 `data class` 의 제약 = 마이그레이션의 `check` (길이 셋·정규식 둘·`price >= 0`) |
 
 **대개 한쪽만 본다.** 화면이 쓰는 것이 서버에 있어야 하고 그 반대는 아니다.
 
@@ -171,7 +174,7 @@ abstract class ConcurrencyTestBase
 ## 알려진 구멍은 테스트로 고정한다
 
 지금 못 막는 것을 알면 **그 구멍이 열려 있음을 재는 테스트**를 둔다. 누가 고치면 그 테스트가 빨개져서 「고쳤다」가 기록된다.
-감사 트리거가 테이블 주인에게 무력한 것(`4a`)이 첫 후보다.
+감사 트리거가 테이블 주인에게 무력한 것(`4a`)이 첫 후보였는데 `V20` 이 역할에서 권한을 회수해 닫았다(`AuditRoleTest`). **지금 열어 둔 구멍은 없다** — 생기면 여기에 적는다.
 
 ## 커버리지
 

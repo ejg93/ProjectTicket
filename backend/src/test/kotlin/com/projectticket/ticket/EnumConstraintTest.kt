@@ -11,9 +11,7 @@ import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import com.projectticket.ticket.settlement.SettlementLineKind
 import com.projectticket.ticket.settlement.SettlementStatus
-import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.streams.asSequence
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
@@ -75,7 +73,7 @@ class EnumConstraintTest {
 
     /** 제약 이름 → 닫아 둔 값 집합. `drop` 을 반영해 **마지막 판만** 남긴다 */
     private fun liveConstraints(): Map<String, List<String>> = buildMap {
-        migrationsInOrder().forEach { sql ->
+        MigrationSql.inOrder(root).forEach { sql ->
             DROP.findAll(sql).forEach { remove(it.groupValues[1]) }
             CHECK_IN.findAll(sql).forEach { match ->
                 val values = VALUE.findAll(match.groupValues[2]).map { it.groupValues[1] }.toList()
@@ -84,24 +82,11 @@ class EnumConstraintTest {
         }
     }
 
-    /** `V2` 가 `V10` 보다 먼저다. 이름순으로 읽으면 `V10` 이 앞에 와서 `drop` 순서가 뒤집힌다 */
-    private fun migrationsInOrder(): List<String> =
-        Files.walk(root.resolve("backend/src/main/resources/db/migration")).use { paths ->
-            paths.asSequence()
-                .filter { it.fileName.toString().startsWith("V") && it.toString().endsWith(".sql") }
-                // `!!` 의 근거: 바로 위 filter 가 이름이 `V` 로 시작하는 것만 남겼고 마이그레이션 이름 규약이 `V<숫자>__` 다.
-                // 그 규약을 어긴 파일이 생기면 여기서 서는 것이 맞다 — 판 순서를 못 정하면 `drop` 반영이 뒤집힌다.
-                .sortedBy { VERSION.find(it.fileName.toString())!!.groupValues[1].toInt() }
-                .map(Files::readString)
-                .toList()
-        }
-
     private companion object {
         /** `constraint 이름 check (칸 in ('a', 'b'))`. `cancelled_by is null or …` 꼴도 받는다 */
         val CHECK_IN = Regex("""constraint\s+(\w+)\s+check\s*\(\s*(?:\w+\s+is\s+null\s+or\s+)?\w+\s+in\s*\(([^)]*)\)""")
         val DROP = Regex("""drop\s+constraint\s+(?:if\s+exists\s+)?(\w+)""")
         val VALUE = Regex("""'([^']*)'""")
-        val VERSION = Regex("""^V(\d+)""")
 
         /** 열거형이 거울인 제약. 새 열거형이 생기면 여기 행이 는다 */
         val MIRRORED: Map<String, List<String>> = mapOf(

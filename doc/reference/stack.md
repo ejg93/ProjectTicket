@@ -26,7 +26,10 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | ArchUnit | 1.5.0 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
-| Node | 22 | `.github/workflows/ci.yml`. 화면(39 뒤)이 쓴다 |
+| Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
+| Next | 16.3.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
+| React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
+| 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
 **버전을 물으면 이 표가 아니라 위 파일들을 본다.** 표가 낡을 수 있다 — `StackVersionConsistencyTest` 가 이 표와 파일을 대조해서 낡으면 빨개진다.
 
@@ -406,7 +409,16 @@ git update-index --chmod=+x backend/gradlew
 `eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
 Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
-### 화면 쪽 — 39 뒤에 걸린다
+### CodeQL 의 Kotlin 추출기는 컴파일러 안에서 돈다 — 데몬 힙이 같이 터진다
+
+`build-mode: manual` 로 `./gradlew classes testClasses` 를 돌리면 추출기가 별도 프로세스가 아니라
+**Kotlin 컴파일러 프로세스에 붙어서** 돈다. 기본 힙으로는 `compileKotlin` 이 10분을 쓰고
+`e: java.lang.OutOfMemoryError: GC overhead limit exceeded` 로 죽는다(run 35427637052).
+**같은 러너에서 `ci.yml` 의 `./gradlew build` 는 초록이라 코드 크기 문제가 아니다** — 추출기 몫이다.
+`codeql.yml` 의 그 step 에만 `-Pkotlin.daemon.jvmargs=-Xmx4g` 를 준다. `gradle.properties` 로 내리면
+안 죽는 레인의 메모리까지 같이 바꾼다.
+
+### 화면 쪽
 
 | 자리 | 사실 |
 |---|---|
@@ -416,6 +428,9 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | `npm run dev` | 죽여도 3000 을 쥔 node 가 남고 낡은 서버가 답한다. HMR 이 새 코드를 도는 것처럼 보이게 한다 |
 | `vitest-axe` | 정식 판이 없고 vitest 최신과 안 붙는다. `axe-core` 를 직접 쓴다 |
 | 브라우저로 밟기 | Puppeteer 가 사용자 홈(`C:\Users\EJG\node_modules\puppeteer`)에 있다. 저장소에 안 넣는다. 경로는 `file://` URL 로 준다 — POSIX 경로를 그대로 넘기면 Node 가 `C:\c\Users\…` 로 읽는다 |
+| `rewrites()` | **`next build` 때 굳는다.** `next.config.ts` 가 읽은 `BACKEND_ORIGIN` 이 `routes-manifest.json` 에 박혀서 시작할 때 주는 env 로는 안 바뀐다 — 다른 주소를 보게 하려면 그 값을 주고 **다시 빌드**한다(`39` 실측: 8080 이 박힌 채로 8081 을 줘서 프록시가 500 이었다) |
+| 비밀번호 블록리스트 | 가입을 손으로 밟을 때 `password` 가 든 문자열은 15자를 넘겨도 막힌다(`PasswordBlocklist`). 400 이 `validation-failed` 로 나온다 |
+| Puppeteer 진입점 | `lib/puppeteer/puppeteer.js` 다. `lib/esm/...` 은 없다 |
 | 접근성 헛것 | 이름 없는 `<input>` 은 `page.accessibility.snapshot()` 으로 브라우저에게 묻고, `<nextjs-portal>`(개발 오버레이)은 걷어낸다 — 판정을 뒤집기 전에 재는 도구부터 의심한다 |
 
 ## 데이터 접근은 `JdbcClient` 다
@@ -440,7 +455,6 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 | 대상 | 언제 |
 |---|---|
-| Next.js 버전·패키지 매니저 | 39 |
 | Redisson(스케줄러 락·좌석 락) | 33, ADR 0003. Lettuce 는 `20a` 가 스타터로 들였다 |
 | 품질 게이트 도구(detekt·CodeQL·SpotBugs) | `P10`(46·47). ProjectShop 의 SpotBugs·find-sec-bugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봤다 — 그 판단은 그때 다시 |
 | Kafka | 28, ADR 0007 |
