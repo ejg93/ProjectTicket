@@ -131,6 +131,7 @@ tasks.test {
 		rootProject.file("../doc/reference/observability-rules.md"),
 		rootProject.file("../doc/reference/stack.md"),
 		rootProject.file("../doc/reference/event-catalog.md"),
+		rootProject.file("../.github/workflows/ci.yml"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

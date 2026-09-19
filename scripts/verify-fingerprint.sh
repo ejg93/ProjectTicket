@@ -19,8 +19,8 @@ lane() {
 #
 # `Dockerfile`·compose·nginx conf 는 `ComposeContractTest`(35)가 글자로 읽는다. 여기 없으면
 # 그 셋만 고친 커밋에서 도장이 안 바뀌고, 35 가 찾은 결함 둘을 막는 검사가 안 돈다.
-# `doc/reference/` 셋도 같은 이유다 — `ErrorContractTest`·`MetricNamesTest`·`StackVersionConsistencyTest` 가 글자로 읽는다(점검 2차).
-lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md
+# `doc/reference/` 넷과 `.github/workflows/ci.yml` 도 같은 이유다 — `ErrorContractTest`·`MetricNamesTest`·`EventCatalogTest`·`StackVersionConsistencyTest` 가 글자로 읽는다(점검 2차·3차).
+lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md .github/workflows/ci.yml
 lane frontend frontend/src frontend/e2e frontend/package.json frontend/package-lock.json frontend/tsconfig.json \
               frontend/next.config.ts frontend/eslint.config.mjs frontend/vitest.config.ts frontend/vitest.setup.ts \
               frontend/playwright.config.ts frontend/postcss.config.mjs
