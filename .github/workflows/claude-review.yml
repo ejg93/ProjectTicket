@@ -23,7 +23,7 @@ jobs:
     # 마무리가 청크 여럿을 한 PR 에 담는다. ProjectShop 실측이 청크당 약 2분이었다.
     timeout-minutes: 30
     permissions:
-      # 읽기만 준다(`D14`). 리뷰는 코멘트만 달고 코드를 안 고친다.
+      # `contents` 는 읽기만 준다(`D14`) — 리뷰는 코멘트만 달고 코드를 안 고친다. 아래 셋은 코멘트와 OIDC 에 필요한 쓰기다.
       contents: read
       pull-requests: write
       issues: write

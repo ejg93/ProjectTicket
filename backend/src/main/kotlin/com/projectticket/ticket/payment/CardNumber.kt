@@ -43,6 +43,8 @@ object CardNumbers {
 
     fun isWellShaped(cardNumber: String): Boolean {
         val digits = digitsOf(cardNumber)
-        return digits.length in MIN_DIGITS..MAX_DIGITS && digits.all { it.isDigit() }
+        // **ASCII 만이다.** `Char.isDigit()` 은 유니코드 Nd 를 전부 받아서 아라비아-인도 숫자가 통과하고,
+        // 그 값은 `card_last4` 가 되어 `payment_card_last4_format_check`(`^[0-9]{4}$`)에 걸린다 — 400 이 500 이 된다.
+        return digits.length in MIN_DIGITS..MAX_DIGITS && digits.all { it in '0'..'9' }
     }
 }

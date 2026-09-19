@@ -30,6 +30,8 @@ class CardNumberTest {
             "12345678901234567890",
             // 숫자·구분자가 아닌 것
             "4242-4242-4242-424a",
+            // 비ASCII 숫자. `Char.isDigit()` 가 유니코드 Nd 를 전부 받아서 새던 자리다(마무리 8차 독립 리뷰)
+            "٤٢٤٢٤٢٤٢٤٢٤٢٤٢٤٢",
         ],
     )
     fun a_card_number_outside_the_standard_is_rejected(cardNumber: String) {

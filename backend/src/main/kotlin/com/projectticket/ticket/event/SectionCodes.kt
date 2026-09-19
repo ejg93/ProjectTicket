@@ -14,7 +14,8 @@ import kotlin.reflect.KClass
  * 그때 잘못된 이름은 앱을 지나 `seat_grade_map_section_format_check`(`V5`)에 걸리고,
  * 제약 위반은 마지막 그물이 받아 **400 이어야 할 것이 500 으로** 나간다.
  *
- * 형식의 출처는 `V4`·`V5` 의 check 다. **여기 정규식이 그쪽과 갈리면 이 검증만 느슨해진다** — 대조는 `I4-1` 이 세운다.
+ * 형식을 **막는** 자리는 `V4`·`V5` 의 check 다(강제 지점 2위). 글자의 출처는 아래 [SectionCodesValidator] 의 `FORMAT_REGEX` 고,
+ * 둘이 갈리면 이 검증만 느슨해져 400 이 500 이 된다 — `AppDbConstraintTest` 가 그 둘을 맞춘다.
  */
 @Constraint(validatedBy = [SectionCodesValidator::class])
 @Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.PROPERTY)
@@ -31,7 +32,7 @@ class SectionCodesValidator : ConstraintValidator<SectionCodes, List<String>> {
     override fun isValid(value: List<String>?, context: ConstraintValidatorContext): Boolean =
         value == null || value.all { FORMAT.matches(it) }
 
-    /** 형식의 유일한 출처. `V4`·`V5` 의 check 와 같아야 한다 — `AppDbConstraintTest` 가 잰다 */
+    /** 글자의 출처. `V4`·`V5` 의 check 와 같아야 한다 — `AppDbConstraintTest` 가 잰다 */
     companion object {
         const val FORMAT_REGEX = "^F[0-9]+-[A-Z]$"
         private val FORMAT = Regex(FORMAT_REGEX)

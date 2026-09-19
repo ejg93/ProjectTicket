@@ -69,7 +69,7 @@ class OrganizerEventController(
         return OpenedPerformance(performanceId, openService.open(performanceId, user.id))
     }
 
-    /** 등급은 공연 단위다(ADR 0003). 구역 형식은 `seat_section_format_check`(`V4`)가 든다 — 여기 정규식은 그 사본이 아니라 입구의 1차 거름이다 */
+    /** 등급은 공연 단위다(ADR 0003). 구역 형식은 `V4`·`V5` 의 check 가 들고 입구는 [SectionCodes] 가 **같은 글자로** 든다 — 갈리면 `AppDbConstraintTest` 가 빨개진다 */
     data class GradeRequest(
         @field:NotBlank @field:Pattern(regexp = "^[A-Z][A-Z0-9]{0,9}$") val code: String,
         @field:NotNull @field:PositiveOrZero val price: Int,
