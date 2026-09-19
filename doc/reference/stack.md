@@ -406,6 +406,15 @@ git update-index --chmod=+x backend/gradlew
 `eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
 Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
+### CodeQL 의 Kotlin 추출기는 컴파일러 안에서 돈다 — 데몬 힙이 같이 터진다
+
+`build-mode: manual` 로 `./gradlew classes testClasses` 를 돌리면 추출기가 별도 프로세스가 아니라
+**Kotlin 컴파일러 프로세스에 붙어서** 돈다. 기본 힙으로는 `compileKotlin` 이 10분을 쓰고
+`e: java.lang.OutOfMemoryError: GC overhead limit exceeded` 로 죽는다(run 35427637052).
+**같은 러너에서 `ci.yml` 의 `./gradlew build` 는 초록이라 코드 크기 문제가 아니다** — 추출기 몫이다.
+`codeql.yml` 의 그 step 에만 `-Pkotlin.daemon.jvmargs=-Xmx4g` 를 준다. `gradle.properties` 로 내리면
+안 죽는 레인의 메모리까지 같이 바꾼다.
+
 ### 화면 쪽 — 39 뒤에 걸린다
 
 | 자리 | 사실 |

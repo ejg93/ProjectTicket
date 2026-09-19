@@ -74,8 +74,14 @@ jobs:
 
       # **컴파일까지만이다.** 테스트는 `ci.yml` 이 돈다 — 여기서 또 돌리면 같은 것을 두 번 하고
       # CodeQL 이 보는 것은 바이트코드라 테스트를 돌릴 이유가 없다.
+      #
+      # **힙을 키우는 것은 이 레인만이다**(`46a-1`). CodeQL 의 Kotlin 추출기는 별도 프로세스가 아니라
+      # **컴파일러 안에 붙어서** 돌아 같은 데몬의 힙을 같이 쓴다 — 기본값으로는 `compileKotlin` 이
+      # `GC overhead limit exceeded` 로 10분 만에 죽었다(run 35427637052). 같은 러너에서 `ci.yml` 의
+      # `./gradlew build` 는 초록이라 **코드가 무거운 것이 아니다.** 그래서 `gradle.properties` 로
+      # 저장소 전체에 걸지 않고 죽는 레인에만 준다.
       - if: matrix.build-mode == 'manual'
-        run: ./gradlew classes testClasses
+        run: ./gradlew classes testClasses -Pkotlin.daemon.jvmargs=-Xmx4g
         working-directory: backend
 
       - uses: github/codeql-action/analyze@v4
