@@ -2,13 +2,13 @@
 
 ## 현재 상태
 
-**대상**: 공연 예매 시스템 (Kotlin + Spring Boot 4 + Next.js, 로컬 전용). **가지**: `work/2026-09-19`
+**대상**: 공연 예매 시스템 (Kotlin + Spring Boot 4 + Next.js, 로컬 전용). **가지**: `work/2026-09-19-b`
 
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
 | 진행중 청크 | 없음 | |
 | 다음 첫 손 | 화면이 `39`~`42` 로 예매 흐름까지 이어졌고 `P10`·`P9` 로 **기준 문서 21개가 전부 닫혔다**. **다음은 `40c`** — 회차 등록 201 의 `Location` 이 가리키는 `GET /api/performances/{id}` 가 없어 404 다(표준 위반이라 1순위). 그다음 `39-1`·`39-2`·`41-1`·`46c`, 화면 `43`~`45`. 배포(`36`~`38`·`48`)·`46b` 는 **설치 승인이 먼저**(kind·helm·k6·Playwright) | `PLAN.md` 8장 |
-| PR | `#20` 머지됨(`014cf24`, 청크 열여섯). 이 가지에는 `P10`·`P9` | |
+| PR | `#21` 머지됨(`e59bc1f`, `P10`·`P9`). **필수 검사 일곱이 push 실행으로 채워지는 것을 그 PR 이 실측했다** — `codeql.yml` 은 `pull_request:` 를 안 켰는데 `CLEAN` 이었다. 이 가지는 비었다 | |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
 | GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(**일곱 잡 필수** — CI 넷 + CodeQL 셋, `P10`). 그 뒤로는 `work/<날짜>` + PR | |
