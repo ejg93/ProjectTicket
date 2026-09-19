@@ -187,7 +187,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 39 | frontend 골격 포팅 | ProjectShop Next.js 뼈대·`api.ts`·login/signup/me. **축**: `D16`. **강제 지점**: `tsc`·lint. **건드리는 자리**: 신설 `frontend/`. **여기서 CodeQL 의 `javascript-typescript` 를 켠다**(`46a` 가 자리를 비워 뒀다). **닫힘**: `npm run build` 초록 + 로그인 e2e | 3 |
+| 39 | frontend 골격 포팅 | ProjectShop Next.js 뼈대·`api.ts`·login/signup/me. **축**: `D16`. **강제 지점**: `tsc`·lint. **건드리는 자리**: 신설 `frontend/`. **여기서 CodeQL 의 `javascript-typescript` 를 켠다**(`46a` 가 자리를 비워 뒀다). **닫힘**: `npm run build` 초록 + 로그인 e2e — 완료(`frontend/` 신설: Next 16.3.5·React 19.3.0·npm, `api.ts` 입구 셋, `api-session.ts` 가 세션 운반을 혼자 든다, login·signup·me. **표기 변환 층을 안 가져왔다** — 이식 원본은 카멜로 바꾸는데 `D5` 가 「화면은 받은 그대로 snake_case 로 읽는다」로 정했다. **강제 지점 셋**: eslint 가 `fetch`·`next/headers` 를 입구 밖에서 막고, `screen-text.test.ts` 가 화면 문구의 반말을 막고, `StackVersionConsistencyTest` 가 버전표와 `package.json` 을 대조한다. e2e 는 Puppeteer 로 가입→로그인→`/me` 를 실제로 밟았다 — 저장소에 안 넣는다(`46b` 가 Playwright 잡을 세운다). CodeQL `javascript-typescript` 를 켰다) | 완료 |
 | 40 | 공연 목록·상세 | 서버 컴포넌트. **축**: `D16`·`D17`. **강제 지점**: 스냅샷. **건드리는 자리**: `frontend/src/app/events`. **닫힘**: `events.test.tsx` | 39·11 |
 | 41 | 좌석도 | 구역·열·번호를 SVG/캔버스로, 상태 색, 선택 N개. **축**: `D17`·접근성(WCAG 색 대비·키보드). **강제 지점**: axe 테스트. **건드리는 자리**: `frontend/src/components/SeatMap`. **닫힘**: `seat-map.test.tsx` | 40·10 |
 | 42 | 예매·결제 흐름 | 선점 → 5분 카운트다운 → 모의 결제 → 발권 확인. **축**: `D17`. **강제 지점**: e2e. **건드리는 자리**: `app/reserve`·`app/checkout`. **닫힘**: `reserve.spec.ts` | 41·18 |

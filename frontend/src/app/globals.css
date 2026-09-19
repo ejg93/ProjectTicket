@@ -1,0 +1,75 @@
+/*
+ * 화면 전체가 쓰는 최소한의 값. **디자인을 여기서 정하지 않는다** — 색·간격 체계는 `D17` 이 정하고
+ * 그 청크(`P9`)가 아직 안 열렸다. 지금 필요한 것은 읽을 수 있는 기본값뿐이다.
+ */
+
+:root {
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-muted: #5c5c5c;
+  --border: #d4d4d4;
+  --accent: #1f4ed8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+label {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  font: inherit;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+  background: var(--accent);
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+a {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.error {
+  border: 1px solid #b42318;
+  border-radius: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  color: #b42318;
+}

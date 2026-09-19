@@ -59,6 +59,19 @@ class StackVersionConsistencyTest {
         assertThat(ci).contains("node-version: '${tableVersion("Node")}'")
     }
 
+    @Test
+    fun frontend_versions_match_package_json() {
+        val pkg = Files.readString(root.resolve("frontend/package.json"))
+
+        // **정확한 판으로 박는다**(`^` 없이). 화면은 프레임워크 판이 바뀌면 캐시 기본값과 API 가 갈려서,
+        // 표가 든 수와 실물이 다르면 `frontend-rules.md` 의 캐시 절을 낡은 근거 위에서 읽게 된다.
+        listOf("Next" to "next", "React" to "react").forEach { (subject, dependency) ->
+            assertThat(pkg)
+                .describedAs("`stack.md` 의 「$subject」 행과 `frontend/package.json` 이 갈렸다")
+                .contains("\"$dependency\": \"${tableVersion(subject)}\"")
+        }
+    }
+
     /** 버전표의 한 행 — `| 대상 | 버전 | …` 에서 둘째 칸 */
     private fun tableVersion(subject: String): String {
         val row = stack.lineSequence().firstOrNull { it.startsWith("| $subject |") }

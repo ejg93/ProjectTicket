@@ -49,7 +49,10 @@ jobs:
           # 으로 죽는다. 그래서 여기만 **`manual`** 이다 — 아래 step 이 컴파일까지만 돌린다(테스트는 `ci.yml` 몫).
           - language: java-kotlin
             build-mode: manual
-          # 화면(`39`)이 생기면 `javascript-typescript` 를 더한다. 지금 켜면 볼 코드가 없다.
+          # 화면이 생겨서 켰다(`39`). **`none` 으로 읽는다** — TypeScript 는 빌드 없이 소스를 훑고,
+          # `next build` 를 여기서 또 돌리면 `ci.yml` 이 하는 일을 두 번 한다.
+          - language: javascript-typescript
+            build-mode: none
     steps:
       - uses: actions/checkout@v7
 
