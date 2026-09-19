@@ -45,7 +45,7 @@ Redis 는 대기열과 캐시고, 좌석을 확정하지 않는다.
 | `32` = `D13` 성능 목표 | `31` 뒤 |
 | `34` → **ADR 0008 완료**(조건부 UPDATE 유지. Redisson 대신 우리 Redis 락으로 쟀고 비율은 안 뒤집혔다) | `33` 뒤 |
 | `P9` `D16`·`D17` 화면 규약 | `41` 뒤 |
-| `P10` `D18` 품질 게이트 | `46`·`47` 뒤 |
+| `P10` `D18` 품질 게이트 | `46a`·`47` 뒤 |
 | `/inspection` | 묶음 서너 개마다 |
 | `/wrapup` 의 독립 리뷰 처분 | 묶음마다 — 리뷰 에이전트 결과를 읽고 처분하는 판단 |
 
@@ -71,11 +71,11 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 | D11 | `event-catalog.md` | 봉투·카탈로그 넷·버전·발행·소비·알림 규약 | 완료(Fable, 선행을 `18` 로 — 근거는 13~18 의 사건) |
 | D12 | `queue-design.md` | 대기열 자료구조, 입장 속도·정원 등식, 토큰, 관문 범위, 이탈 | 완료(12c) |
 | D13 | `performance-goals.md` | 응답 시간·처리량 목표, 측정 방법 | 완료(`32`) — `31`·`35` 의 부하가 근거. 목표가 **모양별**이다(한 대 / 같은 기계에 셋) |
-| D14 | `coding-rules.md` | 계층·예외·트랜잭션·SQL·테스트. **Kotlin 으로** | 이식됨 → `P1` |
-| D15 | `naming-rules.md` | DB·Kotlin 식별자 | 이식됨 → `P2` |
+| D14 | `coding-rules.md` | 계층·예외·트랜잭션·SQL·테스트. **Kotlin 으로** | 완료(`6`) |
+| D15 | `naming-rules.md` | DB·Kotlin 식별자 | 완료(`6`) |
 | D16 **[Fable]** | `frontend-rules.md` | 서버·클라이언트 경계, `api.ts` | 이식됨 → `P9` |
 | D17 **[Fable]** | `screen-rules.md` | 화면 문구·권한 없는 버튼·오류 표시 | 이식됨 → `P9` |
-| D18 **[Fable]** | `quality-gates.md` | 게이트 목록과 문턱, 리뷰 지적 처분 | 이식됨 → `P10` |
+| D18 **[Fable]** | `quality-gates.md` | 게이트 목록과 문턱, 리뷰 지적 처분 | 완료(`P10a`) — 머리말은 `P10` 이 지운다 |
 | D19 | `stack.md` | 버전, 공식 문서, 기억으로 쓰면 틀리는 자리 | 완료(P11) |
 | D20 | `seat-read-model.md` | 좌석 현황 계약, 버전·스냅샷·델타, ETag | 완료(12d) |
 | D21 | `settlement-rules.md` | **정책 표 + 명세 항목.** 회차당 정산서 하나, 종료 뒤 D+7, 불변식 셋 | 완료 |
@@ -199,14 +199,15 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 
 | # | 청크 | 무엇을 하나 | 선행 |
 |---|---|---|---|
-| 46 | codeql·claude-review·e2e 워크플로 | ProjectShop 셋 이식. Kotlin 은 CodeQL `java-kotlin`. **축**: `D18`. **강제 지점**: CI. **건드리는 자리**: `.github/workflows/`. **닫힘**: 세 잡 초록 | 2·39 |
+| 46a | codeql·claude-review 워크플로 | ProjectShop 둘 이식. Kotlin 은 CodeQL `java-kotlin`. **선행을 `39` 에서 뗐다**(점검 6차) — 화면과 무관한데 `46` 한 행에 묶여 있어서 **보안 게이트가 화면을 기다리고 있었다**. **축**: `D18`. **강제 지점**: CI. **건드리는 자리**: `.github/workflows/`. **닫힘**: 두 잡 초록 + `D18` 게이트 표에 행 | 2 |
+| 46b | e2e 워크플로 | Playwright 잡. 화면이 있어야 돌 것이 있다. **축**: `D18`·`D8`. **강제 지점**: CI. **건드리는 자리**: `.github/workflows/`. **닫힘**: 잡 초록 | 42 |
 | 47 | detekt | 완료 — `dev.detekt` 2.0.0-alpha.6(1.23 은 JDK 25 에서 안 돈다, `stack.md`), `backend/config/detekt/detekt.yml`, `check` 에 붙어 CI 가 같이 돈다. 첫 측정 262건 → 문턱 다섯을 근거와 함께 올리고 규칙 하나를 끄고(우리 예외 규약과 충돌) 나머지 열하나를 고쳤다. 곁가지로 `observability/Elapsed.kt`. `D18` 에 게이트·문턱·처분 행 | 완료 |
 | P3 | `api-guidelines.md` 이식 | 완료 — 실물 기준 재작성. 경로 표 22줄, 오류 `type` 계약 30개(새 것 17), 열거값 소문자(DB 와 한 단어). 선점은 `/api/performances/{id}/reservations` — 관문이 회차 id 를 경로에서 읽는다 | 완료 |
 | P4 | `testing-strategy.md` 이식 | 완료 — 실물 기준 재작성. 레인 셋(`measure` 는 `build` 밖), `ConcurrencyTestBase` 규칙 다섯, 「승자 하나」를 응답·DB 넷으로, 정렬 지운 대조 테스트, 만료 테스트는 지난 행을 직접 넣는다 | 완료 |
 | P7 | `time-rules.md` 이식 | 완료 — 실물 기준 재작성. **시계는 DB**(`now()`), 관람일 N일 전 = KST 달력일 차(`at time zone` 없으면 0~9시 취소가 전날로), 박제 표 다섯 | 완료 |
 | P8 | `security-baseline.md`·`observability-rules.md` 이식 | 완료 — 실물 기준 재작성. 선행을 23 으로 뒀었지만 근거(3·4·5·D12)가 이미 있었다. 보안: 정지 계정 타이밍, 세션 재생성, 프록시 IP 미설정(33 이 켠다), 트리거 한계(4a). 관측: 지표 이름 표 10개 | 완료 |
 | P9 **[Fable]** | `frontend-rules.md`·`screen-rules.md` 이식 | 예매·좌석도 화면 규약. **축**: 규약 + WCAG. **강제 지점**: lint 접근성 규칙. **건드리는 자리**: 두 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 41 |
-| P10 **[Fable]** | `quality-gates.md` 이식 | detekt·CodeQL Kotlin. **축**: 규약. **강제 지점**: CI 잡 목록이 문서와 같다. **건드리는 자리**: 그 문서. **닫힘**: `doc-lint.sh` 통과 + 머리말 없음 | 46·47 |
+| P10 **[Fable]** | `quality-gates.md` 머리말·CodeQL 행 | `P10a` 가 게이트 표를 실물로 다시 썼고 **이식 머리말과 CodeQL 행이 남았다**(점검 6차 — 겹치던 자리를 여기로 좁혔다). **축**: 규약. **강제 지점**: CI 잡 목록이 문서와 같다. **건드리는 자리**: 그 문서. **닫힘**: 머리말이 없고 표의 CodeQL 행이 실재하는 잡을 가리킨다 | 46a·47 |
 | P11 | `stack.md`·`identifier-rules.md`·`external-references.md` 이식 | 완료 — 셋 다 머리말 없이 재작성. `stack.md`: 버전표를 실물(Boot 4.1.1·Kotlin 2.3.21·JDK 25·Gradle 9.7.1·PG 17·Redis 7·Testcontainers 2.0.5·ArchUnit 1.5.0·Node 22)로, 쇼핑 전용 절(카트·셀러·SpotBugs·find-sec-bugs·claude-code-action·support)을 지우고 이 저장소가 밟은 사실(on conflict·부분 유일 인덱스·query 별칭·measure up-to-date)을 더했다. `identifier-rules.md`: 노출 번호는 티켓만, 나머지는 내부 id + 404. `external-references.md`: D 번호를 이 저장소 것으로. 닫힘: `StackVersionConsistencyTest`(빠른 레인, 표 ↔ 빌드·wrapper·compose·CI) 초록 | 완료 |
 | I1 | 점검 1차 · 세로 제약 | 완료 — 이름 붙은 제약·트리거·인덱스 108. 트리거 20 중 테스트가 치는 것 19 → `seat_grade_event_frozen` 테스트 추가. 한 행 안 check 43 은 `D14` 대로 안 잰다. 도메인 불변식인 유일 셋(`performance_seat_key`·`reservation_seat_key`·`refund_payment_id_key`)에 직접 치는 테스트 추가. 지연 트리거 셋은 전부 커밋 레인에서 돈다. 누락 둘 → `13a`. 판정 근거는 이력 | 완료 |
 | I2 | 점검 2차 · 가로 규약 | 완료 — `D1`~`D21` 중 검증 가능한 결정을 코드와 대조했다. **맞은 것**(근거를 남겨 다시 안 재게): `D3` 전이표 = `V19` 트리거, `D6` 구간표 = `V10` 시드 넷, `D11` 카탈로그 = `EventType`(안 내는 것도 적혀 있다), `D12` 숫자(C 2,000·M 100·R 20/초·TTL 10분) = `AdmissionService` 상수, `D20` ETag·304 = `SeatController`, `D21` `payout_delay_days` = `SettlementPolicyQuery`, `D2` 아웃박스 7일 = `OutboxCleaner`. **지금 고침 2**: `D5` 계약표에 `account-not-found` 추가 + `ErrorContractTest` 신설(슬러그·상태 양방향), `D9` 무차별 대입 숫자(10분/10분 → 실물 이메일+IP 5회·15분 키 하나). **입력 구멍도 같이 막았다** — 문서를 글자로 읽는 테스트 셋이 있는데 그 문서가 Gradle 입력도 레인 지문도 아니라 문서만 고친 커밋에서 안 돌았다. **신규 청크 셋**: `13b`·`I2-1`·`P10a`. 판정 근거는 이력 | 완료 |
@@ -220,6 +221,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 | I4-1 | 앱 검증과 DB 제약 대조 | 같은 규칙을 **두 벌** 든다 — 길이 셋(displayName 50·title 200·email 254)·정규식 둘(등급 코드·구역)·`price >= 0`. 값 목록은 `I2-1` 이 닫았는데 **길이와 정규식은 아무도 안 잰다**(점검 4차). 갈리면 느슨해진 쪽을 지난 요청이 DB 제약에 걸려 400 대신 500 으로 나간다 — 구역 제약이 실제로 그 모양이었다. **축**: `D14` 강제 지점 + `D5`. **강제 지점**: 테스트(요청 `data class` 의 제약을 리플렉션으로 읽어 마이그레이션의 check 와 맞춘다). **건드리는 자리**: 신설 `AppDbConstraintTest`. **닫힘**: 한쪽 숫자·정규식을 바꾸면 빨개진다 — 완료(`AppDbConstraintTest`. 길이 셋은 애너테이션의 `max` 와 `check` 의 상한을 숫자로 맞추고, 정규식 둘은 글자로 맞춘다(구역은 `seat`·`seat_grade_map` 두 표라 셋을 잰다). `price` 만 모양이 다르다 — 앱은 `@PositiveOrZero` 라 값이 없어서 **있음과 `>= 0` 을 따로 본다**. **예보와 달랐던 것**: 구역 형식은 애너테이션에 없고 검증기 안 상수라 `SectionCodesValidator.FORMAT_REGEX` 로 공개했다. `check (…)` 안쪽은 괄호 짝을 세어 떼낸다 — `length(title) between 1 and 200` 처럼 안에 괄호가 또 있다. 이메일은 앱이 글자·DB 가 옥텟이라 **숫자만** 맞춘다) | 완료 |
 | I5 | 점검 5차 · 가로 표준 | 완료 — `external-references.md` 의 인용에서 코드로 내려가며 「이 요건이 어디에 박혔나」를 물었다. **박혀 있던 것**(근거를 남겨 다시 안 재게): RFC 9457 의 `application/problem+json` 은 MVC 경로(`ProblemDetailTest`)와 필터 경로(`ProblemWriter`) 둘 다, RFC 9110 의 401 챌린지는 진입점과 핸들러 두 자리가 같은 값, RFC 9562 UUIDv4 는 `IdempotencyKeys` 가 변종 자리(`[89ab]`)까지 본다, RFC 5321 254 옥텟은 DB 가 `octet_length` 로 재고 `I4-1` 이 앱과 맞춘다, NIST 15자·블록리스트는 `Password`·`PasswordBlocklist`, 조합 강제는 없다(SHALL NOT), W3C `traceparent` 는 5 가 `w3c` 로 맞췄다, Zalando snake_case 는 핸들러가 필드 이름을 바꾼다. **지금 고침 1**: ISO/IEC 7812 의 12~19 자리가 **입구에 없었다** — `@Pattern` 이 가운데를 구분자로 채우게 둬서 `1 - - - - - - - - - -2`(두 자리)가 통과했고(검증기로 확인), 게이트웨이의 `require` 가 `IllegalArgumentException` 을 던져 400 이 아니라 500 으로 나갔다. `@CardNumber`+`CardNumbers` 로 셈을 한 자리에 두고 `CardNumberTest` 를 세웠다. **문서 고침 1**: CloudEvents 행이 「25 가 정한다」로 미정인데 `event-catalog.md` 가 안 쓰기로 닫았다. **신규 청크 1**: `I5-1`. 판정 근거는 이력 | 완료 |
 | I5-1 | 바깥 근거 다시 열기 | `external-references.md` 의 링크를 **2026-08 에 ProjectShop 에서 연 것이 마지막**이고 `P11` 도 다시 안 열었다. 회사 문서(Zalando·Stripe·Spring·OWASP)는 갱신되고 Testcontainers 이슈 둘은 닫혔을 수 있다 — 낡은 근거는 **틀린 줄 모르고 인용된다**. 축이 아니라 「바깥 근거」 단위다(점검 5차). **축**: 표준·관례. **강제 지점**: 없다 — 문서의 확인 이력이 전부다. **건드리는 자리**: `doc/reference/external-references.md`. **닫힘**: 링크마다 열린다·닫혔다·옮겼다 중 하나가 적히고 확인일이 선다 | — |
+| I6 | 점검 6차 · 계획 자체 | 완료 — 분할표 105행과 기준 문서 21행을 실물과 맞췄다. **낡은 것 셋**: `D14`·`D15` 가 `이식됨 → P1`·`P2` 인데 **그 행이 분할표에 없다** — `6` 이 흡수했다(`PLAN` 의 `6` 행·이력 둘 다 그렇게 적혀 있다). `D18` 은 `P10a` 가 닫았는데 `이식됨 → P10` 이었다. `PROGRESS` 의 기준 문서 행이 `20개` 로 세고 있었다(실제 21). **겹친 것 하나**: `P10` 이 아직 「이식」인데 `P10a` 가 표를 다시 썼다 — 남은 것이 머리말과 CodeQL 행뿐이라 설명을 거기로 좁혔다. **쪼갠 것 하나**: `46`(codeql·claude-review·e2e)의 선행이 `2·39` 라 **CodeQL·claude-review 가 화면을 기다리고 있었다.** 사용자가 화면을 미뤄서 무기한이다 — `46a`(선행 `2`)·`46b`(선행 `42`)로 갈랐고 `P10` 의 선행도 `46a` 로 옮겼다. 판정 근거는 이력 | 완료 |
 | 48 | Railway 배포(선택) | 사용자가 켜면. **축**: 관례. **강제 지점**: 없다. **건드리는 자리**: `Dockerfile`·env. **닫힘**: 공개 URL 의 `/api/health` 200 | 38 |
 
 ## 안 만드는 입구
