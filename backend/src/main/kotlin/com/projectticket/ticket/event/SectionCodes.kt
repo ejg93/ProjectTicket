@@ -31,7 +31,9 @@ class SectionCodesValidator : ConstraintValidator<SectionCodes, List<String>> {
     override fun isValid(value: List<String>?, context: ConstraintValidatorContext): Boolean =
         value == null || value.all { FORMAT.matches(it) }
 
-    private companion object {
-        val FORMAT = Regex("^F[0-9]+-[A-Z]$")
+    /** 형식의 유일한 출처. `V4`·`V5` 의 check 와 같아야 한다 — `AppDbConstraintTest` 가 잰다 */
+    companion object {
+        const val FORMAT_REGEX = "^F[0-9]+-[A-Z]$"
+        private val FORMAT = Regex(FORMAT_REGEX)
     }
 }
