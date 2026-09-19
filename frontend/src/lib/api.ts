@@ -109,7 +109,10 @@ export async function api<T>(
   //
   // 서버 컴포넌트 쪽은 `api-session.ts` 가 같은 일을 한다. 층이 둘이라 두 군데인 것이지 규칙이 둘인 것이 아니다.
   if (response.status === 401 && !path.startsWith("/api/auth/")) {
-    window.location.replace("/login?reason=session-expired");
+    // **「만료됐다」고 말하지 않는다.** 세션 쿠키가 HttpOnly 라 여기서는 **로그인한 적이 있었는지를 모른다** —
+    // 한 번도 로그인 안 한 사람에게 만료를 말하면 사실이 아닌 것을 말하는 것이다(`D17`).
+    // 둘을 가르는 것은 쿠키를 읽을 수 있는 `api-session.ts` 쪽이고, 이쪽은 둘 다 참인 문구를 쓴다.
+    window.location.replace("/login?reason=login-required");
     // 이동이 시작돼도 이 함수는 계속 돈다. 여기서 안 끊으면 부르는 쪽이 오류 문구를 띄우고,
     // 사용자는 로그인 화면으로 넘어가기 직전에 그것을 본다.
     await new Promise(() => {});

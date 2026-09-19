@@ -86,6 +86,18 @@ class EventListTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_huge_page_number_does_not_overflow() {
+        openedPerformance()
+
+        // `page * size` 가 `Int` 에서 넘치면 음수 `offset` 이 되고 Postgres 가 선다 —
+        // **로그인 없이 부르는 목록에서 클라이언트가 고르는 값으로 500 이 난다**(마무리 9차 독립 리뷰).
+        mockMvc.get("/api/events?page=2000000000").andExpect {
+            status { isOk() }
+            jsonPath("$.items") { isEmpty() }
+        }
+    }
+
+    @Test
     fun an_unknown_sort_field_is_rejected() {
         // 정렬 필드는 값이 아니라 식별자라 SQL 에 글자로 박힌다. 허용 목록 밖은 400 이다(`D5`·`D14` 「SQL」).
         mockMvc.get("/api/events?sort=price,asc").andExpect {

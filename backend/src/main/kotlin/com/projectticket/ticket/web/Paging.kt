@@ -13,8 +13,14 @@ import com.projectticket.ticket.error.TicketException
  */
 class Paging(page: Int = 0, size: Int = DEFAULT_SIZE, val sort: String? = null) {
 
-    /** 음수 페이지는 0 이다. 400 으로 세우지 않는 이유는 **주소를 손으로 고친 사람**이 보는 값이라서다 */
-    val page: Int = page.coerceAtLeast(0)
+    /**
+     * 음수 페이지는 0 이다. 400 으로 세우지 않는 이유는 **주소를 손으로 고친 사람**이 보는 값이라서다.
+     *
+     * **위도 자른다.** 안 자르면 `page * size` 가 `Int` 에서 넘쳐 음수 `offset` 이 되고, Postgres 가
+     * `OFFSET must not be negative` 로 선다 — 로그인 없이 부르는 목록에서 클라이언트가 고르는 값으로 500 이 난다.
+     * 상한은 「`Int` 곱이 안 넘치는 값」이 아니라 **실물에 없는 쪽**으로 잡는다: 회차 수가 이 곱을 넘을 일이 없다.
+     */
+    val page: Int = page.coerceIn(0, MAX_PAGE)
 
     /** **최대 100**(`D5`). 넘겨 보내면 잘라서 준다 — 요청을 세우면 목록이 통째로 안 보인다 */
     val size: Int = size.coerceIn(1, MAX_SIZE)
@@ -24,6 +30,9 @@ class Paging(page: Int = 0, size: Int = DEFAULT_SIZE, val sort: String? = null) 
     companion object {
         const val DEFAULT_SIZE = 20
         const val MAX_SIZE = 100
+
+        /** `MAX_PAGE * MAX_SIZE` 가 `Int` 안에 있다. 100만 쪽 뒤를 보는 사람은 없고, 넘치면 500 이다 */
+        const val MAX_PAGE = 1_000_000
     }
 }
 

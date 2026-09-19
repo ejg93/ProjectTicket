@@ -99,7 +99,9 @@ describe("결제", () => {
 
   it("카드를 바꾸면 새 멱등키를 보낸다", async () => {
     document.cookie = "XSRF-TOKEN=t";
-    const spy = mockFetch(declined);
+    // **`approved` 로 잰다.** `declined` 면 화면이 어차피 키를 버려서, 카드 비교를 통째로 지워도 이 테스트가
+    // 초록이다 — 물지 않는 테스트가 된다(마무리 9차 독립 리뷰).
+    const spy = mockFetch(approved);
     render(<CheckoutForm reservationId={7} amount={154000} />);
     const field = screen.getByLabelText("카드번호");
 

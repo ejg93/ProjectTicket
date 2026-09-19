@@ -69,10 +69,19 @@ export function CheckoutForm({ reservationId, amount }: { reservationId: number;
         idempotencyKey: idempotencyKey.current,
       });
 
-      if (result.status === "declined") {
-        // 다시 낼 수 있게 키를 버린다 — 거절은 끝난 시도라 재전송이 아니다.
+      // **결과가 셋이다**(`PaymentStatus`: approved·declined·failed). 승인이 아닌 둘을 승인으로 그리면
+      // 화면이 아무 문구 없이 결제 폼을 다시 그리고, 사용자는 왜 안 됐는지 못 본다.
+      //
+      // **둘 다 키를 버린다.** 끝난 시도라 재전송이 아니고, 안 버리면 서버가 저장해 둔 그 결과가
+      // 같은 키로 그대로 재생돼서 **그 카드로는 영영 결제가 안 된다**(`D4` 「멱등키」).
+      if (result.status !== "approved") {
         idempotencyKey.current = null;
-        setDeclined("카드사에서 결제를 거절했습니다. 다른 카드로 시도해 주세요.");
+        lastCard.current = null;
+        setDeclined(
+          result.status === "declined"
+            ? "카드사에서 결제를 거절했습니다. 다른 카드로 시도해 주세요."
+            : "결제가 끝나지 않았습니다. 좌석은 그대로 잡혀 있으니 다시 시도해 주세요.",
+        );
         return;
       }
 

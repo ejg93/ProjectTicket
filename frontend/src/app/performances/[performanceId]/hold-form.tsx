@@ -28,8 +28,8 @@ function messageOf(error: unknown): string {
     case "admission-required":
       // 대기열이 켜진 회차다. 줄을 서는 화면은 `43` 이 붙인다.
       return "대기 인원이 많아 순서를 기다려야 합니다. 잠시 후 다시 시도해 주세요.";
-    case "unauthenticated":
-      return "로그인하신 뒤에 예매하실 수 있습니다.";
+    // `unauthenticated` 를 여기서 안 본다 — 401 은 `api.ts` 가 로그인 화면으로 보내고 예외를 안 던진다.
+    // 적어 두면 안 닿는 분기가 되고, 다음 사람이 그 자리를 고치면서 있는 줄 안다.
     default:
       return "좌석을 잡지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }

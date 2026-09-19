@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { notFound } from "next/navigation";
+
 import { Countdown } from "@/components/countdown";
+import { ApiError } from "@/lib/api";
 import { apiSession } from "@/lib/api-session";
 import { dateTime, money } from "@/lib/format";
 
@@ -45,7 +48,18 @@ export default async function ReservationPage({
   params: Promise<{ reservationId: string }>;
 }) {
   const { reservationId } = await params;
-  const reservation = await apiSession<Reservation>(`/api/reservations/${reservationId}`);
+
+  let reservation: Reservation;
+  try {
+    reservation = await apiSession<Reservation>(`/api/reservations/${reservationId}`);
+  } catch (thrown) {
+    // 남의 예매·없는 예매는 404 다(`ReservationQuery`). 그대로 던지면 오류 화면의 「다시 시도」로 떨어져
+    // 고장처럼 보인다 — `D16` 은 「403·404 는 부르는 화면이 잡는다」다.
+    if (thrown instanceof ApiError && thrown.slug === "reservation-not-found") {
+      notFound();
+    }
+    throw thrown;
+  }
 
   // 발권은 승인 트랜잭션 안에서 끝난다(`18`). 그래서 `reserved` 면 티켓이 이미 있다.
   const tickets =
