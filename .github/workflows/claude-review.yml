@@ -1,0 +1,153 @@
+# PR 마다 리뷰를 돌린다(청크 `46a`). `ci.yml` 이 「돌렸나」를 사람 기억에서 걷어냈다면
+# 이쪽은 「규약대로 쳤나」를 걷어낸다.
+#
+# **리뷰는 게이트가 아니다.** 조언이라 아무것도 못 막는다 — 막는 것은 `ci.yml` 이고,
+# 산출물은 **리뷰가 반복해서 잡는 것**이다. 그 목록이 테스트·`doc-lint.sh` 로 내려갈 후보고
+# 무엇을 내릴지는 `D18` 이 정한다.
+name: Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# 앞 회차를 접는다. 청크 하나를 여러 번 밀 때 리뷰가 겹쳐 돌 이유가 없다.
+concurrency:
+  group: review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # **dependabot 이 연 PR 은 안 본다.** 바뀌는 것이 버전 숫자 하나라 아래 넷에 물을 것이 없다.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    # 마무리가 청크 여럿을 한 PR 에 담는다. ProjectShop 실측이 청크당 약 2분이었다.
+    timeout-minutes: 30
+    permissions:
+      # 읽기만 준다(`D14`). 리뷰는 코멘트만 달고 코드를 안 고친다.
+      contents: read
+      pull-requests: write
+      issues: write
+      # OIDC 토큰을 받는 자리다. 액션 문서가 필수로 적었다.
+      id-token: write
+    # 시크릿이 없으면 조용히 건너뛴다. 없다고 PR 마다 빨간 것이 뜨면 그 빨강이 진짜 실패를 가린다.
+    env:
+      REVIEW_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        if: env.REVIEW_TOKEN != ''
+        with:
+          # 얕게 받으면 base 와 비교할 것이 없다.
+          fetch-depth: 0
+
+      # 아래 확인 step 이 「**이번 회차가** 코멘트를 남겼나」를 보려면 기준 시각이 있어야 한다.
+      # 개수만 세면 옛 회차의 코멘트로 통과한다(ProjectShop 실측).
+      - name: 회차 시작 시각
+        if: env.REVIEW_TOKEN != ''
+        run: echo "ROUND_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - id: review
+        uses: anthropics/claude-code-action@v1
+        if: env.REVIEW_TOKEN != ''
+        with:
+          # 구독 토큰을 쓴다. 이 저장소의 전제가 「주간 토큰이 남을 때 태운다」라
+          # 별도 과금(`ANTHROPIC_API_KEY`)을 여는 것이 앞뒤가 안 맞는다. 발급은 `claude setup-token`.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # **액션은 Bash 를 기본으로 안 준다.** 안 열면 프롬프트가 시킨 `gh pr comment` 가
+          # 매번 거부되고 코멘트가 0개인데 실행은 성공으로 보인다(ProjectShop 이 PR 여섯에서 밟았다).
+          #
+          # **`--setting-sources user` 가 저장소 훅을 끈다.** 액션이 `.claude` 를 `main` 에서
+          # 되살리므로 파일을 지우는 것으로는 못 끈다 — 리뷰어가 **읽지 않게** 해야 한다.
+          # 이 저장소의 `.claude/settings.json` 은 훅이 검증 도장·미커밋을 보는데, 리뷰 세션에는
+          # 칠 청크도 커밋도 없어서 그 훅이 리뷰를 세운다.
+          #
+          # **`--disallowedTools` 가 도우미를 걷는다.** 리뷰어가 서브에이전트를 띄우고 결과를
+          # 안 받은 채 세션을 끝내는 것이 ProjectShop 에서 두 번 났다 — 둘 다 코멘트가 0개다.
+          # 이름 둘을 같이 적는다: 액션이 버는 CLI 판이 `Agent` 인지 옛 이름 `Task` 인지 여기서 못 고정한다.
+          claude_args: |
+            --setting-sources user
+            --disallowedTools "Task,Agent"
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+
+          # **모델을 안 고정한다.** 액션이 고르는 기본값을 쓴다.
+
+          # **일반 리뷰는 이 저장소의 규약을 모른다.** 무엇을 볼지 여기서 정한다.
+          # 아래 넷은 「마무리」의 대조 중 **기계가 못 잡고 사람이 놓치는 것**들이다.
+          prompt: |
+            PR 번호: ${{ github.event.pull_request.number }}
+
+            이 저장소의 `CLAUDE.md` 와 `doc/reference/` 규약을 기준으로 이 PR 을 검토한다.
+            먼저 `CLAUDE.md` 를 읽고, 이 PR 이 실제로 건드리는 D 문서만 편다. 통짜로 읽지 않는다.
+
+            먼저 `gh pr view <위 PR 번호> --json body` 로 본문을 읽는다 — 청크마다 **시작 세 줄**
+            (무엇을 닫나·걸리는 축·강제 지점)이 있고 그것이 아래 1번의 입력이다.
+            diff 는 `gh pr diff <위 PR 번호>` 다.
+
+            아래 넷에 **청크마다** 답한다. 답은 「예」·「아니오 — 근거」·「모름 — 왜」 셋 중 하나고,
+            근거는 `파일:줄` 과 **어느 규칙의 어느 절**이다. 출처를 못 대면 「아니오」가 아니라 「모름」이다.
+            이 넷은 빌드·테스트가 초록이어도 안 걸리는 것들이다.
+
+            1. **말한 축을 실제로 폈나** — 시작 세 줄이 「제약으로 내린다」고 했으면 마이그레이션에
+               제약이 섰나, 테스트로 끝났나. 「표준」이라 했으면 그 RFC 의 요건이 코드에 닿았나.
+            2. **강제 지점을 더 아래로 내릴 수 있었나** — `coding-rules.md` 「축 2」의 순서다
+               (타입·스키마 > DB 제약 > 앱 검증 > 테스트 > 문서).
+            3. **이 PR 안의 결정끼리 부딪치나** — 한 자리에 넣은 규칙을 짝이 되는 자리에 안 넣었나.
+               청크 A 가 정한 값을 청크 B 가 어기나.
+            4. **문서가 부르는 것이 실물과 맞나** — 바뀐 문서가 가리키는 청크 번호·클래스·테스트
+               이름·마이그레이션 번호·스크립트 경로가 실재하나. **파일을 실제로 열어 확인한 것만
+               「예」다** — 셸은 `gh` 셋만 열려 있으니 파일은 읽기 도구로 연다.
+
+            출력은 **표 하나**다 — 행은 청크, 열은 위 넷. 표 아래에 「아니오」만 다시 모아
+            `파일:줄 — 무엇 — 어느 규칙` 으로 적는다. 칭찬은 안 쓴다. 전부 「예」면 표만 남긴다.
+
+            글은 평서형으로 쓴다(`CLAUDE.md` 「글 작성 규칙」 4번). `~습니다`·`~합니다` 를 안 쓴다.
+
+            **코멘트 본문의 첫 줄은 정확히 `<!-- claude-review -->` 다.** 아래 확인 step 이 그
+            마커로 판정한다. 작성자 이름으로 안 세는 이유는 토큰 종류에 따라 갈려서다.
+
+            **검토가 끝나면 그 결과를 이 PR 의 코멘트로 남긴다** —
+            `gh pr comment <위 PR 번호> --edit-last --create-if-none --body "<본문>"`.
+            로그에만 있으면 아무도 안 읽는다.
+
+            **파일을 만들지 않는다.** `--body-file` 은 파일을 먼저 써야 하는데 그 도구가 안 열려 있다.
+            본문에 백틱과 따옴표가 많으니 셸 인용에 주의한다.
+
+            **혼자 본다.** 서브에이전트 도구는 걷어서 이 세션에 없다 — 청크를 순서대로 직접 읽는다.
+
+            **코멘트를 달기 전에 세션을 끝내지 않는다.** 시간이 모자라면 본 만큼으로 표를 채우고
+            못 본 청크를 「모름 — 왜」로 적은 뒤 단다.
+            **아무것도 안 단 채로 끝나는 것이 가장 나쁜 결과다.**
+
+      # **리뷰가 아무것도 안 내놓으면 여기서 빨개진다.** 내용은 조언이라 아무것도 못 막고,
+      # 이 step 이 보는 것은 **출력이 있나** 하나다. ProjectShop 은 코멘트가 0개인데 초록인 PR 을
+      # 열하나 쌓고 나서야 알아챘다 — **빈 초록은 빨강보다 나쁘다.**
+      #
+      # **액션이 안 돌았으면 요구하지 않는다.** 이 워크플로 파일을 고치는 PR 에서는 액션이
+      # 자기 파일을 `main` 과 대조하고 조용히 건너뛴다 — `execution_file` 이 비면 안 돈 것이다.
+      #
+      # REST 를 쓴다: `gh pr view` 의 `comments` 에는 `updated_at` 이 없어서 `--edit-last` 로
+      # 고쳐 쓴 코멘트의 새 회차를 못 가른다. ISO-8601 Z 는 사전순이 곧 시간순이다.
+      - name: 리뷰가 이번 회차에 코멘트를 남겼나
+        if: env.REVIEW_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          if [ -z "$EXECUTION_FILE" ]; then
+            echo '리뷰가 안 돌았다. 이 워크플로를 고치는 PR 이면 정상이다 — 액션이 자기 파일을 main 과 대조해 건너뛴다'
+            exit 0
+          fi
+          # **개수를 안 세고 줄을 센다.** `--paginate` 는 jq 필터를 페이지마다 따로 돌려서
+          # `| length` 를 쓰면 페이지 수만큼 숫자가 줄로 나온다 — 코멘트 100개가 넘는 PR 에서
+          # 비교가 `integer expression expected` 로 떨어진다.
+          n=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" \
+                --paginate \
+                --jq ".[] | select(.body | startswith(\"<!-- claude-review -->\")) | select(.updated_at >= \"${ROUND_START}\") | .id" \
+              | wc -l | tr -d ' ')
+          if [ "$n" -ge 1 ]; then
+            echo "이번 회차(${ROUND_START} 뒤) 리뷰 코멘트 $n 건"
+            exit 0
+          fi
+          echo "리뷰가 이번 회차에 코멘트를 안 남겼다. 회차 시작: ${ROUND_START}" >&2
+          echo '로그에서 볼 것: permission_denials_count · result 의 마지막 문장 · 서브에이전트를 기다리다 끝났나' >&2
+          exit 1
