@@ -103,10 +103,10 @@ ISO 8601 과 IANA tz 가 전부다. 한국은 서머타임이 없어 `Asia/Seoul
 
 | 자료 | 링크 | 확인한 것 |
 |---|---|---|
-| CloudEvents | https://cloudevents.io/ | CNCF Graduated. 봉투(`id`·`source`·`type`·`specversion`)의 표준 |
+| CloudEvents | https://cloudevents.io/ | CNCF Graduated. 봉투(`id`·`source`·`type`·`specversion`)의 표준. **25 가 안 쓰기로 닫았다** — 소비자가 우리뿐이라 표준 봉투가 사 줄 것이 없다(`event-catalog.md`) |
 | Zalando Event 장 | https://opensource.zalando.com/restful-api-guidelines/ | 위 D5 문서 안 |
 
-도입 여부는 25 가 실제 이벤트를 보고 정한다. 지금 정하면 이벤트가 없는 상태에서 봉투를 고르는 셈이다.
+봉투는 우리 것이다(`event_id`·`aggregate`·`type`·`payload`). 표준을 다시 볼 자리는 **바깥에서 우리 사건을 받는 소비자가 생길 때**다.
 
 ## D13 성능 목표 (31 뒤)
 
@@ -179,6 +179,7 @@ ISO 8601 과 IANA tz 가 전부다. 한국은 서머타임이 없어 `Asia/Seoul
 |---|---|
 | 2026-08-05 · 08-14 | ProjectShop 에서 링크를 열어 확인했다(RFC 9457 현행, OWASP 2025 판, NIST Rev 4, W3C Level 2 초안) |
 | 2026-09-15 | `P11` — 티켓 도메인에 맞춰 다시 썼다. **링크를 다시 열지는 않았다.** 다음 `/inspection` 이 연다 |
+| 2026-09-19 | `I5`(점검 5차) — **요건이 코드에 박혔나**를 봤다(가로 · 표준). 링크는 다시 안 열었다 — 그것은 「바깥 근거」 줄이고 `I5-1` 이 선다 |
 
 ## 이 문서를 고칠 때
 
