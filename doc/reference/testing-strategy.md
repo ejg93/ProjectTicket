@@ -161,7 +161,7 @@ abstract class ConcurrencyTestBase
 |---|---|
 | `ErrorTypeScreenTest` | 화면이 분기하는 슬러그 ⊆ `ErrorCode` 의 슬러그 |
 | `ScreenLengthTest` | 화면 입력칸의 `maxLength` = 요청 `data class` 의 `@Size(max)` |
-| `StateMachineDocTest`(13) | 코드의 전이표 = `state-machines.md` 의 전이표 |
+| `StateMachineDocTest`(`I3-1`) | `state-machines.md` 의 전이표 = 전이 트리거가 허용하는 짝 |
 
 **대개 한쪽만 본다.** 화면이 쓰는 것이 서버에 있어야 하고 그 반대는 아니다.
 

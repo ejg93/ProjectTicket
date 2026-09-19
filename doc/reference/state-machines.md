@@ -104,6 +104,15 @@ draft ──오픈──> open ──판매 마감──> closed
 | `closed` | `sales_close_at` 이 지났다. 남은 `held`·`paying` 은 `expired` 로 | 스케줄러(16a) |
 | `cancelled` | 기획사가 취소했다. 모든 예매가 `cancelled`, `reserved` 는 전액 환불 | 기획사(17a) |
 
+### 전이표
+
+| 에서 | 로 | 조건 | 어디서 |
+|---|---|---|---|
+| — | `draft` | 회차는 이 상태로만 태어난다(`V5` 삽입 가드) | 9 |
+| `draft` | `open` | 좌석이 복제됐다 | 11 |
+| `open` | `closed` | `sales_close_at < now()` | 16a |
+| `open` | `cancelled` | 기획사가 무른다. `closed` 뒤로는 없다 | 17a |
+
 `sales_close_at` 의 기본은 `starts_at - 1시간` 이고 `sales_open_at < sales_close_at < starts_at` 을 check 가 든다(16a).
 `cancelled` 는 17a 가 check 목록과 전이 트리거에 더한다 — `open` 에서만 간다. `closed` 뒤의 취소는 없다.
 
@@ -151,4 +160,4 @@ WAITING ──입장──> ADMITTED ──선점 성공──> (토큰 삭제)
 ## 이 문서를 고칠 때
 
 **상태를 더하면 셋을 같이 본다** — check 제약의 목록, 전이 트리거, 이 문서의 전이표.
-셋 중 하나만 고치면 그날 어느 한쪽이 조용히 뒤처진다. `StateMachineDocTest`(20)가 이 표와 코드의 전이표를 대조한다.
+셋 중 하나만 고치면 그날 어느 한쪽이 조용히 뒤처진다. `StateMachineDocTest`(`I3-1`)가 두 절의 전이표와 전이 트리거를 대조한다 — 트리거를 새로 만들면 표가 없다고 먼저 빨개진다.
