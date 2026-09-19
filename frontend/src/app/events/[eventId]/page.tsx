@@ -88,7 +88,10 @@ export default async function EventDetailPage({
         <ul>
           {event.performances.map((performance) => (
             <li key={performance.performance_id}>
-              {dateTime(performance.starts_at)} · {performance.venue_name} {performance.hall_name}
+              <Link href={`/performances/${performance.performance_id}`}>
+                {dateTime(performance.starts_at)}
+              </Link>{" "}
+              · {performance.venue_name} {performance.hall_name}
             </li>
           ))}
         </ul>
