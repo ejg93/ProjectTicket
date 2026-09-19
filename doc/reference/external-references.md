@@ -50,6 +50,8 @@ UML 상태기계 표기를 빌리는 정도다. 전이표는 우리 도메인이
 - https://github.com/testcontainers/testcontainers-java/issues/11212
 - https://github.com/testcontainers/testcontainers-java/issues/11235
 
+**이슈 둘 다 닫혔다**(2026-09-19 확인) — `11212` 는 PR `11216` 으로, `11235` 는 그 중복으로. 우리는 2.0.5 라 해당 없고, 남겨 두는 이유는 **오류 문구가 원인을 안 드러내서**다.
+
 Boot BOM 이 Testcontainers 를 관리하지 않으므로 `testcontainers-bom` 을 직접 넣는다(2.0.5).
 
 ## D9 보안 기준
@@ -58,7 +60,7 @@ Boot BOM 이 Testcontainers 를 관리하지 않으므로 `testcontainers-bom` �
 
 | 자료 | 링크 | 확인한 것 |
 |---|---|---|
-| OWASP Top 10 2025 | https://owasp.org/Top10/2025/ | 2026-01 최종. `D9` 의 대응표가 이 판이다 |
+| OWASP Top 10 2025 | https://top10.owasp.org/2025 | 2025 최종판(항목 10). `D9` 의 대응표가 이 판이다. **`owasp.org/Top10/2025` 는 308 로 옮겨졌다**(2026-09-19 확인) |
 | OWASP Cheat Sheet Series | https://cheatsheetseries.owasp.org/ | 「어떻게 막나」 |
 | NIST SP 800-63B Rev 4 | https://pages.nist.gov/800-63-4/sp800-63b.html | 비밀번호 — 최소 15자 `SHALL`, 블록리스트 `SHALL`, 조합 강제 `SHALL NOT`, 최대 64자·인쇄 ASCII `SHOULD`. `Password` 애너테이션의 근거 |
 | Spring Security 레퍼런스 | https://docs.spring.io/spring-security/reference/index.html | CSRF · Session Management · MockMvc 절 |
@@ -68,7 +70,7 @@ Boot BOM 이 Testcontainers 를 관리하지 않으므로 `testcontainers-bom` �
 
 | 자료 | 링크 | 확인한 것 |
 |---|---|---|
-| W3C Trace Context | https://www.w3.org/TR/trace-context/ | `traceparent` 형식. Level 2 초안이 있지만 하위호환이라 `D10` 은 안 바뀐다 |
+| W3C Trace Context | https://www.w3.org/TR/trace-context/ | `traceparent` 형식. 이 링크는 **Recommendation**(2021-11-23)이고 Level 2 는 별도 문서다 — 하위호환이라 `D10` 은 안 바뀐다 |
 | Spring Boot 관측 | https://docs.spring.io/spring-boot/reference/actuator/tracing.html | Micrometer Tracing + Brave. 자동설정·브리지 둘 다 필요(`stack.md`) |
 
 OpenTelemetry 는 30 이 붙인다. 지금 붙이면 볼 화면 없이 컨테이너만 는다.
@@ -180,6 +182,7 @@ ISO 8601 과 IANA tz 가 전부다. 한국은 서머타임이 없어 `Asia/Seoul
 | 2026-08-05 · 08-14 | ProjectShop 에서 링크를 열어 확인했다(RFC 9457 현행, OWASP 2025 판, NIST Rev 4, W3C Level 2 초안) |
 | 2026-09-15 | `P11` — 티켓 도메인에 맞춰 다시 썼다. **링크를 다시 열지는 않았다.** 다음 `/inspection` 이 연다 |
 | 2026-09-19 | `I5`(점검 5차) — **요건이 코드에 박혔나**를 봤다(가로 · 표준). 링크는 다시 안 열었다 — 그것은 「바깥 근거」 줄이고 `I5-1` 이 선다 |
+| 2026-09-19 | `I5-1` — 여섯을 열었다: OWASP Top 10 2025(**308 로 옮겨져 링크를 고쳤다**), NIST 800-63B Rev 4(최종, 15자·블록리스트 `SHALL` 그대로), W3C Trace Context(Recommendation 2021-11-23 — Level 2 는 별도 문서라 문구를 고쳤다), Testcontainers 이슈 둘(**닫혔다**), Zalando(열린다, 제목이 「RESTful API and Event Guidelines」). **RFC 다섯·Stripe 여섯·Spring 셋·나머지 여덟은 아직 안 열었다** |
 
 ## 이 문서를 고칠 때
 
