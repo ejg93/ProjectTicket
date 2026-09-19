@@ -44,10 +44,11 @@ jobs:
           # **워크플로 파일도 대상이다.** 거기서 권한·시크릿을 다룬다.
           - language: actions
             build-mode: none
-          # **`none` 으로 둔다.** Gradle 을 안 돌려서 빠르고 `ci.yml` 이 이미 빌드를 돈다.
-          # 대신 빌드가 만드는 생성 소스는 못 본다 — 이 저장소엔 그런 것이 없다.
+          # **Kotlin 은 `none` 으로 못 읽는다**(PR #20 실측). `none` 은 Java 소스만 훑는데 이 저장소엔
+          # `.java` 가 0개라 `CodeQL detected code written in Java/Kotlin but could not process any of it`
+          # 으로 죽는다. 그래서 여기만 **`manual`** 이다 — 아래 step 이 컴파일까지만 돌린다(테스트는 `ci.yml` 몫).
           - language: java-kotlin
-            build-mode: none
+            build-mode: manual
           # 화면(`39`)이 생기면 `javascript-typescript` 를 더한다. 지금 켜면 볼 코드가 없다.
     steps:
       - uses: actions/checkout@v7
@@ -59,6 +60,23 @@ jobs:
           # **질의 묶음을 안 넓힌다.** 기본값으로 첫 측정을 하고 그 수가 `D18` 의 문턱을 정한다 —
           # 재기 전에 넓히면 무엇이 는 것인지 안 갈린다. ProjectShop 은 `JdbcClient` 를 싱크로
           # 더하는 확장 팩을 뒀다(`Q` 줄) — 여기도 같은 판단을 하는데 그 자리는 `P10` 이다(첫 측정값이 문턱을 정한다).
+
+      # `manual` 인 언어만 여기서 빌드한다. `actions` 는 빌드가 없다.
+      - if: matrix.build-mode == 'manual'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          # `build.gradle.kts` 의 툴체인·`ci.yml` 과 같은 값이다. 갈리면 Gradle 이 안 뜬다.
+          java-version: '25'
+
+      - if: matrix.build-mode == 'manual'
+        uses: gradle/actions/setup-gradle@v6
+
+      # **컴파일까지만이다.** 테스트는 `ci.yml` 이 돈다 — 여기서 또 돌리면 같은 것을 두 번 하고
+      # CodeQL 이 보는 것은 바이트코드라 테스트를 돌릴 이유가 없다.
+      - if: matrix.build-mode == 'manual'
+        run: ./gradlew classes testClasses
+        working-directory: backend
 
       - uses: github/codeql-action/analyze@v4
         with:
