@@ -30,7 +30,7 @@ class QualityGateDocTest {
             .toSet()
 
         val inWorkflows = Files.list(root.resolve(".github/workflows")).use { files ->
-            files.filter { it.fileName.toString().endsWith(".yml") }
+            files.filter { WORKFLOW.matches(it.fileName.toString()) }
                 .toList()
                 .flatMap { file -> jobsOf(Files.readString(file)).map { file.fileName.toString() to it } }
         }.toSet()
@@ -54,8 +54,17 @@ class QualityGateDocTest {
     }
 
     private companion object {
+        /**
+         * 셋 다 **넓게 잡는다**(마무리 10차 독립 리뷰).
+         *
+         * 좁으면 문서 행과 워크플로 잡이 **같이** 빠져서 표와 실물이 갈려도 초록이다 — 대조가 조용히 0쌍을 비교한다.
+         * 숫자를 못 읽던 앞 판이 그 모양이었다: `46b` 가 세울 `e2e` 잡이 양쪽에서 빠지고,
+         * 문서를 바르게 고쳐도 한쪽만 읽혀 빨개졌다.
+         */
+        val WORKFLOW = Regex("""^[\w.-]+\.ya?ml$""")
+
         /** `| \`ci.yml\` | \`backend\` | 필수 | …` */
-        val ROW = Regex("""^\| `([a-z-]+\.yml)` \| `([a-z-]+)` \| """)
-        val JOB = Regex("""^  ([a-z][a-z0-9-]*):\s*$""")
+        val ROW = Regex("""^\| `([\w.-]+\.ya?ml)` \| `([\w-]+)` \| """)
+        val JOB = Regex("""^  ([A-Za-z_][\w-]*):\s*$""")
     }
 }

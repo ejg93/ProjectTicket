@@ -40,6 +40,8 @@
 | `EventCatalogTest` | 4 테스트 | 〃 | `D11` 카탈로그와 `EventType` 이 갈리는 것 | — |
 | `SchedulerSingleRunTest` | 4 테스트 | `gradlew integrationTest` | 스케줄러가 인스턴스마다 도는 것(`33`). **입구를 손으로 적어 부른다** — 새 입구가 늘어도 여기는 초록이라, 락을 안 건 입구를 자동으로 찾지는 못한다 | `33` 2026-09-18 — 마무리 6차가 `HoldSweeper` 의 자기 호출을 여기서 잡았다 |
 | eslint 입구 규칙 | 4 테스트 | `npm run lint`(로컬·CI) | `api.ts`·`api-session.ts` 밖의 `fetch` 와 `next/headers`(`39`). **문서에만 있던 `D16` 규칙을 여기서 내렸다** — 우회하면 CSRF·오류 변환을 안 거친 응답이 화면에 닿는다 | — |
+| eslint `jsx-a11y` 전체 | 4 테스트 | `npm run lint`(로컬·CI) | 라벨 없는 입력칸·키보드로 못 누르는 요소 같은 **빠뜨린 것**(`D17` 「접근성」). `eslint-config-next` 가 켜는 것은 부분집합이라 규칙을 통째로 얹었다(`39`). **화면을 만들기 전에 켰다** — 나중에 켜면 이미 나온 마크업을 되돌리는 일이 된다 | — |
+| eslint `react/no-danger` | 4 테스트 | 〃 | `dangerouslySetInnerHTML`(`D9`, OWASP A03). React 는 기본으로 글자를 이스케이프하는데 그것이 끈다 — 남이 쓴 글이 닿으면 남의 스크립트가 우리 페이지에서 돈다. **`39-1` 의 약관 화면이 첫 소비자다**(`consent_item.body` 가 마크다운이다) | — |
 | `screen-text.test.ts` | 4 테스트 | `npm test` | 화면 문구의 **반말**(`D17`). `doc-lint.sh` 의 거울이다 — 그쪽은 개발자 글의 존댓말을 막는다. 주석이 평서형이라 정규식으로는 못 재고 AST 로 걷는다 | — |
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | — |
 | 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
