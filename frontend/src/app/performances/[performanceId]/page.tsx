@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { SeatMap, type SeatMapData } from "@/components/seat-map";
+import type { SeatMapData } from "@/components/seat-map";
 import { ApiError, apiPublic } from "@/lib/api";
+
+import { HoldForm } from "./hold-form";
 
 export const metadata: Metadata = {
   title: "좌석 선택 · ProjectTicket",
@@ -39,7 +41,7 @@ export default async function PerformanceSeatsPage({
   return (
     <div>
       <h1>좌석 선택</h1>
-      <SeatMap data={seats} />
+      <HoldForm data={seats} performanceId={performanceId} />
       <p className="muted">
         <Link href="/events">공연 목록</Link>
       </p>
