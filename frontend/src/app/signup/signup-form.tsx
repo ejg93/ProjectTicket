@@ -71,12 +71,6 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
 
   return (
     <form action={submit}>
-      {error ? (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
       <Field name="email" label="이메일" type="email" autoComplete="email" />
       <Field name="display_name" label="이름" autoComplete="name" />
       <Field name="password" label="비밀번호" type="password" autoComplete="new-password" />
@@ -99,6 +93,13 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
           </p>
         ))}
       </fieldset>
+
+      {/* **제출 버튼 위, 입력칸 아래다**(`D17`). 방금 누른 자리 바로 옆이라야 보인다 */}
+      {error ? (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       <SubmitButton label="가입" pendingLabel="가입하는 중입니다" />
     </form>

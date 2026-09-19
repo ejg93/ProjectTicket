@@ -64,15 +64,19 @@ export function LoginForm() {
 
   return (
     <form action={submit}>
-      {/* 어느 칸도 지목하지 않는 오류다(`D17` 「오류는 자리를 가려서 보여준다」) */}
+      <Field name="email" label="이메일" type="email" autoComplete="email" />
+      <Field name="password" label="비밀번호" type="password" autoComplete="current-password" />
+
+      {/*
+        어느 칸도 지목하지 않는 오류다(`D17`). 서버가 없는 계정인지 틀린 비밀번호인지 일부러 안 알려준다 —
+        칸에 `aria-invalid` 를 걸면 맞은 이메일까지 「잘못된 입력」이라고 낭독된다.
+        **자리는 제출 버튼 위, 입력칸 아래다** — 위에 두면 스크롤한 화면에서 안 보인다.
+      */}
       {error ? (
         <p className="error" role="alert">
           {error}
         </p>
       ) : null}
-
-      <Field name="email" label="이메일" type="email" autoComplete="email" />
-      <Field name="password" label="비밀번호" type="password" autoComplete="current-password" />
 
       <SubmitButton label="로그인" pendingLabel="로그인하는 중입니다" />
     </form>
