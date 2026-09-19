@@ -1,0 +1,22 @@
+{
+  "event_id" : "<event_id>",
+  "title" : "목록 계약 공연",
+  "organizer_name" : "테스트기획",
+  "grades" : [ {
+    "code" : "R",
+    "name" : "R",
+    "price" : 121000
+  }, {
+    "code" : "VIP",
+    "name" : "VIP",
+    "price" : 154000
+  } ],
+  "performances" : [ {
+    "performance_id" : "<performance_id>",
+    "starts_at" : "<starts_at>",
+    "sales_open_at" : "<sales_open_at>",
+    "sales_close_at" : "<sales_close_at>",
+    "hall_name" : "1관",
+    "venue_name" : "테스트홀"
+  } ]
+}
