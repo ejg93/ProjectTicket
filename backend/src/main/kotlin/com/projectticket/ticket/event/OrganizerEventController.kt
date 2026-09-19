@@ -73,7 +73,7 @@ class OrganizerEventController(
     data class GradeRequest(
         @field:NotBlank @field:Pattern(regexp = "^[A-Z][A-Z0-9]{0,9}$") val code: String,
         @field:NotNull @field:PositiveOrZero val price: Int,
-        @field:NotEmpty val sections: List<@Pattern(regexp = "^F[0-9]+-[A-Z]$") String>,
+        @field:NotEmpty @field:SectionCodes val sections: List<String>,
     )
 
     data class CreateEventRequest(
