@@ -140,7 +140,11 @@ class AccountPurgeTest : PostgresTestBase() {
         }.andReturn().sessionCookie()
 
     private fun withdraw(session: Cookie) =
-        mvc.delete("/api/me") { cookie(session); with(csrf()) }.andExpect { status { isNoContent() } }
+        mvc.delete("/api/me") {
+            cookie(session); with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"$PASSWORD"}"""
+        }.andExpect { status { isNoContent() } }
 
     private fun MvcResult.sessionCookie(): Cookie =
         response.getCookie("TICKETSESSION") ?: throw AssertionError("응답에 세션 쿠키가 없다")

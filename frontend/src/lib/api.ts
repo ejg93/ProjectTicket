@@ -108,9 +108,15 @@ export async function api<T>(
   //
   // 로그인·가입 경로는 뺀다. 거기서 나는 401 은 「세션이 없다」가 아니라 「이번 시도가 틀렸다」라
   // 보내 봐야 같은 화면이고, 대신 그 폼이 어느 칸도 지목하지 않는 오류로 그린다.
+  // **`login-failed` 도 같은 뜻이라 뺀다**(`44c`) — 탈퇴가 비밀번호를 다시 받는데 틀렸다고 로그인으로 보내면 세션이 멀쩡한 사람이 튕긴다.
+  // 그래서 401 은 `type` 을 읽고 가른다. 세션이 없는 401 은 `unauthenticated` 다.
   //
   // 서버 컴포넌트 쪽은 `api-session.ts` 가 같은 일을 한다. 층이 둘이라 두 군데인 것이지 규칙이 둘인 것이 아니다.
-  if (response.status === 401 && !path.startsWith("/api/auth/")) {
+  if (response.status === 401) {
+    const error = await toApiError(response);
+    if (path.startsWith("/api/auth/") || error.slug === "login-failed") {
+      throw error;
+    }
     // **「만료됐다」고 말하지 않는다.** 세션 쿠키가 HttpOnly 라 여기서는 **로그인한 적이 있었는지를 모른다** —
     // 한 번도 로그인 안 한 사람에게 만료를 말하면 사실이 아닌 것을 말하는 것이다(`D17`).
     // 둘을 가르는 것은 쿠키를 읽을 수 있는 `api-session.ts` 쪽이고, 이쪽은 둘 다 참인 문구를 쓴다.

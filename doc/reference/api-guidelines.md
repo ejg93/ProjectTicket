@@ -44,12 +44,15 @@
 | `POST /api/reservations/{id}/cancel` | 취소 | 세션(본인) | 17 |
 | `GET /api/reservations/{id}/refund-preview` | 지금 취소하면 얼마인가 — 결제액·D-며칠·율·수수료·환불액. 취소할 수 없으면 `cancellable: false` 와 취소가 받을 `type` 슬러그(`reason`). **계산은 취소와 같은 함수다**(`RefundQuote`) | 세션(본인) | 44a |
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
+| `GET /api/organizer/organizers` · `GET /api/organizer/halls` | 공연을 올릴 내 기획사 · 회차를 올릴 홀(공용 — 공연장·구역 코드·구역별 좌석 수). 등록 폼이 고른다 | 세션(기획사) | 45a-1 |
+| `GET /api/organizer/events?page&size` | 내 기획사들의 공연(오픈 전 포함). 만든 시각 내림차순 고정, 목록 규약 | 세션(기획사) | 45a |
+| `GET /api/organizer/events/{id}` | 공연 하나 + 모든 상태의 회차(판매 기간·홀 좌석 수·팔린 수 — `reserved` 만). 남의 공연은 404 `event-not-found` | 세션(기획사) | 45a |
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11 (취소 서비스는 17a 가 세웠다) |
-| `GET /api/organizer/settlements` | 정산 | 세션(기획사) | 27 |
+| `GET /api/organizer/settlements?performanceId=` | 회차 하나의 정산서 — 상태·합계·항목(`sale`·`platform_fee`·`cancel_fee`·`adjustment`). 없는 회차·남의 회차·정산서가 아직 없는 회차는 한 이름 404 `performance-not-found` | 세션(기획사) | 27·45c |
 | `POST /api/admin/accounts/{id}/suspend` · `unsuspend` | 계정 정지·해제 | 세션(관리자) | 5b |
-| `DELETE /api/me` | 탈퇴 | 세션 | 5a |
+| `DELETE /api/me` | 탈퇴. 본문 `{ "password" }` 로 **비밀번호를 다시 받는다** — 틀리면 로그인과 같은 401 `login-failed`, 로그인 실패 카운터를 같이 센다(`44c`) | 세션 | 5a·44c |
 
 **선점이 회차 아래에 있는 이유**: 대기열 관문(23)이 **회차 id 를 경로에서 읽는다.** 본문에 두면 필터가 JSON 을 파싱해야 하고, 그러면 본문 스트림을 두 번 읽는 문제가 따라온다.
 예매가 만들어진 뒤에는 `/api/reservations/{id}` 로 평평하게 간다 — 그때는 예매가 회차를 안다.
@@ -121,14 +124,14 @@
 
 | 슬러그 | 상태 | 뜻 | 추가 필드 | 청크 |
 |---|---|---|---|---|
-| `login-failed` | 401 | 이메일·비밀번호가 안 맞거나 정지된 계정. **셋을 안 가른다** | | 있다 |
+| `login-failed` | 401 | 이메일·비밀번호가 안 맞거나 정지된 계정. **셋을 안 가른다**. 탈퇴의 비밀번호 재확인도 같은 이름·같은 카운터다(`44c`) | | 있다 |
 | `unauthenticated` | 401 | 로그인 필요 | | 있다 |
 | `forbidden` | 403 | 권한 없음·CSRF 실패 | | 있다 |
 | `email-taken` | 409 | 가입된 이메일 | | 있다 |
 | `account-not-found` | 404 | 없거나 이미 탈퇴한 계정. **관리자에게도 404 다**(아래 「403 이냐 404 냐」) | | 5b |
 | `unknown-consent-item` · `required-consent-missing` | 422 | 동의 | | 있다 |
 | `consent-item-not-found` | 404 | 그런 코드의 동의 항목이 없다(약관·처리방침 화면) | | 39-1 |
-| `performance-not-found` | 404 | 회차 없음 | | 있다 |
+| `performance-not-found` | 404 | 회차 없음. 기획사 정산 조회는 남의 회차·정산서가 아직 없는 회차도 이 이름이다(`45c` — 둘을 가르면 남의 회차 존재가 샌다) | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
 | `validation-failed` | 400 | Bean Validation | `errors[{field, message}]` | 있다 |
 | `malformed-request` · `method-not-allowed` · `unsupported-media-type` · `endpoint-not-found` · `internal` | 400·405·415·404·500 | 프레임워크 | | 있다 |

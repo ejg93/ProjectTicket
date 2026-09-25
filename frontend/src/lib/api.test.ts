@@ -85,6 +85,33 @@ describe("api()", () => {
     expect((thrown as ApiError).traceId).toBe("abc");
   });
 
+  it("세션이 없는 401(`unauthenticated`)은 던지지 않고 로그인으로 넘어가는 동안 멈춘다", async () => {
+    mockFetch(jsonResponse({ type: "tag:projectticket.example,2026:unauthenticated", detail: "로그인 필요" }, 401));
+
+    // 이동 자체는 jsdom 이 못 한다(`location` 을 못 갈아 끼운다). 대신 **안 던진다**를 잰다 — 아래 `login-failed` 예외를
+    // 넓혀 이 슬러그까지 던지게 되면 부르는 폼이 오류 문구를 띄우고 로그인으로 안 간다(마무리 14차).
+    const settled = await Promise.race([
+      api("/api/me/reservations").then(
+        () => "resolved",
+        () => "rejected",
+      ),
+      new Promise((resolve) => setTimeout(() => resolve("pending"), 50)),
+    ]);
+
+    expect(settled).toBe("pending");
+  });
+
+  it("비밀번호가 틀린 401(`login-failed`)은 로그인으로 안 보내고 던진다(`44c`)", async () => {
+    document.cookie = "XSRF-TOKEN=token-value";
+    mockFetch(jsonResponse({ type: "tag:projectticket.example,2026:login-failed", detail: "틀렸다" }, 401));
+
+    // 탈퇴 입구는 `/api/auth/` 밖이다. 세션이 멀쩡한데 로그인으로 튕기면 안 된다.
+    const thrown = await api("/api/me", { method: "DELETE", body: { password: "x" } }).catch((e) => e);
+
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect((thrown as ApiError).slug).toBe("login-failed");
+  });
+
   it("남이 낸 problem+json 은 우리 이름으로 안 읽는다", async () => {
     mockFetch(jsonResponse({ type: "about:blank", detail: "Gateway Timeout" }, 504));
 
