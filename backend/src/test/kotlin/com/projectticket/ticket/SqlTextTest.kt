@@ -31,9 +31,10 @@ class SqlTextTest {
 
     @Test
     fun every_seat_update_is_conditional_on_the_current_status() {
+        // 바닥을 박는다 — 몇 개가 원시 문자열 밖으로 옮겨 가도 「하나는 읽었다」로 초록이 되지 않게(마무리 12차 독립 리뷰).
         assertThat(statements)
-            .describedAs("`update performance_seat` 를 하나도 못 읽었다 — 원시 문자열 밖으로 옮겼으면 이 파서도 같이 고친다")
-            .isNotEmpty()
+            .describedAs("`update performance_seat` 를 ${SEAT_UPDATES_FLOOR} 개보다 적게 읽었다 — 원시 문자열 밖으로 옮겼으면 이 파서도, 지웠으면 바닥도 같이 고친다")
+            .hasSizeGreaterThanOrEqualTo(SEAT_UPDATES_FLOOR)
 
         val unconditional = statements.filterNot { (_, sql) -> conditionsOnStatus(sql) }.map { (path, _) -> path.fileName.toString() }
         assertThat(unconditional)
@@ -41,17 +42,43 @@ class SqlTextTest {
             .isEmpty()
     }
 
-    /** `where` 뒤에 좌석 표(별칭 또는 맨 이름)의 `status = …`·`status in (…)` 이 있나. `exists` 안의 `p.status` 는 회차라 안 센다 */
+    /**
+     * `where` 뒤에 좌석 표(별칭 또는 맨 이름)의 `status = …`·`status in (…)` 이 있나.
+     * **하위 질의는 걷어내고 본다** — `exists (select … p.status …)`·`in (select … where status = …)` 의 `status` 는 회차·예매의 것이라,
+     * 남겨 두면 좌석 조건이 없어도 통과한다(마무리 12차 독립 리뷰).
+     */
     private fun conditionsOnStatus(sql: String): Boolean {
         val alias = SEAT_UPDATE.find(sql)?.groupValues?.get(1)?.takeUnless { it.equals("set", ignoreCase = true) }
-        val where = sql.substringAfter(WHERE_KEYWORD.find(sql)?.value ?: return false)
+        val where = withoutSubqueries(sql.substringAfter(WHERE_KEYWORD.find(sql)?.value ?: return false))
         val qualifier = if (alias.isNullOrEmpty()) """(?<![\w.])""" else """(?:(?<![\w.])|\b$alias\.)"""
         return Regex("""(?i)${qualifier}status\s*(?:=|in\s*\()""").containsMatchIn(where)
     }
 
+    /** `select` 로 시작하는 괄호 묶음을 통째로 지운다. 안쪽 괄호까지 세어서 짝을 맞춘다 */
+    private fun withoutSubqueries(text: String): String = buildString {
+        var i = 0
+        while (i < text.length) {
+            if (text[i] == '(' && SUBQUERY_START.matchesAt(text, i)) {
+                var depth = 0
+                while (i < text.length) {
+                    if (text[i] == '(') depth++
+                    if (text[i] == ')') depth--
+                    i++
+                    if (depth == 0) break
+                }
+            } else {
+                append(text[i++])
+            }
+        }
+    }
+
     private companion object {
+        /** 지금 좌석 UPDATE 는 일곱이다(`PaymentTransition` 둘·`PerformanceCancel`·`RefundTransition`·`HoldSweeper`·`PerformanceClose`·`SeatHold`) */
+        const val SEAT_UPDATES_FLOOR = 7
+
         val RAW_STRING = Regex("\"\"\"(.*?)\"\"\"", RegexOption.DOT_MATCHES_ALL)
-        val SEAT_UPDATE = Regex("""(?i)\bupdate\s+performance_seat\b\s*(\w+)?""")
+        val SEAT_UPDATE = Regex("""(?i)\bupdate\s+performance_seat\b(?:\s+(?:as\s+)?(\w+))?""")
         val WHERE_KEYWORD = Regex("""(?i)\bwhere\b""")
+        val SUBQUERY_START = Regex("""(?i)\(\s*select\b""")
     }
 }

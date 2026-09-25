@@ -26,6 +26,19 @@ unlink_modules() {  # junction 은 rmdir 이 링크만 지운다. `rm -rf` 는 �
   [ -e "$1/frontend/node_modules" ] || return 0
   if win; then MSYS_NO_PATHCONV=1 cmd /c rmdir "$(cygpath -w "$1/frontend/node_modules")"; else rm "$1/frontend/node_modules"; fi
 }
+# **링크가 남은 채로 `git worktree remove --force` 를 부르지 않는다** — Git for Windows 2.45 는 junction 을 따라 들어가
+# 진짜 `frontend/node_modules` 를 비운다(마무리 12차 독립 리뷰가 재현했다, `stack.md`). 끊겼는지 보고 나서 지운다.
+remove_worktree() {
+  unlink_modules "$1"
+  if [ -e "$1/frontend/node_modules" ]; then
+    echo "링크가 안 끊겼다: $1/frontend/node_modules — 워크트리를 안 지운다. cmd /c rmdir 로 링크를 먼저 끊고 git worktree remove 한다"
+    return 1
+  fi
+  git worktree remove --force "$1" || echo "워크트리를 못 지웠다: $1 — git worktree prune 으로 치운다"
+}
+wt=
+trap '[ -n "$wt" ] && [ -d "$wt" ] && remove_worktree "$wt"' EXIT
+trap 'exit 130' INT TERM
 
 bad=0
 for name in "$@"; do
@@ -51,7 +64,7 @@ for name in "$@"; do
       echo "[$name] 막았다 — exit $rc, 「$expect」(${took}초)"
     fi
   fi
-  unlink_modules "$wt"
-  git worktree remove --force "$wt" || echo "[$name] 워크트리를 못 지웠다: $wt — git worktree prune 으로 치운다"
+  remove_worktree "$wt" || bad=1
+  wt=
 done
 exit "$bad"

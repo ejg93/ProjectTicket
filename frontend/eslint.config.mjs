@@ -62,7 +62,9 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": [
         "error",
         {
-          selector: "MemberExpression[property.name='message'], MemberExpression[property.value='message']",
+          // 구조 분해(`const { message } = thrown`)도 같은 읽기다(마무리 12차 독립 리뷰).
+          selector:
+            "MemberExpression[property.name='message'], MemberExpression[property.value='message'], ObjectPattern > Property[key.name='message']",
           message: "화면은 원인 문구를 안 적는다 — 슬러그로 가르고 문구는 화면이 정한다. 되짚을 값은 digest 다(frontend-rules.md)",
         },
       ],

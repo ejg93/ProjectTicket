@@ -370,6 +370,11 @@ MSYS 경로 변환이 `ref/x:.dir/file` 꼴(슬래시 든 ref + 점으로 시작
 `ref:path` 인자를 안 쓴다 — `git ls-tree <ref> -- <path>` 로 받거나, 꼭 써야 하면 `MSYS_NO_PATHCONV=1` 을 앞에 둔다.
 같은 변환이 `cmd` 의 슬래시 옵션도 먹는다 — `cmd //c mklink /J` 의 `/J` 가 `J:\` 가 되어 「구문이 틀립니다」로 죽는다(`G2`). 역시 `MSYS_NO_PATHCONV=1`.
 
+### `git worktree remove --force` 는 junction 을 따라 들어가 원본을 지운다
+
+Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안의 junction 이 가리키는 폴더가 통째로 빈다.
+워크트리에 `node_modules` 같은 것을 junction 으로 빌렸으면 `cmd /c rmdir` 로 링크부터 끊고, **끊겼는지 확인한 뒤** 워크트리를 지운다(`gate-probe.sh` 의 `remove_worktree`).
+
 ### `npx` 는 로컬에 없는 도구를 말없이 받아 온다
 
 `node_modules` 가 없는 자리(워크트리·새 클론)에서 `npx eslint` 를 부르면 레지스트리에서 받아서 돈다 — 우리 설정이 아닌 판이 돌고 오류는 모듈 해석 쪽으로 난다(`G2`). 스크립트의 `npx` 는 `--no-install` 을 붙인다.

@@ -1,5 +1,6 @@
 package com.projectticket.ticket
 
+import com.tngtech.archunit.core.domain.AccessTarget
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaMethod
 import com.tngtech.archunit.core.importer.ImportOption
@@ -19,6 +20,8 @@ import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestMethod
 
 /**
  * `coding-rules.md`(D14)가 글로만 적어 둔 계층 규칙을 기계가 지킨다.
@@ -59,24 +62,50 @@ class ArchitectureTest {
         .should().beAnnotatedWith(PatchMapping::class.java)
         .orShould().beAnnotatedWith(PutMapping::class.java)
 
+    /** 같은 것을 `@RequestMapping(method = [PUT])` 꼴로 적은 자리(마무리 12차 독립 리뷰). 지금 `@RequestMapping` 메서드가 없어 빈 규칙을 허용한다 */
+    @ArchTest
+    val noPutOrPatchViaRequestMapping: ArchRule = methods()
+        .that().areAnnotatedWith(RequestMapping::class.java)
+        .should(
+            object : ArchCondition<JavaMethod>("not map PUT or PATCH") {
+                override fun check(method: JavaMethod, events: ConditionEvents) {
+                    method.getAnnotationOfType(RequestMapping::class.java).method
+                        .filter { it == RequestMethod.PUT || it == RequestMethod.PATCH }
+                        .forEach { events.add(SimpleConditionEvent.violated(method, "${method.fullName} 가 $it 을 받는다 — 상태는 하위 경로에 POST(D5)")) }
+                }
+            },
+        )
+        .allowEmptyShould(true)
+
     /**
      * 앱 시계를 안 읽는다(`D7` — 만료·마감 판정은 SQL `now()`, 앱의 `Clock` 은 주입받는 계산기에만). `G7a`.
-     * 예외는 이름으로 적는다 — 넷 다 판정이 아니거나 비교 상대가 앱 시계로 찍힌 값이다. 사유는 `time-rules.md`.
+     * **주입받은 `Clock` 으로 부르는 `now(clock)` 은 된다** — 인자 없는 `now()`·`Clock.system*()`·`System.currentTimeMillis()` 만 막는다.
+     * 예외는 이름으로 적는다 — 넷 다 판정이 아니거나 비교 상대가 앱 시계로 찍힌 값이다. 사유는 `time-rules.md` 의 예외 표.
+     * 목록이 낡으면(예외 클래스가 없어지거나 시계를 안 읽게 되면) 선다.
      */
     @ArchTest
     val noAppClockReads: ArchRule = classes()
         .that().resideInAPackage("com.projectticket.ticket..")
         .should(
-            object : ArchCondition<JavaClass>("not read the app clock (java.time *.now(), System.currentTimeMillis)") {
+            object : ArchCondition<JavaClass>("not read the app clock (java.time now(), Clock.system*, System.currentTimeMillis)") {
+                private val allowedSeen = mutableSetOf<String>()
+
+                override fun init(allObjectsToTest: Collection<JavaClass>) = allowedSeen.clear()
+
                 override fun check(javaClass: JavaClass, events: ConditionEvents) {
-                    if (javaClass.name.substringBefore('$') in APP_CLOCK_ALLOWED) return
-                    javaClass.methodCallsFromSelf
-                        .filter { call ->
-                            val target = call.target
-                            (target.owner.packageName == "java.time" && target.name == "now") ||
-                                (target.owner.name == "java.lang.System" && target.name == "currentTimeMillis")
-                        }
-                        .forEach { events.add(SimpleConditionEvent.violated(it, "${it.description} — 앱 시계다. 판정은 SQL now(), 계산은 주입받은 Clock")) }
+                    val reads = javaClass.methodCallsFromSelf.filter { readsAppClock(it.target) }
+                    val topLevel = javaClass.name.substringBefore('$')
+                    if (topLevel in APP_CLOCK_ALLOWED) {
+                        if (reads.isNotEmpty()) allowedSeen += topLevel
+                        return
+                    }
+                    reads.forEach { events.add(SimpleConditionEvent.violated(it, "${it.description} — 앱 시계다. 판정은 SQL now(), 계산은 주입받은 Clock")) }
+                }
+
+                override fun finish(events: ConditionEvents) {
+                    (APP_CLOCK_ALLOWED - allowedSeen).forEach {
+                        events.add(SimpleConditionEvent.violated(it, "$it 가 앱 시계 예외 목록에 있는데 시계를 안 읽는다 — 목록과 time-rules.md 표에서 지운다"))
+                    }
                 }
             },
         )
@@ -133,7 +162,12 @@ class ArchitectureTest {
         )
 
     private companion object {
-        /** 앱 시계를 읽어도 되는 클래스. 늘리려면 `time-rules.md` 「앱 시계의 예외」에 사유를 먼저 적는다 */
+        fun readsAppClock(target: AccessTarget.MethodCallTarget): Boolean =
+            (target.owner.packageName == "java.time" && target.name == "now" && target.rawParameterTypes.isEmpty()) ||
+                (target.owner.name == "java.time.Clock" && target.name.startsWith("system")) ||
+                (target.owner.name == "java.lang.System" && target.name == "currentTimeMillis")
+
+        /** 앱 시계를 읽어도 되는 클래스. 늘리려면 `time-rules.md` 의 예외 표에 사유를 먼저 적는다 */
         val APP_CLOCK_ALLOWED = setOf(
             "com.projectticket.ticket.demo.DemoSeeder",
             "com.projectticket.ticket.health.HealthController",

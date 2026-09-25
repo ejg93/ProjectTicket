@@ -38,7 +38,7 @@ DB 는 하나고 그 시계도 하나다.
 **앱의 `Clock` 은 계산기에만 쓴다** — 수수료 구간(17)·예상 대기(21)처럼 **입력을 받아 답을 내는 순수 함수**가 `Clock` 을 주입받고, 테스트가 고정값을 넣는다(`D8`).
 그 함수가 DB 행을 판정하지 않는다.
 
-**앱 시계 호출(`java.time` 의 `now()`·`System.currentTimeMillis()`)은 `ArchitectureTest.noAppClockReads` 가 막는다**(`G7a`). 예외는 넷이고 이름으로 적혀 있다:
+**앱 시계 호출(`java.time` 의 인자 없는 `now()`·`Clock.system*()`·`System.currentTimeMillis()`)은 `ArchitectureTest.noAppClockReads` 가 막는다**(`G7a`). 주입받은 `Clock` 으로 부르는 `now(clock)` 은 된다. 예외는 넷이고 이름으로 적혀 있다 — 목록이 낡으면 그 테스트가 선다:
 
 | 클래스 | 왜 앱 시계인가 |
 |---|---|

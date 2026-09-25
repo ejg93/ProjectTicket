@@ -184,6 +184,9 @@ tasks.test {
 		rootProject.file("../doc/reference/stack.md"),
 		rootProject.file("../doc/reference/event-catalog.md"),
 		rootProject.file("../doc/reference/state-machines.md"),
+		// `TestConventionTest`(G7d)가 레인 표와 이 빌드 파일을 글자로 읽는다(마무리 12차 독립 리뷰).
+		rootProject.file("../doc/reference/testing-strategy.md"),
+		rootProject.file("build.gradle.kts"),
 		rootProject.file("../.github/workflows/ci.yml"),
 		rootProject.file("../.github/workflows/codeql.yml"),
 		rootProject.file("../.github/workflows/claude-review.yml"),

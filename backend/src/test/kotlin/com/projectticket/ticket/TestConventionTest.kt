@@ -7,6 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.Tags
 import org.junit.jupiter.api.Test
 
 /**
@@ -93,7 +94,10 @@ class TestConventionTest {
 
     private fun JavaClass.isOnBase(): Boolean = BASES.any { isAssignableTo(it) }
 
-    private fun JavaClass.tagsDb(): Boolean = tryGetAnnotationOfType(Tag::class.java).map { it.value == "db" }.orElse(false)
+    /** `@Tag` 를 둘 이상 달면 컴파일러가 `@Tags` 로 묶는다 — 둘 다 본다(마무리 12차 독립 리뷰) */
+    private fun JavaClass.tagsDb(): Boolean =
+        tryGetAnnotationOfType(Tag::class.java).map { it.value == "db" }.orElse(false) ||
+            tryGetAnnotationOfType(Tags::class.java).map { tags -> tags.value.any { it.value == "db" } }.orElse(false)
 
     private companion object {
         /** 테스트 클래스는 지금 쉰이 넘는다. 이 밑이면 읽기가 틀린 것이다 */

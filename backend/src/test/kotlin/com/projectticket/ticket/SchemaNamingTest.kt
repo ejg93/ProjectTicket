@@ -43,6 +43,9 @@ class SchemaNamingTest : PostgresTestBase() {
     fun a_single_primary_key_is_table_id_or_the_parent_key() {
         val primaryKeys = keyColumns("PRIMARY KEY")
         val foreignKeys = keyColumns("FOREIGN KEY").flatMap { (table, cols) -> cols.map { "$table.$it" } }.toSet()
+        // 질의가 틀려 0행이면 아래가 조용히 통과한다(마무리 12차 독립 리뷰).
+        assertThat(primaryKeys).describedAs("기본키를 못 읽었다 — information_schema 질의를 본다").hasSizeGreaterThan(MIN_TABLES)
+        assertThat(foreignKeys).describedAs("외래키를 못 읽었다 — 1:1 확장 표를 가를 수 없다").isNotEmpty()
 
         val wrong = primaryKeys
             .filterValues { it.size == 1 }
@@ -122,6 +125,9 @@ class SchemaNamingTest : PostgresTestBase() {
 
         /** `V1`~`V20` 이 만든 컬럼은 이보다 훨씬 많다. 이 밑이면 질의가 틀린 것이다 */
         const val MIN_COLUMNS = 100
+
+        /** 표는 스물이 넘는다. 기본키를 이보다 적게 읽으면 질의가 틀린 것이다 */
+        const val MIN_TABLES = 10
 
         /** 소문자·숫자·밑줄, 끝이 밑줄이 아니다 */
         val SNAKE = Regex("^[a-z][a-z0-9_]*[a-z0-9]$")
