@@ -25,6 +25,12 @@ DB 와 Kotlin 의 이름을 정한다. 기준은 `sqlstyle.guide` 와 Kotlin 공
 
 두 번째는 `sqlstyle.guide` 가 「`id` 를 기본 식별자로 쓰지 말라」고 한 것을 따른 것이고, 첫 번째는 같은 가이드를 버린 것이다.
 
+**이 표를 도는 스키마에 거는 것은 `SchemaNamingTest`(컨테이너 레인)다**(`G7b`) — snake_case·기본키·`_at`/`_until`↔`timestamptz`·`is_`. 어긋난 채로 둔 것은 아래 하나고 시험이 이름으로 봐준다.
+
+| 컬럼 | 규칙 | 왜 그대로인가 |
+|---|---|---|
+| `account_consent.granted` | 불리언은 `is_` | `V3` 가 표·뷰·append-only 트리거에 같은 이름으로 걸었다. 고치려면 새 `V` 로 셋을 같이 바꾼다(`G7b` 가 찾았다) |
+
 ### `held_until` 같은 이름
 
 `_at` 은 「일어난 시각」이고 `_until` 은 「거기까지 유효한 시각」이다. **뜻이 다르면 접미사도 다르다** —

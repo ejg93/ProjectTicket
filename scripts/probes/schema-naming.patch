@@ -1,0 +1,11 @@
+# 게이트: SchemaNamingTest
+# 명령: cd backend && TESTCONTAINERS_REUSE_ENABLE=false ./gradlew integrationTest --tests '*SchemaNamingTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/integrationTest/*SchemaNamingTest.xml 2>/dev/null; exit $r
+# 문구: 따옴표 없이 못 부르는 이름
+diff --git a/backend/src/main/resources/db/migration/V21__probe_camel.sql b/backend/src/main/resources/db/migration/V21__probe_camel.sql
+new file mode 100644
+index 0000000..319dfbc
+--- /dev/null
++++ b/backend/src/main/resources/db/migration/V21__probe_camel.sql
+@@ -0,0 +1,2 @@
++-- probe
++alter table account add column "probeCamel" text;

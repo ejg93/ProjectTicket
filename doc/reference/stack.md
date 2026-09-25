@@ -277,6 +277,10 @@ Spring 은 그 표시를 테스트 클래스의 상속 계층에서 찾는데 �
 `.withReuse(true)` 가 코드에 있어도 기계마다 `~/.testcontainers.properties` 에 `testcontainers.reuse.enable=true` 가 있어야 한다. 안 켜져 있어도 실패하지 않고 경고 한 줄과 함께 새로 띄운다.
 CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사용 컨테이너를 지운다** — Flyway 체크섬이 안 맞아 전부 빨개진다.
 
+**시험 삼아 넣은 `V` 는 지워도 스키마에 남는다**(`G7b`). 파일을 지우면 Flyway 가 그 판을 「미래 판」으로 넘겨서 오류도 안 나고,
+재사용 컨테이너에 컬럼과 이력 행이 그대로 남아 다음 실행의 스키마 시험이 그것을 짚는다. 스키마를 바꾸는 탐침은
+`TESTCONTAINERS_REUSE_ENABLE=false` 로 새 컨테이너를 띄운다. 이미 남았으면 그 컨테이너에서 컬럼과 `flyway_schema_history` 행만 지운다.
+
 ### `@ServiceConnection` 컨테이너는 Spring 컨텍스트마다 뜬다
 
 `Containers` 가 `@TestConfiguration` 이라 **컨텍스트가 갈리면 컨테이너도 따로 뜬다.** 컨텍스트 캐시 키는 애너테이션으로 갈리므로 `ConcurrencyTestBase` 가 `PostgresTestBase` 와 애너테이션을 똑같이 맞춘다(`@AutoConfigureMockMvc` 까지) — `@Transactional` 만 캐시 키에 안 들어간다.
