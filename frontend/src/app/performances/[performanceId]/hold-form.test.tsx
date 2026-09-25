@@ -14,8 +14,9 @@ import { HoldForm } from "./hold-form";
  * 뒤를 어기면 서버가 **앞 요청의 답**(다른 좌석의 예매)을 돌려준다.
  */
 
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn() }),
 }));
 
 function seatMap(): SeatMapData {
@@ -64,6 +65,8 @@ async function submit(): Promise<void> {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  push.mockClear();
+  window.sessionStorage.clear();
   document.cookie = "XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 });
 
@@ -120,5 +123,31 @@ describe("선점", () => {
     await submit();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/좌석 현황을 새로 고쳐/);
+  });
+
+  it("대기열을 지나온 탭이면 입장 토큰을 헤더로 싣는다(`43`)", async () => {
+    document.cookie = "XSRF-TOKEN=t";
+    window.sessionStorage.setItem("admission:5", "token-abc");
+    const spy = mockFetch({ reservation_id: 1 });
+    render(<HoldForm data={seatMap()} performanceId="5" />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /1번, 선택 가능/ }));
+    await submit();
+
+    const call = spy.mock.calls.find((c) => String(c[0]).includes("/reservations"));
+    expect(call?.[1].headers["X-Admission-Token"]).toBe("token-abc");
+  });
+
+  it("관문이 줄을 요구하면 낡은 토큰을 버리고 대기열로 간다(`43`)", async () => {
+    document.cookie = "XSRF-TOKEN=t";
+    window.sessionStorage.setItem("admission:5", "expired");
+    mockFetch({ type: "tag:projectticket.example,2026:admission-required", detail: "줄을 서라" }, 429);
+    render(<HoldForm data={seatMap()} performanceId="5" />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /1번, 선택 가능/ }));
+    await submit();
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/queue/5"));
+    expect(window.sessionStorage.getItem("admission:5")).toBeNull();
   });
 });

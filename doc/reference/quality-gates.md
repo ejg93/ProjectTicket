@@ -25,13 +25,14 @@
 | `tsc --noEmit` · `next build` | **1 타입** | `verify.sh`(빠른·느린) · CI | 화면이 서버 응답을 **받은 그대로**(snake_case) 읽는지까지 타입이 든다(`39`). 응답 모양이 바뀌면 화면이 컴파일에서 선다 | 부수지 않는다 — 컴파일과 같다. 응답 타입의 필드 이름을 틀리면 그 자리에서 선다(`G2`) |
 | `Paging`·`OrderBy` | **1 타입** | 컴파일 | 목록의 `size` 상한과 정렬 허용 목록(`40a`, `D5`). 컨트롤러가 셋을 따로 받을 길이 없어서 새 목록이 생겨도 상한을 빠뜨릴 자리가 없다 | 마무리 9차 2026-09-19 — `page` 에 상한이 없어 `Int` 가 넘쳤다. 타입이 든다는 말이 `size` 에만 참이었다 |
 | 마이그레이션 제약 | 2 제약 | 기동·테스트 | `V1`~`V20` 의 `check`·`not null`·`references`·유일·전이 트리거. 점검 1차가 108 개를 셌다 | `I1` 2026-09-15 |
-| CodeQL | 4 테스트 | CI(`codeql.yml`, push·주 1회) | 파일을 넘어가는 데이터 흐름 — 사용자 입력이 SQL·셸까지 가나. `actions`·`javascript-typescript` 는 `build-mode: none`, `java-kotlin` 은 **`manual`**(Kotlin 은 `none` 으로 못 읽는다) 이고 **그 레인만 힙을 키운다**(`-Pkotlin.daemon.jvmargs=-Xmx4g` — 추출기가 컴파일러 안에서 돌아 기본 힙을 넘긴다). **잡 셋이 필수 검사다**(`P10`) | `46a` 2026-09-19 — `none` 은 실행이 성공하고 **코드를 0개** 읽었다. `46a-1` — `manual` 은 10분 GC 로 죽었다. 둘 다 잡은 「돌았다」 |
+| CodeQL | 4 테스트 | CI(`codeql.yml`, push·주 1회) | 파일을 넘어가는 데이터 흐름 — 사용자 입력이 SQL·셸까지 가나. `actions`·`javascript-typescript` 는 `build-mode: none`, `java-kotlin` 은 **`manual`**(Kotlin 은 `none` 으로 못 읽는다) 이고 **그 레인만 힙을 키운다**(`-Pkotlin.daemon.jvmargs=-Xmx4g` — 추출기가 컴파일러 안에서 돌아 기본 힙을 넘긴다). **잡 셋이 필수 검사다**(`P10`). `46c` 부터 `JdbcClient.sql()` 도 싱크다(`.github/codeql/extensions/`). **못 보는 꼴 하나** — 도우미 함수가 `StringBuilder` 로 조립해 넘긴 SQL(`46c` 탐침 ⓑ, `G10`) | `46a` 2026-09-19 — `none` 은 실행이 성공하고 **코드를 0개** 읽었다. `46a-1` — `manual` 은 10분 GC 로 죽었다. 둘 다 잡은 「돌았다」. `46c` 2026-09-26 — 탐침 가지 `probe/codeql`(run `36158775415`): `JdbcClient` 직접 결합 · `JdbcTemplate` 대조군이 `java/sql-injection` high 둘, 도우미 조립은 0 |
 | Claude Review | 5 문서 | CI(`claude-review.yml`, PR) | **아무것도 못 막는다** — 조언이다. 막는 것은 「이번 회차에 코멘트를 남겼나」 하나고, 그것이 없으면 5~7분이 게이트도 조언도 아니게 된다(`46a`) | 게이트가 아니다 — 조언이라 부술 것이 없다. 막는 것은 「코멘트를 안 남기면 선다」 step 하나고 PR 에서만 돈다(`G2`) |
 | `ArchitectureTest` | 4 테스트 | `gradlew test`(빠른 레인) | `D14` 의 계층·예외·의존. **패키지 순환도 본다** — `auth ↔ queue` 가 실제로 걸려서 `SecuredApiFilter` 로 뒤집었다(`20a`). `G7a` 가 셋을 더했다 — 의존 방향(`payment → reservation → event → settlement`)·`PUT`·`PATCH` 금지·앱 시계 호출(예외 넷, `D7`) | `20a` 2026-09-17. `G7a` 2026-09-25 — 새 셋에 위반을 하나씩 넣으니 셋 다 빨강. 탐침 `arch-layers`·`arch-put-patch`·`arch-app-clock` |
 | `EnumConstraintTest` | 4 테스트 | 〃 | 열거형과 DB 의 닫힌 값 목록이 갈리는 것(`I2-1`). 한쪽에만 더한 값은 **그 값이 실제로 흐를 때까지** 안 보인다. **열거형이 없는 목록 다섯은 못 지킨다** — 그 자리는 목록에 박아 두는 것까지다 | `I2-1` 2026-09-18 — DB 에만 `bounced` 를 더하니 짚었다 |
 | `ErrorContractTest` | 4 테스트 | 〃 | `D5` 「`type` 목록」과 `ErrorCode` 가 갈리는 것(`I2`). 계약에 없는 슬러그는 화면이 모르고, 계약에만 있는 슬러그는 안 오는 분기다 | `I2` 2026-09-18 — 계약 행을 빼니 단언 둘이 짚었다 |
 | `StateMachineDocTest` | 4 테스트 | 〃 | `state-machines.md` 의 전이표와 전이 트리거가 갈리는 것(`I3-1`). 문서만 고치면 다음 사람이 낡은 쪽을 믿는다 | `G2` 2026-09-25 — 전이표에서 `held → paying` 한 줄을 지우니 「갈렸다」로 빨강. 탐침 `state-machine-doc` |
 | `AppDbConstraintTest` | 4 테스트 | 〃 | 앱 검증과 DB 제약이 같은 규칙을 두 벌 드는 자리가 갈리는 것(`I4-1`) — 앱이 느슨해지면 400 이 500 이 된다. **역방향도 본다**(`I4-2`): 마이그레이션의 길이·정규식 `check` 전부가 표에 있거나 짝이 없는 근거를 들어야 한다 | `I4-2` 2026-09-19 — 표에서 한 줄 빼니 빨갛고 되돌리니 초록 |
+| `SeatLimitConsistencyTest` | 4 테스트 | `gradlew test`(빠른 레인) | 화면 `SeatMap.MAX_SEATS` 와 서버 `MAX_SEATS_PER_HOLD` 가 갈리는 것(`41-1`). 언어가 달라 컴파일이 못 묶어 `seat-map.tsx` 를 글자로 읽는다 — 그 파일이 `inputs.files`·backend 지문에 있다 | `41-1` 2026-09-26 — `MAX_SEATS` 를 5 로 바꾸니 빨강, backend 지문도 바뀌었다. 탐침 `seat-limit` |
 | `MigrationTextTest` | 4 테스트 | `gradlew test`(빠른 레인) | 마이그레이션의 시드(규약 표 셋 밖의 `insert`)와 옥텟 표준 컬럼의 `length`(`G7b`). 주석은 `MigrationSql` 이 걷는다 | `G7b` 2026-09-25 — 허용 밖 `insert`·`length(email)` 를 새 `V` 로 넣으니 각자 빨강. 탐침 `migration-seed`·`migration-octet` |
 | `SqlTextTest` | 4 테스트 | 〃 | `where` 에 좌석 `status` 조건이 없는 `update performance_seat`(`G7b`, `D4`). 흐름 시험은 한 사람씩 돌아서 덮어쓰기를 못 본다. **원시 문자열 밖에서 조립한 SQL 은 못 본다** | `G7b` 2026-09-25 — 조건 없는 좌석 UPDATE 를 넣으니 빨강. 탐침 `sql-seat-update` |
 | `SchemaNamingTest` | 4 테스트 | `gradlew integrationTest` | 도는 스키마의 이름(`D15`) — snake_case·기본키 `<표>_id`·`_at`/`_until`↔`timestamptz`·`is_`(`G7b`). 첫 실행이 `account_consent.granted` 를 찾았다 — `naming-rules.md` 에 적고 이름으로 봐준다 | `G7b` 2026-09-25 — camelCase 컬럼을 새 `V` 로 넣으니 빨강. 탐침 `schema-naming`(재사용 컨테이너를 안 쓴다) |
@@ -48,6 +49,8 @@
 | eslint `react/no-danger` | 4 테스트 | 〃 | `dangerouslySetInnerHTML`(`D9`, OWASP A03). React 는 기본으로 글자를 이스케이프하는데 그것이 끈다 — 남이 쓴 글이 닿으면 남의 스크립트가 우리 페이지에서 돈다. **`39-1` 의 약관 화면이 첫 소비자다**(`consent_item.body` 가 마크다운이다) | `G2` 2026-09-25 — `dangerouslySetInnerHTML` 한 줄에 빨강. 탐침 `no-danger` |
 | eslint `.message` 금지 | 4 테스트 | `npm run lint`(로컬·CI) | `src/app`·`src/components` 의 `.message` 읽기(`D16` 「원인을 화면에 안 적는다」, `G7c`). **변수 이름으로 안 가린다** — `catch` 변수가 `thrown` 이라 `error`·`err`·`e` 로 가리면 하나도 못 문다 | `G7c` 2026-09-25 — `error.tsx` 에 `{error.message}` 를 넣으니 빨강. 탐침 `eslint-message` |
 | `screen-text.test.ts` | 4 테스트 | `npm test` | 화면 문구의 **반말**(`D17`). `doc-lint.sh` 의 거울이다 — 그쪽은 개발자 글의 존댓말을 막는다. 주석이 평서형이라 정규식으로는 못 재고 AST 로 걷는다 | `G2` 2026-09-25 — 「좌석이 풀렸다」(반말)로 바꾸니 빨강. 탐침 `screen-text` |
+| `form-pending.test.ts` | 4 테스트 | `npm test` | `<form action={fn}>` 파일이 pending 을 `useState` 로 드는 것 · `onSubmit` 폼의 `SubmitButton`(`39-2`, `D16`). **린트로 못 내린다** — 「한 파일에 둘이 같이」를 선택자가 못 적는다 | `39-2` 2026-09-26 — `hold-form.tsx` 에 `const [pending, setPending] = useState(false)` 를 넣으니 빨강. 탐침 `form-pending` |
+| `screen-map.test.ts` | 4 테스트 | `npm test` | `screen-rules.md` 「화면 지도」의 경로마다 `app/<경로>/page.tsx` 가 있는지(`39-1`, `D17`). 없으면 링크가 404 로 떨어진다 — 아직 안 만든 화면은 자리표시가 선다 | `39-1` 2026-09-26 — `/me/withdraw` 자리표시를 치우니 빨강. 탐침 `screen-map`(파일 없는 경로를 지도에 더한다) |
 | `error-types.test.ts` | 4 테스트 | `npm test` | 화면이 가르는 오류 슬러그(`case`·`.slug ===`)가 `api-guidelines.md` 계약표 밖인 것(`G7c`). 표 = `ErrorCode` 는 `ErrorContractTest` 가 재서 둘이 이어진다 | `G7c` 2026-09-25 — `case "no-such-type":` 을 넣으니 빨강. 탐침 `error-type-slug` |
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | `G2` 2026-09-25 — 이름 없는 `<button>` 에 `button-name`. 탐침 `axe` |
 | 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
@@ -132,8 +135,8 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 같은 자리를 다른 이유(파서가 아예 못 읽음)로도 빨갛게 만들 수 있다 — 그래서 그 테스트는 「못 읽었다」와
 「갈렸다」를 **다른 문장**으로 낸다. 부술 때 실패 문구까지 읽는다.
 
-**CodeQL 은 파일이 아니라 가지째 부순다**(ProjectShop `2e-2` 실측 — 여기서는 아직 안 부쉈다). 탐침 가지를 밀어
-경보가 뜨는 것을 보고 그 가지를 지우면 그 경보도 같이 닫힌다. **`46c` 가 `JdbcClient` 싱크를 들이면서 그 방법으로 부순다.**
+**CodeQL 은 파일이 아니라 가지째 부순다**(ProjectShop `2e-2` 실측, 여기서는 `46c`). 탐침 가지를 밀어
+경보가 뜨는 것을 보고 그 가지를 지우면 그 경보도 같이 닫힌다. `46c` 가 `JdbcClient` 싱크를 들이며 그렇게 부쉈다 — 경보가 우리 파일에서만 뜨는지도 같은 실행에서 본다(`main` 열린 경보 0).
 
 **gitleaks 는 문서의 예시 키를 안 잡는다**(ProjectShop 실측). `AKIAIOSFODNN7EXAMPLE` 은 allowlist 라 그것으로 부수면
 게이트가 고장 난 것처럼 보인다. 아무 값이나 만든 키로 부순다.
@@ -158,7 +161,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | 게이트 | 문턱 | 근거가 된 측정 |
 |---|---|---|
 | **detekt** | **새 검출 0건** | `47` 첫 측정 262건. 문턱을 올린 것 다섯(줄 길이 200·반환 6·throw 8·긴 함수 120줄·함수 수 20)과 끈 것 하나(`TooGenericExceptionCaught` — 경계에서 `RuntimeException` 을 잡는 것이 우리 규약이다)에 **근거를 설정 파일에 같이 적었다**. 나머지 마흔은 고쳤다 |
-| **CodeQL** | **새 경보 0건** | `46a-1` 첫 측정(run `35443023092`): `java-kotlin` 규칙 76개·결과 0, `actions` 규칙 17개·결과 0, `javascript-typescript` 는 `39` 에서 켜 결과 0. **0 이 문턱이다 — 다만 0 이 「없다」가 아니라 「안 봤다」인 자리가 하나 있다.** 기본 질의는 `JdbcClient.sql()` 을 SQL 싱크로 모른다(ProjectShop `2e-4` 가 `JdbcTemplate` 은 잡고 `JdbcClient` 는 안 잡는 것을 같은 실행에서 쟀다). 이 저장소의 데이터 접근이 전부 `JdbcClient` 고 `EventQuery` 가 `order by` 를 문자열로 붙이므로, **싱크 목록을 늘린다(`46c`)**. 그 뒤 첫 실행이 0 이면 그때의 0 이 문턱이다 |
+| **CodeQL** | **새 경보 0건** | `46a-1` 첫 측정(run `35443023092`): `java-kotlin` 규칙 76개·결과 0, `actions` 규칙 17개·결과 0, `javascript-typescript` 는 `39` 에서 켜 결과 0. **0 이 문턱이다 — 다만 0 이 「없다」가 아니라 「안 봤다」인 자리가 하나 있다.** 기본 질의는 `JdbcClient.sql()` 을 SQL 싱크로 모른다(ProjectShop `2e-4` 가 `JdbcTemplate` 은 잡고 `JdbcClient` 는 안 잡는 것을 같은 실행에서 쟀다). 이 저장소의 데이터 접근이 전부 `JdbcClient` 고 `EventQuery` 가 `order by` 를 문자열로 붙이므로, **싱크 목록을 늘린다(`46c`)**. `46c` 뒤 첫 측정(탐침 run `36158775415`): 우리 코드의 경보 **0** — 확장 뒤의 0 이라 이제 「봤다」의 0 이다 |
 | 테스트 | 실패 0 | — |
 | `npm audit` | **high 이상 0건** | `39` 첫 측정 0(전 등급). 처음 나오는 것부터 처분한다 |
 | gitleaks | 검출 0 | 아직 안 나왔다 |
@@ -175,7 +178,6 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 |---|---|---|
 | Dependabot **경보** | 켠 뒤 며칠. 취약점이 몇 개나, Gradle 쪽인지 npm 쪽인지 | **`P10` 이 2026-09-19 에 켰다.** 그 전엔 꺼져 있어서 측정 자체가 없었다 |
 | Claude Review | 반복해서 잡히는 지적의 목록 | PR `#20` 에 코멘트 하나(첫 실물). 회차 서너 개가 쌓여야 「반복」이 보인다 |
-| CodeQL 확장 뒤 | `JdbcClient` 싱크를 들인 뒤의 경보 수 | `46c` |
 
 **안 재고 정하지 않는다.** `D13` 이 「측정값이 없어서 못 쓴다」로 막혀 있던 것과 같은 자리고,
 여기서 잠정치를 박으면 **그 값이 근거 없이 관례가 된다.**

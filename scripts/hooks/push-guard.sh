@@ -11,6 +11,15 @@ fi
 
 printf '%s\n' "$c" | grep -qE '(^|[;&|])[[:space:]]*git push([[:space:]]|$)' || exit 0
 
+# 가지 삭제는 코드를 안 민다 — 도장을 안 본다(`46c` 가 탐침 가지를 지우다 막혔다). `main` 삭제만 막는다.
+if printf '%s\n' "$c" | grep -qE '(^|[;&|])[[:space:]]*git push[^;&|]*[[:space:]](--delete|-d)([[:space:]]|$)'; then
+  if printf '%s\n' "$c" | grep -qE '(--delete|-d)[[:space:]]+([^;&|]*[[:space:]])?main([[:space:]]|$)'; then
+    echo 'main 을 지우지 않는다.' >&2
+    exit 2
+  fi
+  exit 0
+fi
+
 if [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" = main ]; then
   echo '현재 가지가 main 이다. work/<날짜> 가지를 따고 민다(CLAUDE.md 「재개 프로토콜」 6번).' >&2
   exit 2

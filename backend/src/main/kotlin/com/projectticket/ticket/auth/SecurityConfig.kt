@@ -223,9 +223,13 @@ class SecurityConfig {
             "/api/auth/login",
             // 가입 화면이 무엇에 동의를 받아야 하는지 알아야 한다. 로그인 전에 보는 것이라 공개다.
             "/api/consent-items",
+            // 약관·처리방침 본문(`39-1`). 발에서 누구나 닿아야 한다.
+            "/api/consent-items/*",
             // 공연 목록·상세도 로그인 전에 본다 — 무엇을 파는지 보고 나서 로그인한다(`40a`).
             "/api/events",
             "/api/events/*",
+            // 회차 하나(`40c`). `*` 는 한 단계라 `/api/performances/*/reservations` 는 안 열린다 — `PerformanceDetailTest` 가 본다.
+            "/api/performances/*",
             // 좌석도는 로그인 전에 본다 — 자리를 보고 나서 로그인한다.
             "/api/performances/*/seats",
             // 델타도 같은 그림이다(10a). 로그인 전에 좌석을 보고 나서 로그인한다.

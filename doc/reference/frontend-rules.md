@@ -137,7 +137,7 @@ CSRF 토큰이 브라우저 쿠키에 있고, 멱등키를 쥐고 재시도하�
 
 **React 는 액션이 끝나면 폼을 비운다.** 다시 낼 때 사용자는 같은 값을 다시 친다 — 멱등키를 「같은 입력이면 같은 키」로 쥐는 쪽(`CheckoutForm`)이 그것을 전제한다(`42`).
 
-**아직 기계가 안 본다** — `39` 가 `form-pending.test.ts`(두 꼴이 섞인 파일을 잡는 검사)를 안 가져왔다. `39-2` 가 세운다.
+**`frontend/src/test/form-pending.test.ts` 가 잰다**(`39-2`) — `action=` 폼 파일의 pending `useState`, `onSubmit` 폼 파일의 `SubmitButton`. 린트는 「한 파일에 둘이 같이」를 못 적어서 시험이다.
 
 ## 캐시 — 실수하면 남의 것이 보인다
 

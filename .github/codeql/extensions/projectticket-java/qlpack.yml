@@ -1,0 +1,15 @@
+# CodeQL 싱크 목록에 이 저장소가 쓰는 API 를 더한다(`46c`, ProjectShop `2e-5` 에서 옮겼다).
+#
+# **질의를 새로 안 짠다.** 기본 묶음의 `java/sql-injection` 이 이미 도는데
+# (ProjectShop `2e-4` 가 `SqlTainted.qlx` 가 로드되는 것을 로그로 확인했다), 그 질의가 보는
+# **싱크 목록에 `JdbcClient` 가 없어서** 우리 코드를 못 본다.
+#
+# 목록만 늘리는 방식이라 CodeQL 이 올라가도 안 깨진다 — 질의를 복사해 두면
+# 원본이 좋아질 때 우리 사본만 낡는다.
+name: projectticket/java-models
+version: 0.0.1
+library: true
+extensionTargets:
+  codeql/java-all: '*'
+dataExtensions:
+  - models/**/*.model.yml

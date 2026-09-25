@@ -35,6 +35,29 @@ class ConsentSignupTest : PostgresTestBase() {
     }
 
     @Test
+    fun one_item_carries_its_text_publicly() {
+        // 약관 화면(`39-1`)이 로그인 없이 본문을 읽는다. 약관은 마크다운 `body`, 개인정보는 정형 넷이다.
+        mvc.get("/api/consent-items/terms_of_service").andExpect {
+            status { isOk() }
+            jsonPath("$.title") { value("이용약관") }
+            jsonPath("$.body") { value(org.hamcrest.Matchers.containsString("## 제1조")) }
+            jsonPath("$.purpose") { value(null as Any?) }
+        }
+        mvc.get("/api/consent-items/privacy_collect").andExpect {
+            status { isOk() }
+            jsonPath("$.body") { value(null as Any?) }
+            jsonPath("$.purpose") { exists() }
+            jsonPath("$.collected_items") { exists() }
+            jsonPath("$.retention_period") { exists() }
+            jsonPath("$.refusal_disadvantage") { exists() }
+        }
+        mvc.get("/api/consent-items/no_such_item").andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:consent-item-not-found") }
+        }
+    }
+
+    @Test
     fun signup_without_required_consent_is_rejected() {
         signUp(mapOf("terms_of_service" to true)).andExpect {
             status { isUnprocessableEntity() }

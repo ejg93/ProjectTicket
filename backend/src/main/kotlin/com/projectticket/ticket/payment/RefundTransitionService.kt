@@ -20,7 +20,7 @@ import java.time.OffsetDateTime
  * 관객 취소의 트랜잭션 둘 — ① `reserved → cancelled` + 환불 행(`requested`) + 좌석 해제, ③ 환불 `done`.
  * ②(PG 환불)는 [RefundService] 가 트랜잭션 밖에서 한다(`D4` 「트랜잭션 경계」).
  *
- * 수수료 계산은 **① 안에서, DB 의 `now()` 로** 한다(`D7` 「시계는 DB 다」). 구간은 행에서 고르고(`refund_fee_tier`) 산수는 [RefundPolicy] 가 한다.
+ * 수수료 계산은 **① 안에서, DB 의 `now()` 로** 한다(`D7` 「시계는 DB 다」). 계산은 [RefundQuote.amounts] 한 곳이다 — 미리보기(`44a`)와 같은 함수다.
  */
 @Service
 class RefundTransitionService(
@@ -29,6 +29,7 @@ class RefundTransitionService(
     private val outbox: OutboxWriter,
     private val seatVersions: SeatVersions,
     private val metrics: TicketMetrics,
+    private val quote: RefundQuote,
 ) {
 
     /** ① 이 끝난 환불. [refundAmount] 만 PG 로 간다 */
@@ -68,17 +69,19 @@ class RefundTransitionService(
             .optional()
             .orElseThrow { cannotCancel(accountId, reservationId) }
 
-        val daysBefore = RefundPolicy.daysBefore(cancelled.startsAt, cancelled.cancelledAt)
-        val rate = tierRateFor(daysBefore)
+        val payment = approvedPaymentOf(reservationId)
+        val amounts = quote.amounts(cancelled.startsAt, cancelled.cancelledAt, payment.amount)
             ?: throw TicketException(
                 ErrorCode.CANCEL_WINDOW_CLOSED,
                 "관람일 당일이라 취소할 수 없다: starts_at=${cancelled.startsAt}",
                 mapOf("starts_at" to cancelled.startsAt),
             )
 
-        val payment = approvedPaymentOf(reservationId)
-        val fee = RefundPolicy.fee(payment.amount, rate)
-        val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, payment.amount - fee)
+        val daysBefore = amounts.daysBefore
+        val rate = amounts.tierRate
+        val fee = amounts.feeAmount
+        val refundAmount = amounts.refundAmount
+        val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, refundAmount)
 
         val released = jdbc.sql(
             """
@@ -107,7 +110,7 @@ class RefundTransitionService(
                 "refund_id" to refundId,
                 "reason" to REASON_AUDIENCE,
                 "fee_amount" to fee,
-                "refund_amount" to payment.amount - fee,
+                "refund_amount" to refundAmount,
             ),
         )
 
@@ -116,9 +119,9 @@ class RefundTransitionService(
             "reservation.cancelled",
             accountId,
             AuditLog.Target.of("reservation", reservationId),
-            mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to payment.amount - fee),
+            mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to refundAmount),
         )
-        return Requested(refundId, reservationId, payment.paymentId, daysBefore, rate, fee, payment.amount - fee)
+        return Requested(refundId, reservationId, payment.paymentId, daysBefore, rate, fee, refundAmount)
     }
 
     private fun cannotCancel(accountId: Long, reservationId: Long): TicketException {
@@ -173,26 +176,6 @@ class RefundTransitionService(
             .param("number", refundNumber)
             .param("id", refundId)
             .update() == 1
-
-    /**
-     * 지금 효력 있는 판에서 `days_before >= days_before_min` 인 가장 큰 구간(`D6` 「고르는 규칙」). 없으면 당일이다.
-     * 판은 `effective_at <= now()` 인 최신 — 개정하면 새 판을 넣고 옛 판은 남긴다.
-     */
-    private fun tierRateFor(daysBefore: Int): BigDecimal? =
-        jdbc.sql(
-            """
-            select rate
-              from refund_fee_tier
-             where effective_at = (select max(effective_at) from refund_fee_tier where effective_at <= now())
-               and days_before_min <= :days
-             order by days_before_min desc
-             limit 1
-            """,
-        )
-            .param("days", daysBefore)
-            .query(BigDecimal::class.java)
-            .optional()
-            .orElse(null)
 
     /** `reserved` 예매에는 승인된 결제가 정확히 하나 있다(`payment_approved_idx`). 없으면 상태와 결제가 어긋난 것이다 */
     private fun approvedPaymentOf(reservationId: Long): ApprovedPayment =

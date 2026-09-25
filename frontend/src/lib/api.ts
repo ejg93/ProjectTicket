@@ -72,14 +72,16 @@ type Json = unknown;
  * @param init.idempotencyKey 좌석이나 돈이 움직이는 POST 에 필수다(`D4`). 만드는 쪽은 화면이고,
  *                            **재시도에도 같은 값을 보내야 한다** — 새로 만들면 서버가 재전송이 아니라
  *                            새 요청으로 보고 하나 더 만든다
+ * @param init.headers 그 밖에 얹을 헤더 — 선점의 `X-Admission-Token`(`43`, `D12`). CSRF·멱등키·본문 형식은 여기서 못 덮는다
  * @throws ApiError 서버가 2xx 가 아닌 것을 줬을 때
  */
 export async function api<T>(
   path: string,
-  init: { method?: string; body?: Json; idempotencyKey?: string } = {},
+  init: { method?: string; body?: Json; idempotencyKey?: string; headers?: Record<string, string> } = {},
 ): Promise<T> {
   const method = init.method ?? "GET";
-  const headers: Record<string, string> = {};
+  // 부르는 쪽의 헤더를 먼저 깔고 아래가 덮는다 — 멱등키·CSRF 를 실수로 지우지 못하게.
+  const headers: Record<string, string> = { ...init.headers };
 
   if (init.body !== undefined) {
     headers["Content-Type"] = "application/json";

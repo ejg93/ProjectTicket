@@ -1,0 +1,10 @@
+# 게이트: screen-map.test.ts
+# 명령: cd frontend && npx --no-install vitest run src/test/screen-map.test.ts
+# 문구: /probe-nowhere
+diff --git a/doc/reference/screen-rules.md b/doc/reference/screen-rules.md
+--- a/doc/reference/screen-rules.md
++++ b/doc/reference/screen-rules.md
+@@ -33,2 +33,3 @@
+ |---|---|---|---|
++| `/probe-nowhere` | 탐침 — 파일 없는 경로 | 누구나 | — |
+ | `/` | 홈. 지도만 준다 — 목록을 여기서 또 읽지 않는다 | 누구나 | `39` **완료** |

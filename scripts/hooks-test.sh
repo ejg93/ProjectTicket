@@ -55,6 +55,8 @@ restore() { g checkout -q -- . && g clean -qfd; }
 hook 'push main'           push-guard       "$(cmd 'git push origin main')"      2 'main 에 직접 안 민다'
 hook 'push 도장 없음'      push-guard       "$(cmd 'git push')"                  2 'full 도장이 없다'
 hook 'push 아닌 명령'      push-guard       "$(cmd 'ls')"                        0 ''
+hook 'push 가지 삭제'      push-guard       "$(cmd 'git push origin --delete probe/x')" 0 ''
+hook 'push main 삭제'      push-guard       "$(cmd 'git push origin --delete main')" 2 'main 을 지우지 않는다'
 hook 'commit 도장 없음'    commit-guard     "$(cmd 'git commit -m x')"           2 '도장 없는 커밋은'
 hook 'commit 아닌 git'     commit-guard     "$(cmd 'git status')"                0 ''
 hook 'stop 도장 없음'      stop-stamp       '{"stop_hook_active":false}'         2 '검증 도장이 없다'

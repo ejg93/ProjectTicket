@@ -1,0 +1,16 @@
+# 게이트: SeatLimitConsistencyTest
+# 명령: cd backend && ./gradlew test --tests '*SeatLimitConsistencyTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*SeatLimitConsistencyTest.xml 2>/dev/null; exit $r
+# 문구: 상한이 갈렸다
+diff --git a/frontend/src/components/seat-map.tsx b/frontend/src/components/seat-map.tsx
+index 902dccb..ccb21e5 100644
+--- a/frontend/src/components/seat-map.tsx
++++ b/frontend/src/components/seat-map.tsx
+@@ -20,7 +20,7 @@ export type SeatMapData = {
+ };
+ 
+ /** 한 번에 고르는 좌석은 **4석**이다(ADR 0003). 서버도 같은 수를 들고 넘으면 `over-limit` 이다 */
+-export const MAX_SEATS = 4;
++export const MAX_SEATS = 5;
+ 
+ /**
+  * 상태 한 글자 → 사람이 읽는 말.

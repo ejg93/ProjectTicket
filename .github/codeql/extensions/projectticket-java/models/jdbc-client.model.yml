@@ -1,0 +1,17 @@
+# `JdbcClient` 를 SQL 주입 싱크로 선언한다(`46c`, ProjectShop `2e-5` 에서 옮겼다).
+#
+# **왜 필요한가**(ProjectShop `2e-4` 의 측정): 같은 실행에서 CodeQL 이 `JdbcTemplate` 주입은
+# `java/sql-injection` HIGH 로 잡고 `JdbcClient` 주입은 안 잡았다. `build-mode` 와도
+# 무관했다 — `JdbcClient` 가 Spring 6.1(2023-11)에 들어왔는데 싱크 모델이 안 따라왔다.
+#
+# **이 저장소의 데이터 접근이 전부 이것이다**(`D14` 「SQL」 — JPA 를 안 쓴다). 그래서 이 한 줄이
+# 없으면 SQL 주입을 보는 자동 수단이 0이다.
+#
+# 칸 뜻: 패키지 · 타입 · 하위타입까지 · 메서드 · 시그니처 · 확장 · 어느 인자 · 어떤 종류 · 출처
+# `subtypes = true` 라 `JdbcClient` 를 구현한 것까지 같이 본다 — 인터페이스라 실제 객체는 구현체다.
+extensions:
+  - addsTo:
+      pack: codeql/java-all
+      extensible: sinkModel
+    data:
+      - ["org.springframework.jdbc.core.simple", "JdbcClient", true, "sql", "(String)", "", "Argument[0]", "sql-injection", "manual"]

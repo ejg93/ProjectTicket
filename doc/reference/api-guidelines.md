@@ -30,17 +30,19 @@
 | `GET /api/health` | 앱·DB·마이그레이션 수 | 공개 | 있다 |
 | `POST /api/auth/signup` · `login` · `logout` | 가입·로그인·로그아웃 | 공개·공개·세션 | 있다 |
 | `GET /api/me` | 내 계정 | 세션 | 있다 |
+| `GET /api/me/reservations?page&size` | 내 예매 목록. 만든 시각 내림차순 고정(`sort` 없음), 목록 규약(`items`·`page`·`size`·`total`) | 세션 | 44a |
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
+| `GET /api/consent-items/{code}` | 항목 하나의 지금 판과 본문 — 약관은 `body`(마크다운), 개인정보는 정형 넷. 목록은 본문을 안 싣는다 | 공개 | 39-1 |
 | `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 있다(`40a`) |
-| `GET /api/performances/{id}` | 회차 하나. **회차 등록 201 의 `Location` 이 이미 이것을 가리킨다**(11) — **지금 없어서 그 `Location` 이 404 다**(마무리 9차) | 공개 | 40c |
+| `GET /api/performances/{id}` | 회차 하나 + 공연 머리 + 등급 + `status`. 회차 등록 201 의 `Location` 이 이것을 가리킨다(11). **`draft` 는 그 기획사 사람에게만 답하고 남·비로그인에게는 404** — 아래 「기획사의 공연·회차 404」 | 공개(`draft` 제외) | 40c |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
 | `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |
 | `POST /api/queue/{performanceId}` · `GET` · `DELETE` | 대기열 진입·순번·이탈(`D12`) | 세션 | 21·24 |
 | **`POST /api/performances/{id}/reservations`** | 좌석 선점 | 세션 + 관문 | 13 |
 | `GET /api/reservations/{id}` | 예매 하나 | 세션(본인) | 13 |
-| `GET /api/me/reservations` | 내 예매 목록 | 세션 | 44 |
 | `POST /api/reservations/{id}/payments` | 결제 시작·결과 | 세션(본인) | 16 |
 | `POST /api/reservations/{id}/cancel` | 취소 | 세션(본인) | 17 |
+| `GET /api/reservations/{id}/refund-preview` | 지금 취소하면 얼마인가 — 결제액·D-며칠·율·수수료·환불액. 취소할 수 없으면 `cancellable: false` 와 취소가 받을 `type` 슬러그(`reason`). **계산은 취소와 같은 함수다**(`RefundQuote`) | 세션(본인) | 44a |
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
@@ -125,6 +127,7 @@
 | `email-taken` | 409 | 가입된 이메일 | | 있다 |
 | `account-not-found` | 404 | 없거나 이미 탈퇴한 계정. **관리자에게도 404 다**(아래 「403 이냐 404 냐」) | | 5b |
 | `unknown-consent-item` · `required-consent-missing` | 422 | 동의 | | 있다 |
+| `consent-item-not-found` | 404 | 그런 코드의 동의 항목이 없다(약관·처리방침 화면) | | 39-1 |
 | `performance-not-found` | 404 | 회차 없음 | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
 | `validation-failed` | 400 | Bean Validation | `errors[{field, message}]` | 있다 |
