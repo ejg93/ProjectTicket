@@ -82,7 +82,7 @@ DB 도 같다 — `account.deleted_at` 이 수명이고 `status` 가 업무 상�
 `JdbcClient.list()` 의 원소는 Java 에서 와서 Kotlin 이 `T?` 로 본다. 행이 널일 수 없는 조회면 `filterNotNull()` 로 걷어내고,
 널일 수 있으면 그대로 둔다. **`!!` 로 덮지 않는다** — 덮으면 왜 널이 아닌지가 아무 데도 안 남는다.
 
-`!!` 를 쓸 자리가 정말 있으면 **왜 널이 아닌지를 주석으로 댄다.**
+`!!` 를 쓸 자리가 정말 있으면 **`checkNotNull(값) { 왜 널이 아닌지 }`** 로 쓴다 — 근거가 예외 문구에 남는다. main 의 `!!` 는 주석이 있어도 `check` 가 세운다(`detektMain` 의 `UnsafeCallOnNullableType`, `G8`). 테스트는 그 규칙의 기본 제외라 주석으로 댄다.
 
 ## Kotlin 으로 쓴다
 

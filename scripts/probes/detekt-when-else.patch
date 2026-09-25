@@ -1,5 +1,5 @@
-# 게이트: detekt ElseCaseInsteadOfExhaustiveWhen(detektMain)
-# 명령: cd backend && ./gradlew detektMain --no-daemon --build-cache -q
+# 게이트: detekt ElseCaseInsteadOfExhaustiveWhen(check → detektMain). `check` 로 부른다 — 태스크를 바로 부르면 `check` 에서 빠져도 막는다(마무리 15차)
+# 명령: cd backend && ./gradlew check -x test -x integrationTest --no-daemon --build-cache -q
 # 문구: ElseCaseInsteadOfExhaustiveWhen
 diff --git a/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt b/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt
 new file mode 100644

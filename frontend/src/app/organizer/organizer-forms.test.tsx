@@ -66,6 +66,12 @@ describe("공연 등록", () => {
     const { container } = render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
     await expectNoAxeViolations(container);
   });
+
+  it("제목 칸의 상한이 입력칸에 실제로 붙는다(`G9`)", () => {
+    // `ScreenLengthTest` 는 폼이 `Field` 에 넘기는 prop 을 글자로 읽는다 — `Field` 가 `<input>` 에 안 붙이면 그 시험은 초록인 채 막는 것이 없다.
+    render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
+    expect(screen.getByLabelText("공연 제목")).toHaveAttribute("maxlength", "200");
+  });
 });
 
 describe("회차 등록", () => {

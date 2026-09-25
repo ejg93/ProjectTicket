@@ -1,6 +1,6 @@
 # 게이트: ScreenLengthTest
 # 명령: cd backend && ./gradlew test --tests '*ScreenLengthTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*ScreenLengthTest.xml 2>/dev/null; exit $r
-# 문구: 칸에 `maxLength={50}` 가 없다
+# 문구: 칸은 `maxLength={60}`
 diff --git a/frontend/src/app/signup/signup-form.tsx b/frontend/src/app/signup/signup-form.tsx
 index b812310..da14fa9 100644
 --- a/frontend/src/app/signup/signup-form.tsx

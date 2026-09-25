@@ -161,7 +161,7 @@ abstract class ConcurrencyTestBase
 | 테스트 | 무엇을 대조하나 |
 |---|---|
 | `error-types.test.ts`(`G7c`) | 화면이 분기하는 슬러그 ⊆ `api-guidelines.md` 계약표의 슬러그 |
-| `ScreenLengthTest`(`G9`) | 화면 폼의 `maxLength` = 요청 `data class` 의 `@Size(max)`(메타 애너테이션까지 — `@EmailAddress`·`@Password`). 폼→DTO 짝은 시험 안 표 |
+| `ScreenLengthTest`(`G9`) | 요청 `data class` 의 `@Size(max)`(메타 애너테이션까지 — `@EmailAddress`·`@Password`) → 화면 폼의 같은 `maxLength`. **이것만 서버에서 화면 쪽이다** — 서버에 상한이 있는데 화면에 없으면 사용자가 400 을 보고, 화면에만 있으면 해가 없다. 폼→DTO 짝과 「짝 없는 폼」은 시험 안 표 |
 | `StateMachineDocTest`(`I3-1`) | `state-machines.md` 의 전이표 = 전이 트리거가 허용하는 짝 |
 | `AppDbConstraintTest`(`I4-1`) | 요청 `data class` 의 제약 = 마이그레이션의 `check` (길이 셋·정규식 둘·`price >= 0`) |
 
