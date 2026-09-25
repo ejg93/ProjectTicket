@@ -27,7 +27,7 @@
 | 마이그레이션 제약 | 2 제약 | 기동·테스트 | `V1`~`V20` 의 `check`·`not null`·`references`·유일·전이 트리거. 점검 1차가 108 개를 셌다 | `I1` 2026-09-15 |
 | CodeQL | 4 테스트 | CI(`codeql.yml`, push·주 1회) | 파일을 넘어가는 데이터 흐름 — 사용자 입력이 SQL·셸까지 가나. `actions`·`javascript-typescript` 는 `build-mode: none`, `java-kotlin` 은 **`manual`**(Kotlin 은 `none` 으로 못 읽는다) 이고 **그 레인만 힙을 키운다**(`-Pkotlin.daemon.jvmargs=-Xmx4g` — 추출기가 컴파일러 안에서 돌아 기본 힙을 넘긴다). **잡 셋이 필수 검사다**(`P10`) | `46a` 2026-09-19 — `none` 은 실행이 성공하고 **코드를 0개** 읽었다. `46a-1` — `manual` 은 10분 GC 로 죽었다. 둘 다 잡은 「돌았다」 |
 | Claude Review | 5 문서 | CI(`claude-review.yml`, PR) | **아무것도 못 막는다** — 조언이다. 막는 것은 「이번 회차에 코멘트를 남겼나」 하나고, 그것이 없으면 5~7분이 게이트도 조언도 아니게 된다(`46a`) | 게이트가 아니다 — 조언이라 부술 것이 없다. 막는 것은 「코멘트를 안 남기면 선다」 step 하나고 PR 에서만 돈다(`G2`) |
-| `ArchitectureTest` | 4 테스트 | `gradlew test`(빠른 레인) | `D14` 의 계층·예외·의존. **패키지 순환도 본다** — `auth ↔ queue` 가 실제로 걸려서 `SecuredApiFilter` 로 뒤집었다(`20a`) | `20a` 2026-09-17 |
+| `ArchitectureTest` | 4 테스트 | `gradlew test`(빠른 레인) | `D14` 의 계층·예외·의존. **패키지 순환도 본다** — `auth ↔ queue` 가 실제로 걸려서 `SecuredApiFilter` 로 뒤집었다(`20a`). `G7a` 가 셋을 더했다 — 의존 방향(`payment → reservation → event → settlement`)·`PUT`·`PATCH` 금지·앱 시계 호출(예외 넷, `D7`) | `20a` 2026-09-17. `G7a` 2026-09-25 — 새 셋에 위반을 하나씩 넣으니 셋 다 빨강. 탐침 `arch-layers`·`arch-put-patch`·`arch-app-clock` |
 | `EnumConstraintTest` | 4 테스트 | 〃 | 열거형과 DB 의 닫힌 값 목록이 갈리는 것(`I2-1`). 한쪽에만 더한 값은 **그 값이 실제로 흐를 때까지** 안 보인다. **열거형이 없는 목록 다섯은 못 지킨다** — 그 자리는 목록에 박아 두는 것까지다 | `I2-1` 2026-09-18 — DB 에만 `bounced` 를 더하니 짚었다 |
 | `ErrorContractTest` | 4 테스트 | 〃 | `D5` 「`type` 목록」과 `ErrorCode` 가 갈리는 것(`I2`). 계약에 없는 슬러그는 화면이 모르고, 계약에만 있는 슬러그는 안 오는 분기다 | `I2` 2026-09-18 — 계약 행을 빼니 단언 둘이 짚었다 |
 | `StateMachineDocTest` | 4 테스트 | 〃 | `state-machines.md` 의 전이표와 전이 트리거가 갈리는 것(`I3-1`). 문서만 고치면 다음 사람이 낡은 쪽을 믿는다 | `G2` 2026-09-25 — 전이표에서 `held → paying` 한 줄을 지우니 「갈렸다」로 빨강. 탐침 `state-machine-doc` |
@@ -46,7 +46,7 @@
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | `G2` 2026-09-25 — 이름 없는 `<button>` 에 `button-name`. 탐침 `axe` |
 | 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
 | 변이 시험(PIT) | 5 문서 | `gradlew mutationTest` — **손으로**, `build` 밖 | **아무것도 못 막는다** — 초록인 시험이 무엇을 무는지 잰다(`G4`). 대상 여덟은 틀려도 흐름 시험이 초록인 순수 계산이다. 목록과 처분은 `doc/notes/mutation-2026-09.md` | `G4` 2026-09-25 — 첫 판 산 것 7·덮지 않음 23 → 시험 둘 신설·사례 둘 추가 뒤 산 것 3, 셋 다 동치. PIT 기본 변이가 못 만드는 `HALF_UP → HALF_DOWN` 은 손으로 넣어 `RefundPolicyTest` 가 잡았다 |
-| detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다 | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength` |
+| detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다. **타입 해석 규칙은 `detekt` 가 조용히 건너뛴다** — `check` 가 `detektMain` 을 따로 돌리고 거기는 `detekt-typed.yml` 에 고른 규칙만 돈다(`G7a`). 기본 규칙 전부를 타입 해석으로 올리는 것은 `G8` | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength`. `G7a` 2026-09-25 — 열거 주어 `when` 에 `else` 를 넣으니 `detektMain` 빨강. 탐침 `detekt-when-else` |
 | `npm audit --audit-level=high` | 4 테스트 | CI(`audit` 잡, 필수 아님) | 화면 의존성의 알려진 취약점(`39`). `moderate` 이하는 알리기만 한다. 전이 의존성 권고가 우리 커밋과 무관하게 머지를 세우지 않게 필수에서 뺐다(`B0-5`) | 부수지 않는다 — 취약 판을 일부러 넣으면 잠금 파일이 더러워지고, 필수도 아니다(`B0-5`, `G2`) |
 | `doc-lint.sh` | 4 테스트 | **편집 직후 훅** + CI `docs` 잡 | 개발자 글의 존댓말과 표 파편. 고치는 순간 걸려서 커밋까지 안 간다 | `G1` 2026-09-25 — `hooks-test.sh` 가 위반 다섯(존댓말·표 셀 중복·설계 행·이력 해시·UTF-8)을 tools 레인마다 다시 부순다. 처음은 `B0-3` 이 손으로 |
 | `verify.sh` 도장 | 4 테스트 | **Stop 훅**(빠른) · **push 훅**(`--full`) | 안 돌려 보고 청크를 닫거나 미는 것. 레인 지문이 `origin/main` 과 다르면 그 레인을 돌리고 도장을 찍는다 | 마무리 6차 2026-09-18 — 도장 없이 밀려다 막혔다 |
@@ -142,13 +142,9 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 |---|---|---|---|---|
 | ① | 화면은 오류 `type` 으로 분기하고 그 슬러그는 표 안에 있다 | `D5`·`D16` | 문서가 `ErrorTypeScreenTest` 를 불렀는데 **없다** | `G7c` — vitest `error-types.test.ts` |
 | ② | 레인·태그·바탕 이름은 `build.gradle.kts` 와 같다 | `D8` | 문서가 「`P4` 의 대조 테스트」를 불렀는데 **없다** | `G7d` — `TestConventionTest`(ProjectShop `Q30` 이식) |
-| ③ | 열거값 `when` 에 `else` 를 안 둔다 | `D14` | `else ->` 5곳, detekt 규칙 꺼짐 | `G7a` — detekt `ElseCaseInsteadOfExhaustiveWhen` |
-| ④ | 의존 방향 `payment → reservation → event → settlement` | `D14` | `ArchitectureTest` 6규칙에 순환 금지만 | `G7a` — ArchUnit 방향 규칙 |
 | ⑤ | 시드를 마이그레이션에 안 넣는다 | `D14` | `V3`·`V10`·`V16` 에 `insert into` — 셋은 데이터가 아니라 **규약 표**(동의 항목·환불 요율·정산 정책) | `G7b` — `MigrationTextTest`, 허용 표 목록 밖이면 실패. **목록이 곧 규칙이다** |
 | ⑥ | 표준이 옥텟으로 말하면 길이 `check` 는 `octet_length` | `D14` | `V5`·`V7` 에 `length(` 셋 — 옥텟 표준 컬럼인지 미확인 | `G7b` — 같은 테스트. 이름 컬럼이면 글자 수가 맞다(실패 사다리) |
-| ⑦ | 상태 변경은 하위 경로 `POST`, `PATCH`·`PUT` 없음 | `D5` | 0개, 막는 것 없음 | `G7a` — ArchUnit 한 줄 |
 | ⑧ | 좌석 상태를 바꾸는 SQL 은 조건부 UPDATE | `D4` | 독립 리뷰가 눈으로 | `G7b` — `SqlTextTest`(`Q30` 이식) |
-| ⑨ | 만료·마감 판정은 SQL `now()`, 앱 시계 안 씀 | `D7` | `OffsetDateTime.now()` 둘(`DemoSeeder`·`HealthController` — 판정 아님) | `G7a` — ArchUnit 호출 금지, 예외 둘 명시 |
 | ⑩ | 화면이 `error.message` 를 안 적는다 | `D16` | `app/` 에 1곳 | `G7c` — eslint `no-restricted-syntax` |
 | ⑪ | 컬럼 snake_case, 기본키 `<표>_id` | `D15` | `SchemaNamingTest` 없음(ProjectShop `Q31` 이 있다) | `G7b` — 이식, 컨테이너 레인 |
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |

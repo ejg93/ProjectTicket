@@ -1,0 +1,12 @@
+# 게이트: ArchitectureTest 앱 시계
+# 명령: cd backend && ./gradlew test --tests '*ArchitectureTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*ArchitectureTest.xml 2>/dev/null; exit $r
+# 문구: should not read the app clock
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeNow.kt b/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeNow.kt
+new file mode 100644
+index 0000000..ee5ffbe
+--- /dev/null
++++ b/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeNow.kt
+@@ -0,0 +1,3 @@
++package com.projectticket.ticket.reservation
++
++internal fun probeNow(): java.time.OffsetDateTime = java.time.OffsetDateTime.now()

@@ -1,0 +1,15 @@
+# 게이트: detekt ElseCaseInsteadOfExhaustiveWhen(detektMain)
+# 명령: cd backend && ./gradlew detektMain --no-daemon --build-cache -q
+# 문구: ElseCaseInsteadOfExhaustiveWhen
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt b/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt
+new file mode 100644
+index 0000000..857e88b
+--- /dev/null
++++ b/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt
+@@ -0,0 +1,6 @@
++package com.projectticket.ticket.payment
++
++internal fun probeElse(status: PaymentStatus): Int = when (status) {
++    PaymentStatus.APPROVED -> 1
++    else -> 0
++}

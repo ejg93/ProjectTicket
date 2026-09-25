@@ -1,0 +1,12 @@
+# 게이트: ArchitectureTest 의존 방향
+# 명령: cd backend && ./gradlew test --tests '*ArchitectureTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*ArchitectureTest.xml 2>/dev/null; exit $r
+# 문구: Layered architecture considering only dependencies in layers
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/settlement/ProbeUpward.kt b/backend/src/main/kotlin/com/projectticket/ticket/settlement/ProbeUpward.kt
+new file mode 100644
+index 0000000..0971daf
+--- /dev/null
++++ b/backend/src/main/kotlin/com/projectticket/ticket/settlement/ProbeUpward.kt
+@@ -0,0 +1,3 @@
++package com.projectticket.ticket.settlement
++
++internal fun probeUpward(): Int = com.projectticket.ticket.event.PerformanceSeatStatus.entries.size

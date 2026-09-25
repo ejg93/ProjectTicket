@@ -98,6 +98,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 | 기본 인자 | 오버로드 여럿 |
 
 **`when` 에 `else` 를 안 둔다** — 열거값이 늘면 컴파일러가 빠진 가지를 짚어 준다. `else` 를 두면 새 값이 조용히 기본 가지로 간다.
+열거·sealed·Boolean 주어면 `detektMain`(`detekt-typed.yml` 의 `ElseCaseInsteadOfExhaustiveWhen`)이 막는다(`G7a`). 주어 없는 `when {}` 의 `else` 는 「나머지 전부」라 둔다.
 
 ## SQL
 
@@ -185,6 +186,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `reservation` · `settlement`.
 
 **의존 방향은 `payment → reservation → event → settlement`, 그리고 전부 `outbox`·`idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있고 회차 종료가 `reservation` 에 있는 이유다 — 부르는 쪽이 아래로 간다.
+넷 사이의 방향은 `ArchitectureTest.resourcePackagesDependDownward` 가 막는다(`G7a`).
 
 **소비자(`notification`·`settlement`)는 봉투만 알고 서로 모른다**(`D11`). 알림이 죽어도 정산은 간다 — 그것이 소비자를 가른 값이다.
 
