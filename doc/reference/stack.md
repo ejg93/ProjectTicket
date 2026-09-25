@@ -119,7 +119,7 @@ RFC 9110 이 422 를 「Unprocessable Content」로 고쳤다. `HttpStatus.UNPRO
 ### Kotlin 의 검증 애너테이션은 `@field:` 로 붙인다
 
 `data class` 생성자 파라미터에 `@Size` 를 그냥 붙이면 파라미터에 붙어 Bean Validation 이 못 본다. 이 저장소는 `@field:NotBlank` 처럼 대상을 명시하고,
-`build.gradle.kts` 의 `-Xannotation-default-target=param-property` 가 명시 없는 자리를 받친다. `ScreenLengthTest`(39)가 `@Size(max)` 를 리플렉션으로 읽을 때 이 자리를 본다.
+`build.gradle.kts` 의 `-Xannotation-default-target=param-property` 가 명시 없는 자리를 받친다. `AppDbConstraintTest`(`I4-1`)가 `@Size(max)` 를 필드에서 리플렉션으로 읽을 때 이 자리를 본다.
 
 ### `@Transactional` 은 자기 호출에 안 먹는다
 
@@ -277,6 +277,10 @@ Spring 은 그 표시를 테스트 클래스의 상속 계층에서 찾는데 �
 `.withReuse(true)` 가 코드에 있어도 기계마다 `~/.testcontainers.properties` 에 `testcontainers.reuse.enable=true` 가 있어야 한다. 안 켜져 있어도 실패하지 않고 경고 한 줄과 함께 새로 띄운다.
 CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사용 컨테이너를 지운다** — Flyway 체크섬이 안 맞아 전부 빨개진다.
 
+**시험 삼아 넣은 `V` 는 지워도 스키마에 남는다**(`G7b`). 파일을 지우면 Flyway 가 그 판을 「미래 판」으로 넘겨서 오류도 안 나고,
+재사용 컨테이너에 컬럼과 이력 행이 그대로 남아 다음 실행의 스키마 시험이 그것을 짚는다. 스키마를 바꾸는 탐침은
+`TESTCONTAINERS_REUSE_ENABLE=false` 로 새 컨테이너를 띄운다. 이미 남았으면 그 컨테이너에서 컬럼과 `flyway_schema_history` 행만 지운다.
+
 ### `@ServiceConnection` 컨테이너는 Spring 컨텍스트마다 뜬다
 
 `Containers` 가 `@TestConfiguration` 이라 **컨텍스트가 갈리면 컨테이너도 따로 뜬다.** 컨텍스트 캐시 키는 애너테이션으로 갈리므로 `ConcurrencyTestBase` 가 `PostgresTestBase` 와 애너테이션을 똑같이 맞춘다(`@AutoConfigureMockMvc` 까지) — `@Transactional` 만 캐시 키에 안 들어간다.
@@ -359,6 +363,22 @@ git update-index --chmod=+x backend/gradlew
 파일로 두고 `--data-binary @body.json` 으로 보낸다. 파일은 Write 도구로 만든다 — 셸 heredoc 도 같은 자리에서 깨진다.
 **heredoc 은 백슬래시도 먹는다** — `\\d` 가 `\d` 로 들어간다. 정규식이 든 소스는 Write 도구로 쓴다.
 
+### Git Bash 가 `origin/main:.claude/…` 인자를 경로로 바꿔 버린다
+
+MSYS 경로 변환이 `ref/x:.dir/file` 꼴(슬래시 든 ref + 점으로 시작하는 경로)을 경로 목록으로 읽어 고친다. `git rev-parse -q --verify` 가 오류 없이 빈손으로 끝나 「그 경로 없음」과 구별이 안 된다.
+`HEAD:.claude/…` 는 멀쩡해서 한쪽만 틀린다 — 옛 `verify-fingerprint.sh` 가 이것으로 윈도에서 backend·tools 레인을 늘 「바뀜」으로 셌다(`G1`).
+`ref:path` 인자를 안 쓴다 — `git ls-tree <ref> -- <path>` 로 받거나, 꼭 써야 하면 `MSYS_NO_PATHCONV=1` 을 앞에 둔다.
+같은 변환이 `cmd` 의 슬래시 옵션도 먹는다 — `cmd //c mklink /J` 의 `/J` 가 `J:\` 가 되어 「구문이 틀립니다」로 죽는다(`G2`). 역시 `MSYS_NO_PATHCONV=1`.
+
+### `git worktree remove --force` 는 junction 을 따라 들어가 원본을 지운다
+
+Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안의 junction 이 가리키는 폴더가 통째로 빈다.
+워크트리에 `node_modules` 같은 것을 junction 으로 빌렸으면 `cmd /c rmdir` 로 링크부터 끊고, **끊겼는지 확인한 뒤** 워크트리를 지운다(`gate-probe.sh` 의 `remove_worktree`).
+
+### `npx` 는 로컬에 없는 도구를 말없이 받아 온다
+
+`node_modules` 가 없는 자리(워크트리·새 클론)에서 `npx eslint` 를 부르면 레지스트리에서 받아서 돈다 — 우리 설정이 아닌 판이 돌고 오류는 모듈 해석 쪽으로 난다(`G2`). 스크립트의 `npx` 는 `--no-install` 을 붙인다.
+
 ### 훅이 산문을 명령으로 읽는 자리가 둘이다
 
 ① 훅 입력은 JSON(`{"tool_input":{"command":"…"}}`)이라 원문에 `grep` 을 걸면 설명문까지 읽힌다 — 명령만 꺼내고 본다.
@@ -375,7 +395,7 @@ git update-index --chmod=+x backend/gradlew
 
 ### `main` 가지 보호는 admin 을 기본으로 안 막는다
 
-`enforce_admins` 가 `false` 면 저장소 주인은 그대로 민다. `gh api -X POST repos/<소유자>/<이름>/branches/main/protection/enforce_admins` 로 켠다. 켜져 있다(「현재 상태」).
+`enforce_admins` 가 `false` 면 저장소 주인은 그대로 민다. `gh api -X POST repos/<소유자>/<이름>/branches/main/protection/enforce_admins` 로 켠다. **지금 꺼져 있다**(`G2` 가 2026-09-25 에 읽었다) — 이 줄이 「켜져 있다」고 적고 있었다. 켤지는 `G6`.
 
 ### Dependabot 경보는 가지에 밀어도 안 닫힌다
 

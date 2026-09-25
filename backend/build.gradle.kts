@@ -117,6 +117,58 @@ val measure = tasks.register<Test>("measure") {
 	testLogging { showStandardStreams = true }
 }
 
+// 변이 시험(`G4`, ProjectShop `69` 이식). 측정 레인처럼 `build` 밖이고 손으로 돈다 — 산출물은 살아남은 변이 목록이다.
+//
+// **플러그인이 아니라 명령줄을 부른다.** Gradle 9 와 맞는 PIT 플러그인 판을 확인하지 못했고, 명령줄은
+// 클래스패스와 인자만 받아서 빌드 도구 판에 안 묶인다. 대상은 틀려도 흐름 시험이 초록인 순수 계산이다 —
+// 한 변이마다 시험을 다시 돌려서 `db` 태그 시험을 넣으면 한 번에 몇 시간이 된다.
+val pitest = configurations.create("pitest")
+
+dependencies {
+	pitest("org.pitest:pitest-command-line:1.30.0")
+	pitest("org.pitest:pitest-junit5-plugin:1.2.3")
+}
+
+val mutationTargets = listOf(
+	// 수수료 반올림·D-며칠(`D6`·`D7`). 1원·하루가 틀려도 흐름 시험은 초록이다.
+	"com.projectticket.ticket.payment.RefundPolicy",
+	// 목록 상한 보정·정렬 허용 목록(`D5`). 부등호 하나가 `size=10000` 을 연다.
+	// 이름을 다 적는다 — `CardNumber*` 같은 글롭은 `CardNumberTest` 까지 변이했다(첫 판 실측).
+	"com.projectticket.ticket.web.Paging",
+	"com.projectticket.ticket.web.OrderBy",
+	"com.projectticket.ticket.web.OrderBy\$Companion",
+	// 입구 형식 셋 — 카드 자릿수(ISO/IEC 7812)·멱등키(UUIDv4)·구역 코드.
+	"com.projectticket.ticket.payment.CardNumbers",
+	"com.projectticket.ticket.payment.CardNumberValidator",
+	"com.projectticket.ticket.idempotency.IdempotencyKeys",
+	"com.projectticket.ticket.event.SectionCodesValidator")
+
+tasks.register<JavaExec>("mutationTest") {
+	description = "순수 계산 클래스에 변이를 넣고 빠른 레인 시험이 잡는지 본다(G4). 손으로 돌린다."
+	group = "verification"
+	dependsOn(tasks.testClasses)
+	mainClass = "org.pitest.mutationtest.commandline.MutationCoverageReport"
+	classpath = pitest + sourceSets.test.get().runtimeClasspath
+	// Windows 에서 클래스패스가 길면 줄여서 넘어가고, 그러면 PIT 가 `java.class.path` 에서 자기 에이전트를
+	// 못 찾는다(「Unable to load class content for org.pitest.boot.HotSwapAgent」, ProjectShop 실측). 파일로 한 번 더 준다.
+	val classPathFile = layout.buildDirectory.file("pitest-classpath.txt")
+	doFirst {
+		classPathFile.get().asFile.writeText(classpath.files.joinToString("\n") { it.path })
+	}
+	args(
+		"--classPathFile", classPathFile.get().asFile.path,
+		"--reportDir", layout.buildDirectory.dir("reports/pitest").get().asFile.path,
+		"--targetClasses", mutationTargets.joinToString(","),
+		// 원본은 `<대상>Test*` 로 짝지었는데 여기는 시험 이름이 대상과 안 맞는다(`Paging` 은 `EventListTest` 가 잰다).
+		// 빠른 레인 전체를 주면 PIT 가 변이를 덮는 시험만 골라 돈다.
+		"--targetTests", "com.projectticket.ticket.*",
+		"--sourceDirs", file("src/main/kotlin").path,
+		"--excludedGroups", "db,measure",
+		"--outputFormats", "XML,HTML",
+		"--timestampedReports", "false",
+		"--threads", "4")
+}
+
 tasks.test {
 	useJUnitPlatform { excludeTags("db") }
 
@@ -132,6 +184,9 @@ tasks.test {
 		rootProject.file("../doc/reference/stack.md"),
 		rootProject.file("../doc/reference/event-catalog.md"),
 		rootProject.file("../doc/reference/state-machines.md"),
+		// `TestConventionTest`(G7d)가 레인 표와 이 빌드 파일을 글자로 읽는다(마무리 12차 독립 리뷰).
+		rootProject.file("../doc/reference/testing-strategy.md"),
+		rootProject.file("build.gradle.kts"),
 		rootProject.file("../.github/workflows/ci.yml"),
 		rootProject.file("../.github/workflows/codeql.yml"),
 		rootProject.file("../.github/workflows/claude-review.yml"),
@@ -159,9 +214,16 @@ configurations.named("detekt") {
 }
 
 
+// 타입 해석 규칙은 `detekt` 태스크에서 안 돈다 — detekt 2.0 은 그것을 `detektMain` 에서만 돌린다(`G7a` 실측).
+// 켜도 조용히 안 도는 규칙이 되지 않게 `check` 에 `detektMain` 을 걸고, 거기는 `detekt-typed.yml` 에 고른 규칙만 돌린다.
+tasks.named<dev.detekt.gradle.Detekt>("detektMain") {
+	config.setFrom(files("$rootDir/config/detekt/detekt-typed.yml"))
+	buildUponDefaultConfig = false
+}
+
 // `gradlew build` 가 두 레인을 다 돈다. 빠른 레인만 보고 push 하면 DB 결함이 CI 에서야 드러난다.
 tasks.check {
-	dependsOn(tasks.test, integrationTest)
+	dependsOn(tasks.test, integrationTest, "detektMain")
 }
 
 tasks.withType<Test> {

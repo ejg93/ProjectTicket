@@ -1,0 +1,16 @@
+# 게이트: TestConventionTest 레인 표
+# 명령: cd backend && ./gradlew test --tests '*TestConventionTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*TestConventionTest.xml 2>/dev/null; exit $r
+# 문구: build.gradle.kts 에 없다
+diff --git a/doc/reference/testing-strategy.md b/doc/reference/testing-strategy.md
+index d3dcf35..b35059e 100644
+--- a/doc/reference/testing-strategy.md
++++ b/doc/reference/testing-strategy.md
+@@ -24,7 +24,7 @@
+ | 레인 | 명령 | 무엇 | 태그 |
+ |---|---|---|---|
+ | 빠른 | `gradlew test` | 컨테이너 없이 초 단위로 답한다 | 태그 없음 |
+-| 느린 | `gradlew integrationTest` | 컨테이너를 띄운다. `build` 가 같이 돈다 | `db` |
++| 느린 | `gradlew slowTest` | 컨테이너를 띄운다. `build` 가 같이 돈다 | `db` |
+ | **측정** | `gradlew measure` | 수치를 남기는 것 — 1000 스레드 선점(19), 락 비교, 가상 스레드 전후(35a). **`build` 밖이다** | `measure` |
+ | **변이** | `gradlew mutationTest` | 순수 계산 여덟 클래스에 변이를 넣고 빠른 레인 시험이 잡나(PIT, `G4`). 산출물은 살아남은 변이 목록(`doc/notes/mutation-2026-09.md`)이고 문턱이 없다. **`build` 밖이다** — 대상을 고친 청크가 손으로 돈다 | 빠른 레인 전체(`db`·`measure` 제외) |
+ 

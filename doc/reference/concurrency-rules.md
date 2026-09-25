@@ -40,6 +40,9 @@ update performance_seat
 | `performance_id` 를 같이 건다 | 다른 회차의 좌석 id 를 섞어 보내는 요청이 그 회차의 좌석을 못 잡는다 |
 | 상태 리터럴은 코드의 열거형에서 바인딩한다 | `D14` 「SQL」 |
 
+**좌석 상태를 바꾸는 `update performance_seat` 는 전부 `where` 에 좌석 `status` 조건을 단다** — 선점만이 아니라 확정·해제·취소·스윕도다.
+`SqlTextTest` 가 `src/main/kotlin` 의 원시 문자열을 훑어 막는다(`G7b`). 지금 일곱이다.
+
 ### 여러 행을 잠글 때 — id 오름차순으로 먼저 잠근다
 
 한 문장 `UPDATE … WHERE id = ANY(…)` 는 **행을 잠그는 순서를 보장하지 않는다.** 두 요청이 겹치는 좌석을 다른 순서로 잠그면

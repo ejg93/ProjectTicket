@@ -1,0 +1,15 @@
+# 게이트: EventCatalogTest
+# 명령: cd backend && ./gradlew test --tests '*EventCatalogTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*EventCatalogTest.xml 2>/dev/null; exit $r
+# 문구: D11 카탈로그
+diff --git a/doc/reference/event-catalog.md b/doc/reference/event-catalog.md
+index f55505b..8acf88b 100644
+--- a/doc/reference/event-catalog.md
++++ b/doc/reference/event-catalog.md
+@@ -46,7 +46,6 @@
+ | `type` | 언제 (트랜잭션) | `payload` | 누가 받나 |
+ |---|---|---|---|
+ | `reservation.reserved` | 결제 승인 반영(`PaymentTransitionService.confirm`) — 예매 `reserved`, 좌석 `reserved`, 발권과 같은 트랜잭션 | `reservation_id`·`account_id`·`performance_id`·`payment_id`·`total_amount`·`seat_count` | 26 확정 메일 · 27 정산 매출 |
+-| `reservation.cancelled` | 관객 취소(`RefundTransitionService.request`) | `reservation_id`·`account_id`·`performance_id`·`refund_id`·`reason`(`audience`)·`fee_amount`·`refund_amount` | 26 취소 메일 · 27 취소 수수료 |
+ | `performance.closed` | 판매 마감 자동 종료(16a) — `open → closed`, 남은 `held`·`paying` 만료와 같은 트랜잭션 | `performance_id`·`closed_at` | 27 정산서 생성(`payout_delay_days` 뒤) |
+ | `performance.cancelled` | 기획사 회차 취소(17a) — 모든 예매 취소·전액 환불과 같은 트랜잭션 | `performance_id`·`cancelled_reservation_count` | 26 회차 취소 메일(예매자 전원 — 소비자가 표에서 읽는다) · 27 정산 없음 표시 |
+ 

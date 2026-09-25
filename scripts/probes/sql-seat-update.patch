@@ -1,0 +1,19 @@
+# 게이트: SqlTextTest 조건부 UPDATE
+# 명령: cd backend && ./gradlew test --tests '*SqlTextTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*SqlTextTest.xml 2>/dev/null; exit $r
+# 문구: 좌석 `status` 조건이 없다
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeOverwrite.kt b/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeOverwrite.kt
+new file mode 100644
+index 0000000..0d38479
+--- /dev/null
++++ b/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeOverwrite.kt
+@@ -0,0 +1,10 @@
++package com.projectticket.ticket.reservation
++
++import org.springframework.jdbc.core.simple.JdbcClient
++
++internal fun probeOverwrite(jdbc: JdbcClient, id: Long): Int =
++    jdbc.sql(
++        """
++        update performance_seat set status = 'held' where performance_seat_id = :id
++        """,
++    ).param("id", id).update()

@@ -19,13 +19,14 @@
 **MockMvc 로 충분한 자리와 아닌 자리를 가른다.** MockMvc 는 보안 필터 체인을 다 지나므로 401·403·CSRF·관문(23)까지 잰다.
 못 재는 것은 **서블릿 컨테이너가 하는 일** — 쿠키의 `Secure`·`SameSite` 실제 동작, 프록시 헤더, 오류 페이지 디스패치다. 그때만 HTTP 층을 연다.
 
-## 레인 셋
+## 레인
 
 | 레인 | 명령 | 무엇 | 태그 |
 |---|---|---|---|
 | 빠른 | `gradlew test` | 컨테이너 없이 초 단위로 답한다 | 태그 없음 |
 | 느린 | `gradlew integrationTest` | 컨테이너를 띄운다. `build` 가 같이 돈다 | `db` |
 | **측정** | `gradlew measure` | 수치를 남기는 것 — 1000 스레드 선점(19), 락 비교, 가상 스레드 전후(35a). **`build` 밖이다** | `measure` |
+| **변이** | `gradlew mutationTest` | 순수 계산 여덟 클래스에 변이를 넣고 빠른 레인 시험이 잡나(PIT, `G4`). 산출물은 살아남은 변이 목록(`doc/notes/mutation-2026-09.md`)이고 문턱이 없다. **`build` 밖이다** — 대상을 고친 청크가 손으로 돈다 | 빠른 레인 전체(`db`·`measure` 제외) |
 
 **태그는 바탕이 붙인다.** `PostgresTestBase`·`ConcurrencyTestBase` 를 상속하면 `db` 가 따라오고, 상속하지 않고 DB 를 쓰면 빠른 레인에서 곧바로 빨개진다.
 빠뜨릴 자리가 없는 것이 이 방식의 값이다.
@@ -155,12 +156,12 @@ abstract class ConcurrencyTestBase
 ## 두 층에 흩어진 문자열의 대조
 
 화면이 `error.type` 으로 분기하고 백엔드가 그 슬러그를 바꾸면 **그 가지는 죽고 사용자는 영영 기본 문구만 본다.** 빌드도 타입 검사도 통과한다.
-그래서 이 대조는 화면이 아니라 **백엔드 테스트**로 둔다 — 실물 목록(`ErrorCode`)이 거기 있어서다. 39 가 세운다.
+**둘을 한 번에 안 잇고 문서 표를 가운데 둔다** — `ErrorContractTest`(백엔드)가 `ErrorCode` = 계약표를 재고, `error-types.test.ts`(화면)가 화면 분기 ⊆ 계약표를 잰다(`G7c`).
 
 | 테스트 | 무엇을 대조하나 |
 |---|---|
-| `ErrorTypeScreenTest` | 화면이 분기하는 슬러그 ⊆ `ErrorCode` 의 슬러그 |
-| `ScreenLengthTest` | 화면 입력칸의 `maxLength` = 요청 `data class` 의 `@Size(max)` |
+| `error-types.test.ts`(`G7c`) | 화면이 분기하는 슬러그 ⊆ `api-guidelines.md` 계약표의 슬러그 |
+| (없다) | 화면 입력칸의 `maxLength` = 요청 `data class` 의 `@Size(max)`. `ScreenLengthTest` 로 적혀 있었는데 실물이 없고 화면에 `maxLength` 가 0개다 — 세울지는 `G9` |
 | `StateMachineDocTest`(`I3-1`) | `state-machines.md` 의 전이표 = 전이 트리거가 허용하는 짝 |
 | `AppDbConstraintTest`(`I4-1`) | 요청 `data class` 의 제약 = 마이그레이션의 `check` (길이 셋·정규식 둘·`price >= 0`) |
 
@@ -183,4 +184,4 @@ JaCoCo 가 붙어 있고 **문턱은 없다.** 문턱을 정하는 것은 `D18` 
 
 ## 이 문서를 고칠 때
 
-**레인·태그·바탕 이름은 `build.gradle.kts` 와 같아야 한다.** `P4` 가 그 대조 테스트를 세운다. 바탕을 더하면 「층」 표에 행을 더한다.
+**레인·태그·바탕 이름은 `build.gradle.kts` 와 같아야 한다.** `TestConventionTest`(빠른 레인, `G7d`)가 셋을 잰다 — 「레인」 표의 명령·태그가 빌드 파일에 있고 빌드 파일의 `Test` 태스크가 표에 있다 · DB·`MockMvc` 를 쓰는 테스트는 바탕을 물려받는다 · 손으로 단 `@Tag("db")` 는 바탕 둘과 사유 있는 이름 목록(`SharedSessionTest`·`SeedBootTest`)뿐이다. 바탕을 더하면 「층」 표에 행을 더하고 그 테스트의 `BASES` 에도 더한다.

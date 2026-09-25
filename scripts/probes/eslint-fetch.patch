@@ -1,0 +1,16 @@
+# 게이트: eslint 입구 규칙
+# 명령: cd frontend && npx --no-install eslint src/components/countdown.tsx
+# 문구: no-restricted-globals
+diff --git a/frontend/src/components/countdown.tsx b/frontend/src/components/countdown.tsx
+index ed2c865..18e5994 100644
+--- a/frontend/src/components/countdown.tsx
++++ b/frontend/src/components/countdown.tsx
+@@ -14,6 +14,8 @@ import { useEffect, useState } from "react";
+  * 첫 그림은 서버에서도 그려지므로 `mounted` 전에는 남은 시간을 안 그린다 — 서버와 클라이언트의 시계가
+  * 달라서 hydration 이 어긋난다.
+  */
++export const probe = () => fetch("/api/probe");
++
+ export function Countdown({ deadline, label }: { deadline: string; label: string }) {
+   const [remaining, setRemaining] = useState<number | null>(null);
+ 

@@ -98,6 +98,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 | 기본 인자 | 오버로드 여럿 |
 
 **`when` 에 `else` 를 안 둔다** — 열거값이 늘면 컴파일러가 빠진 가지를 짚어 준다. `else` 를 두면 새 값이 조용히 기본 가지로 간다.
+열거·sealed·Boolean 주어면 `detektMain`(`detekt-typed.yml` 의 `ElseCaseInsteadOfExhaustiveWhen`)이 막는다(`G7a`). 주어 없는 `when {}` 의 `else` 는 「나머지 전부」라 둔다.
 
 ## SQL
 
@@ -117,9 +118,9 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 |---|---|
 | `V` 번호를 건너뛰거나 되쓰지 않는다 | Flyway 가 순서를 어긴 것으로 보고 멈춘다 |
 | 적용된 파일을 고치지 않는다 | 체크섬이 안 맞아 기동이 막힌다. 고칠 것이 있으면 새 `V` 를 판다 |
-| 새 `V` 를 더하면 `HealthControllerTest` 의 수를 올린다 | 올리는 것을 잊으면 거기서 빨개진다. 그 자리가 「기동 경로를 지났나」를 재는 곳이다 |
+| 새 `V` 는 `HealthControllerTest` 가 스스로 센다 | 파일 수와 적용 수를 비교해서(`B0-4`) 올릴 숫자가 없다. 그 자리가 「기동 경로를 지났나」를 재는 곳이다 |
 | 제약에 이름을 준다 | 이름이 없으면 오류 문구로 어느 규칙이 걸렸는지 못 짚는다 |
-| **시드를 마이그레이션에 안 넣는다** — `local` 프로필의 `DemoSeeder` 가 서비스를 불러 만든다 | 운영 스키마와 데모 데이터가 섞이면 지울 것을 못 고른다. 마이그레이션으로 넣으면 그 번호가 적용 이력의 최고가 돼서 **다음 마이그레이션이 막힌다**(12, 사용자 선택) |
+| **시드를 마이그레이션에 안 넣는다** — `local` 프로필의 `DemoSeeder` 가 서비스를 불러 만든다. 규약 표 셋(`consent_item`·`refund_fee_tier`·`settlement_policy`)은 데이터가 아니라 규약이라 넣는다 — 그 밖의 `insert` 는 `MigrationTextTest` 가 막는다(`G7b`) | 운영 스키마와 데모 데이터가 섞이면 지울 것을 못 고른다. 마이그레이션으로 넣으면 그 번호가 적용 이력의 최고가 돼서 **다음 마이그레이션이 막힌다**(12, 사용자 선택) |
 
 ## 열거값을 어디에 두나
 
@@ -145,6 +146,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 `account_email_length_check`·`account_display_name_length_check` 에 두 벌 있다. 갈리기 시작하면 대조 테스트를 세운다.
 
 **단위를 맞춘다.** 표준이 옥텟으로 말하면 DB 도 `octet_length` 로 잰다 — `length` 는 글자 수라 비ASCII 에서 다른 값이 된다.
+우리가 글자 수로 정한 상한(이름·제목)은 `length` 가 맞다. 옥텟 표준 컬럼 목록은 `MigrationTextTest.OCTET_STANDARD_COLUMNS` 이고 지금은 `email` 하나다(`G7b`).
 
 ## 주석
 
@@ -185,6 +187,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `reservation` · `settlement`.
 
 **의존 방향은 `payment → reservation → event → settlement`, 그리고 전부 `outbox`·`idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있고 회차 종료가 `reservation` 에 있는 이유다 — 부르는 쪽이 아래로 간다.
+넷 사이의 방향은 `ArchitectureTest.resourcePackagesDependDownward` 가 막는다(`G7a`).
 
 **소비자(`notification`·`settlement`)는 봉투만 알고 서로 모른다**(`D11`). 알림이 죽어도 정산은 간다 — 그것이 소비자를 가른 값이다.
 

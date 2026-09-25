@@ -1,0 +1,15 @@
+# 게이트: axe
+# 명령: cd frontend && npx --no-install vitest run src/components/seat-map.test.tsx
+# 문구: button-name
+diff --git a/frontend/src/components/seat-map.tsx b/frontend/src/components/seat-map.tsx
+index 902dccb..681b8a2 100644
+--- a/frontend/src/components/seat-map.tsx
++++ b/frontend/src/components/seat-map.tsx
+@@ -75,6 +75,7 @@ export function SeatMap({
+ 
+   return (
+     <div>
++      <button type="button" />
+       <ul className="legend">
+         {data.grades.map((grade) => (
+           <li key={grade.code}>

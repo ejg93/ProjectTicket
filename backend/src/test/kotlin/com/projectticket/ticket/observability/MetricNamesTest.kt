@@ -21,8 +21,13 @@ class MetricNamesTest {
 
     @Test
     fun the_document_and_the_code_hold_the_same_names() {
-        assertThat(documentedNames())
-            .describedAs("`D10` 의 이름 표와 `TicketMetrics` 가 갈리면 대시보드가 조용히 빈다")
+        // 「못 읽었다」와 「갈렸다」를 다른 문장으로 낸다(`D18` 「부수다가 알게 된 것」, `G3`).
+        val documented = documentedNames()
+        assertThat(documented)
+            .describedAs("`D10` 의 「| 이름 |」 표에서 이름을 못 읽었다. 표의 꼴이 바뀌었으면 이 파서도 같이 고친다")
+            .isNotEmpty()
+        assertThat(documented)
+            .describedAs("`D10` 의 이름 표와 `TicketMetrics` 가 갈렸다 — 갈리면 대시보드가 조용히 빈다")
             .containsExactlyInAnyOrderElementsOf(TicketMetrics.ALL)
     }
 
@@ -33,6 +38,7 @@ class MetricNamesTest {
                 .filter { it.toString().endsWith(".kt") }
                 .joinToString("\n") { Files.readString(it) }
         }
+        assertThat(sources).describedAs("backend/src/main/kotlin 에서 .kt 를 0개 읽었다").isNotBlank()
 
         // 상수만 있고 아무도 안 부르면 그 지표는 영원히 0 이다 — 그림이 비는 것과 구분이 안 된다.
         TicketMetrics.ALL.forEach { name ->

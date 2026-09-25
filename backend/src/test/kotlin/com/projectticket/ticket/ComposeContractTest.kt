@@ -29,6 +29,11 @@ class ComposeContractTest {
 
     @Test
     fun the_gateway_resolves_the_app_name_on_every_request() {
+        // 아래 셋은 「없어야 한다」 단언이라 읽을 것이 없으면 초록이다 — `proxy_pass` 가 다른 파일로 옮겨 가도 그렇다(`G3`).
+        assertThat(nginx)
+            .describedAs("nginx.conf 에서 proxy_pass 를 못 읽었다 — 설정을 다른 파일로 옮겼으면 이 검사도 같이 옮긴다")
+            .contains("proxy_pass ")
+
         // `upstream` 블록은 이름을 기동 때 한 번만 푼다. 대수를 늘리려면 변수여야 한다.
         assertThat(nginx).doesNotContain("upstream ")
         assertThat(nginx).contains("resolver ")

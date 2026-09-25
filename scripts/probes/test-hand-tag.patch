@@ -1,0 +1,19 @@
+# 게이트: TestConventionTest 손 태그
+# 명령: cd backend && ./gradlew test --tests '*TestConventionTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*TestConventionTest.xml 2>/dev/null; exit $r
+# 문구: 손으로 달았다
+diff --git a/backend/src/test/kotlin/com/projectticket/ticket/ProbeHandTagTest.kt b/backend/src/test/kotlin/com/projectticket/ticket/ProbeHandTagTest.kt
+new file mode 100644
+index 0000000..e6bd88c
+--- /dev/null
++++ b/backend/src/test/kotlin/com/projectticket/ticket/ProbeHandTagTest.kt
+@@ -0,0 +1,10 @@
++package com.projectticket.ticket
++
++import org.junit.jupiter.api.Tag
++import org.junit.jupiter.api.Test
++
++@Tag("db")
++class ProbeHandTagTest : PostgresTestBase() {
++    @Test
++    fun probe() = Unit
++}

@@ -72,10 +72,14 @@ class StackVersionConsistencyTest {
         }
     }
 
-    /** 버전표의 한 행 — `| 대상 | 버전 | …` 에서 둘째 칸 */
+    /**
+     * 버전표의 한 행 — `| 대상 | 버전 | …` 에서 둘째 칸.
+     * 칸이 비면 `image: grafana/grafana:` 처럼 접두만 남은 문장이 compose 에 그대로 들어 있어 초록이다 — 그래서 여기서 선다(`G3`).
+     */
     private fun tableVersion(subject: String): String {
         val row = stack.lineSequence().firstOrNull { it.startsWith("| $subject |") }
             ?: throw AssertionError("stack.md 버전표에 「$subject」 행이 없다")
         return row.split("|")[2].trim()
+            .ifBlank { throw AssertionError("stack.md 버전표 「$subject」 행의 버전 칸을 못 읽었다 — 비었다") }
     }
 }

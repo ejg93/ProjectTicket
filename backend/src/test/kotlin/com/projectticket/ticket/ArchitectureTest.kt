@@ -1,5 +1,7 @@
 package com.projectticket.ticket
 
+import com.tngtech.archunit.core.domain.AccessTarget
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaMethod
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
@@ -11,9 +13,15 @@ import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods
+import com.tngtech.archunit.library.Architectures.layeredArchitecture
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import jakarta.validation.Valid
+import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestMethod
 
 /**
  * `coding-rules.md`(D14)가 글로만 적어 둔 계층 규칙을 기계가 지킨다.
@@ -29,6 +37,78 @@ class ArchitectureTest {
      */
     @ArchTest
     val noPackageCycles: ArchRule = slices().matching("com.projectticket.ticket.(*)..").should().beFreeOfCycles()
+
+    /**
+     * 의존은 `payment → reservation → event → settlement` 로 아래로만 간다(`D14` 「패키지」, `G7a`).
+     * 순환 금지만으로는 **거꾸로 선 한 방향**(`settlement` 가 `event` 를 부르는 것)을 못 막는다 — 순환이 아니라서다.
+     * 넷 밖의 패키지(`outbox`·`error`·`queue` …)와 오가는 의존은 여기서 안 본다.
+     */
+    @ArchTest
+    val resourcePackagesDependDownward: ArchRule = layeredArchitecture().consideringOnlyDependenciesInLayers()
+        .layer("payment").definedBy("..ticket.payment..")
+        .layer("reservation").definedBy("..ticket.reservation..")
+        .layer("event").definedBy("..ticket.event..")
+        .layer("settlement").definedBy("..ticket.settlement..")
+        .whereLayer("payment").mayNotBeAccessedByAnyLayer()
+        .whereLayer("reservation").mayOnlyBeAccessedByLayers("payment")
+        .whereLayer("event").mayOnlyBeAccessedByLayers("payment", "reservation")
+        .whereLayer("settlement").mayOnlyBeAccessedByLayers("payment", "reservation", "event")
+
+    /**
+     * `PUT`·`PATCH` 를 안 쓴다(`D5` — 상태는 하위 경로에 `POST`). 고칠 자원이 생기면 `merge-patch+json` 을 먼저 정하고 이 규칙을 푼다(`G7a`).
+     */
+    @ArchTest
+    val noPutOrPatchEndpoints: ArchRule = noMethods()
+        .should().beAnnotatedWith(PatchMapping::class.java)
+        .orShould().beAnnotatedWith(PutMapping::class.java)
+
+    /** 같은 것을 `@RequestMapping(method = [PUT])` 꼴로 적은 자리(마무리 12차 독립 리뷰). 지금 `@RequestMapping` 메서드가 없어 빈 규칙을 허용한다 */
+    @ArchTest
+    val noPutOrPatchViaRequestMapping: ArchRule = methods()
+        .that().areAnnotatedWith(RequestMapping::class.java)
+        .should(
+            object : ArchCondition<JavaMethod>("not map PUT or PATCH") {
+                override fun check(method: JavaMethod, events: ConditionEvents) {
+                    method.getAnnotationOfType(RequestMapping::class.java).method
+                        .filter { it == RequestMethod.PUT || it == RequestMethod.PATCH }
+                        .forEach { events.add(SimpleConditionEvent.violated(method, "${method.fullName} 가 $it 을 받는다 — 상태는 하위 경로에 POST(D5)")) }
+                }
+            },
+        )
+        .allowEmptyShould(true)
+
+    /**
+     * 앱 시계를 안 읽는다(`D7` — 만료·마감 판정은 SQL `now()`, 앱의 `Clock` 은 주입받는 계산기에만). `G7a`.
+     * **주입받은 `Clock` 으로 부르는 `now(clock)` 은 된다** — 인자 없는 `now()`·`Clock.system*()`·`System.currentTimeMillis()` 만 막는다.
+     * 예외는 이름으로 적는다 — 넷 다 판정이 아니거나 비교 상대가 앱 시계로 찍힌 값이다. 사유는 `time-rules.md` 의 예외 표.
+     * 목록이 낡으면(예외 클래스가 없어지거나 시계를 안 읽게 되면) 선다.
+     */
+    @ArchTest
+    val noAppClockReads: ArchRule = classes()
+        .that().resideInAPackage("com.projectticket.ticket..")
+        .should(
+            object : ArchCondition<JavaClass>("not read the app clock (java.time now(), Clock.system*, System.currentTimeMillis)") {
+                private val allowedSeen = mutableSetOf<String>()
+
+                override fun init(allObjectsToTest: Collection<JavaClass>) = allowedSeen.clear()
+
+                override fun check(javaClass: JavaClass, events: ConditionEvents) {
+                    val reads = javaClass.methodCallsFromSelf.filter { readsAppClock(it.target) }
+                    val topLevel = javaClass.name.substringBefore('$')
+                    if (topLevel in APP_CLOCK_ALLOWED) {
+                        if (reads.isNotEmpty()) allowedSeen += topLevel
+                        return
+                    }
+                    reads.forEach { events.add(SimpleConditionEvent.violated(it, "${it.description} — 앱 시계다. 판정은 SQL now(), 계산은 주입받은 Clock")) }
+                }
+
+                override fun finish(events: ConditionEvents) {
+                    (APP_CLOCK_ALLOWED - allowedSeen).forEach {
+                        events.add(SimpleConditionEvent.violated(it, "$it 가 앱 시계 예외 목록에 있는데 시계를 안 읽는다 — 목록과 time-rules.md 표에서 지운다"))
+                    }
+                }
+            },
+        )
 
     /**
      * 웹 애너테이션은 `*Controller` 에만 붙는다. 서비스가 `@RequestMapping` 을 들면 웹을 아는 서비스가 되고,
@@ -80,4 +160,19 @@ class ArchitectureTest {
                 }
             },
         )
+
+    private companion object {
+        fun readsAppClock(target: AccessTarget.MethodCallTarget): Boolean =
+            (target.owner.packageName == "java.time" && target.name == "now" && target.rawParameterTypes.isEmpty()) ||
+                (target.owner.name == "java.time.Clock" && target.name.startsWith("system")) ||
+                (target.owner.name == "java.lang.System" && target.name == "currentTimeMillis")
+
+        /** 앱 시계를 읽어도 되는 클래스. 늘리려면 `time-rules.md` 의 예외 표에 사유를 먼저 적는다 */
+        val APP_CLOCK_ALLOWED = setOf(
+            "com.projectticket.ticket.demo.DemoSeeder",
+            "com.projectticket.ticket.health.HealthController",
+            "com.projectticket.ticket.auth.AbsoluteSessionTimeoutFilter",
+            "com.projectticket.ticket.payment.MockPaymentGateway",
+        )
+    }
 }

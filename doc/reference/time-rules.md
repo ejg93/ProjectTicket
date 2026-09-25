@@ -38,6 +38,15 @@ DB 는 하나고 그 시계도 하나다.
 **앱의 `Clock` 은 계산기에만 쓴다** — 수수료 구간(17)·예상 대기(21)처럼 **입력을 받아 답을 내는 순수 함수**가 `Clock` 을 주입받고, 테스트가 고정값을 넣는다(`D8`).
 그 함수가 DB 행을 판정하지 않는다.
 
+**앱 시계 호출(`java.time` 의 인자 없는 `now()`·`Clock.system*()`·`System.currentTimeMillis()`)은 `ArchitectureTest.noAppClockReads` 가 막는다**(`G7a`). 주입받은 `Clock` 으로 부르는 `now(clock)` 은 된다. 예외는 넷이고 이름으로 적혀 있다 — 목록이 낡으면 그 테스트가 선다:
+
+| 클래스 | 왜 앱 시계인가 |
+|---|---|
+| `DemoSeeder` | `local` 시드의 회차 시각을 「지금부터 며칠 뒤」로 놓는다. 판정이 아니다 |
+| `HealthController` | 응답에 서버 시각을 싣는다. 판정이 아니다 |
+| `AbsoluteSessionTimeoutFilter` | 비교 상대인 세션 생성 시각을 Spring Session 이 앱 시계로 찍는다. DB `now()` 로 재면 두 시계가 섞인다 |
+| `MockPaymentGateway` | 가짜 승인번호의 일련 부분. 판정이 아니다 |
+
 **시각 컬럼의 기본값도 `now()`** 다 — `created_at`·`acted_at`·`updated_at`(트리거). 앱이 값을 넣지 않는다.
 
 ## 관람일과 구간

@@ -61,7 +61,7 @@
 | `GET` | 조회. 몇 번 해도 같다 |
 | `POST` | 생성, 그리고 **CRUD 가 아닌 동작** |
 | `DELETE` | 자원을 없앤다 — 대기열 이탈, 탈퇴 |
-| `PUT`·`PATCH` | **지금 안 쓴다.** 고칠 자원이 없다. 생기면 `PATCH` 는 `application/merge-patch+json` 이다 |
+| `PUT`·`PATCH` | **지금 안 쓴다.** 고칠 자원이 없다. 생기면 `PATCH` 는 `application/merge-patch+json` 이다. `ArchitectureTest.noPutOrPatchEndpoints` 가 막는다 — 쓰기로 하면 그 규칙을 먼저 푼다(`G7a`) |
 
 **상태를 바꾸는 것은 하위 경로에 `POST` 한다** — `…/open`, `…/cancel`, `…/payments`. `PATCH` 로 `status` 를 보내는 방식은 안 쓴다.
 전이표(`D3`)를 거치지 않는 상태 변경 경로가 생기기 때문이다. 상태는 **동작의 결과**지 클라이언트가 정하는 값이 아니다.
@@ -245,5 +245,5 @@
 
 ## 이 문서를 고칠 때
 
-**`type` 을 더하면 `ErrorCode` 와 이 표를 같이 고친다.** 39 뒤로는 `ErrorTypeScreenTest` 가 화면의 분기가 이 표 안에 있는지 잰다(`D8`).
+**`type` 을 더하면 `ErrorCode` 와 이 표를 같이 고친다.** 화면의 분기(`switch (…slug)` 의 `case`·`….slug === "…"`)가 이 표 안에 있는지는 `frontend/src/test/error-types.test.ts` 가 잰다(`G7c`).
 경로를 바꾸는 것은 화면·e2e 가 같이 가는 것이라 청크로 세운다.
