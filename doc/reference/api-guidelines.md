@@ -50,7 +50,7 @@
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11 (취소 서비스는 17a 가 세웠다) |
-| `GET /api/organizer/settlements` | 정산 | 세션(기획사) | 27 |
+| `GET /api/organizer/settlements?performanceId=` | 회차 하나의 정산서 — 상태·합계·항목(`sale`·`platform_fee`·`cancel_fee`·`adjustment`). 없는 회차·남의 회차·정산서가 아직 없는 회차는 한 이름 404 `performance-not-found` | 세션(기획사) | 27·45c |
 | `POST /api/admin/accounts/{id}/suspend` · `unsuspend` | 계정 정지·해제 | 세션(관리자) | 5b |
 | `DELETE /api/me` | 탈퇴. 본문 `{ "password" }` 로 **비밀번호를 다시 받는다** — 틀리면 로그인과 같은 401 `login-failed`, 로그인 실패 카운터를 같이 센다(`44c`) | 세션 | 5a·44c |
 

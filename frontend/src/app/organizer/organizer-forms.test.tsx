@@ -6,6 +6,7 @@ import { expectNoAxeViolations } from "@/test/axe";
 
 import { PerformanceActions } from "./events/[eventId]/performance-actions";
 import { PerformanceForm } from "./events/[eventId]/performance-form";
+import { SettlementSummary } from "./events/[eventId]/settlement-summary";
 import { EventForm } from "./events/new/event-form";
 
 /**
@@ -105,5 +106,21 @@ describe("회차 조작", () => {
 
     rerender(<PerformanceActions performanceId={7} status="closed" />);
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("정산 칸(`45c`)", () => {
+  it("상태·합계와 항목을 그리고, 정산서가 없으면 그렇게 말한다", async () => {
+    const { container, rerender } = render(
+      <SettlementSummary
+        settlement={{ status: "pending", amount: 90000, settle_at: "2026-10-02T00:00:00Z", settled_at: "2026-10-02T00:00:00Z", lines: [{ kind: "sale", amount: 100000 }, { kind: "platform_fee", amount: -10000 }] }}
+      />,
+    );
+    expect(screen.getByText(/정산 계산됨 · 90,000원/)).toBeInTheDocument();
+    expect(screen.getByText(/플랫폼 수수료/)).toHaveTextContent("-10,000원");
+    await expectNoAxeViolations(container);
+
+    rerender(<SettlementSummary settlement={null} />);
+    expect(screen.getByText("정산서가 아직 없습니다.")).toBeInTheDocument();
   });
 });
