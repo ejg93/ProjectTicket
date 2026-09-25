@@ -46,7 +46,7 @@
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | — |
 | 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
 | detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다 | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength` |
-| `npm audit --audit-level=high` | 4 테스트 | CI(`frontend` 잡) | 화면 의존성의 알려진 취약점(`39`). `moderate` 이하는 알리기만 한다 | — |
+| `npm audit --audit-level=high` | 4 테스트 | CI(`audit` 잡, 필수 아님) | 화면 의존성의 알려진 취약점(`39`). `moderate` 이하는 알리기만 한다. 전이 의존성 권고가 우리 커밋과 무관하게 머지를 세우지 않게 필수에서 뺐다(`B0-5`) | — |
 | `doc-lint.sh` | 4 테스트 | **편집 직후 훅** + CI `docs` 잡 | 개발자 글의 존댓말과 표 파편. 고치는 순간 걸려서 커밋까지 안 간다 | — |
 | `verify.sh` 도장 | 4 테스트 | **Stop 훅**(빠른) · **push 훅**(`--full`) | 안 돌려 보고 청크를 닫거나 미는 것. 레인 지문이 `origin/main` 과 다르면 그 레인을 돌리고 도장을 찍는다 | 마무리 6차 2026-09-18 — 도장 없이 밀려다 막혔다 |
 | gitleaks | 4 테스트 | **CI 만** | 커밋에 들어간 시크릿. 이력 전체를 본다 | — |
@@ -85,7 +85,8 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | 워크플로 | 잡 | 필수 검사 | 왜 |
 |---|---|---|---|
 | `ci.yml` | `backend` | 필수 | 빌드·테스트 두 레인·detekt |
-| `ci.yml` | `frontend` | 필수 | `next build`·lint·test·`npm audit`. `frontend/` 가 있을 때만 돈다 — 그 전에는 `steps.has` 가 건너뛰어도 잡은 초록이다 |
+| `ci.yml` | `frontend` | 필수 | `next build`·lint·test. `frontend/` 가 있을 때만 돈다 — 그 전에는 `steps.has` 가 건너뛰어도 잡은 초록이다 |
+| `ci.yml` | `audit` | 아니다 | `npm audit --audit-level=high`. 빨가면 배지로 보이고 dependabot 이 고친다 — 필수로 걸면 남의 권고 하나에 머지가 선다(`B0-5`, 사용자 결정 (가)) |
 | `ci.yml` | `secrets` | 필수 | gitleaks |
 | `ci.yml` | `docs` | 필수 | `doc-lint.sh` |
 | `codeql.yml` | `analyze` | **필수 — 언어 셋 다**(`P10`) | 문맥 이름이 `analyze (java-kotlin, manual)`·`analyze (javascript-typescript, none)`·`analyze (actions, none)` 이다. **push 에서만 돌지만 보호는 이름으로 맞추고 이벤트를 안 가려서** 그 실행이 자리를 채운다 — `46a` 가 그렇게 적었고 `P10` 뒤 첫 PR 이 실측이다 |
