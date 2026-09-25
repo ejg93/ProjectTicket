@@ -33,6 +33,7 @@
 | `StateMachineDocTest` | 4 테스트 | 〃 | `state-machines.md` 의 전이표와 전이 트리거가 갈리는 것(`I3-1`). 문서만 고치면 다음 사람이 낡은 쪽을 믿는다 | `G2` 2026-09-25 — 전이표에서 `held → paying` 한 줄을 지우니 「갈렸다」로 빨강. 탐침 `state-machine-doc` |
 | `AppDbConstraintTest` | 4 테스트 | 〃 | 앱 검증과 DB 제약이 같은 규칙을 두 벌 드는 자리가 갈리는 것(`I4-1`) — 앱이 느슨해지면 400 이 500 이 된다. **역방향도 본다**(`I4-2`): 마이그레이션의 길이·정규식 `check` 전부가 표에 있거나 짝이 없는 근거를 들어야 한다 | `I4-2` 2026-09-19 — 표에서 한 줄 빼니 빨갛고 되돌리니 초록 |
 | `SeatLimitConsistencyTest` | 4 테스트 | `gradlew test`(빠른 레인) | 화면 `SeatMap.MAX_SEATS` 와 서버 `MAX_SEATS_PER_HOLD` 가 갈리는 것(`41-1`). 언어가 달라 컴파일이 못 묶어 `seat-map.tsx` 를 글자로 읽는다 — 그 파일이 `inputs.files`·backend 지문에 있다 | `41-1` 2026-09-26 — `MAX_SEATS` 를 5 로 바꾸니 빨강, backend 지문도 바뀌었다. 탐침 `seat-limit` |
+| `ScreenLengthTest` | 4 테스트 | `gradlew test`(빠른 레인) | 화면 폼의 `maxLength` 와 요청 `@Size(max)` 가 갈리는 것(`G9`) — 서버가 400 으로 돌려보낼 글자를 화면이 받아 준다. 서버는 리플렉션(메타 애너테이션까지), 화면은 `*-form.tsx` 글자라 그 파일들이 `inputs.files`·backend 지문에 있다 | `G9` 2026-09-26 — 탐침 `screen-length`(가입 이름 50→60) 빨강 「칸에 `maxLength={50}` 가 없다」 |
 | `MigrationTextTest` | 4 테스트 | `gradlew test`(빠른 레인) | 마이그레이션의 시드(규약 표 셋 밖의 `insert`)와 옥텟 표준 컬럼의 `length`(`G7b`). 주석은 `MigrationSql` 이 걷는다 | `G7b` 2026-09-25 — 허용 밖 `insert`·`length(email)` 를 새 `V` 로 넣으니 각자 빨강. 탐침 `migration-seed`·`migration-octet` |
 | `SqlTextTest` | 4 테스트 | 〃 | `where` 에 좌석 `status` 조건이 없는 `update performance_seat`(`G7b`, `D4`). 흐름 시험은 한 사람씩 돌아서 덮어쓰기를 못 본다. **원시 문자열 밖에서 조립한 SQL 은 못 본다** | `G7b` 2026-09-25 — 조건 없는 좌석 UPDATE 를 넣으니 빨강. 탐침 `sql-seat-update` |
 | `SchemaNamingTest` | 4 테스트 | `gradlew integrationTest` | 도는 스키마의 이름(`D15`) — snake_case·기본키 `<표>_id`·`_at`/`_until`↔`timestamptz`·`is_`(`G7b`). 첫 실행이 `account_consent.granted` 를 찾았다 — `naming-rules.md` 에 적고 이름으로 봐준다 | `G7b` 2026-09-25 — camelCase 컬럼을 새 `V` 로 넣으니 빨강. 탐침 `schema-naming`(재사용 컨테이너를 안 쓴다) |
@@ -150,7 +151,6 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | # | 규칙 | 문서 | 지금 실물 | 처분 |
 |---|---|---|---|---|
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
-| ⑬ | 화면 입력칸 `maxLength` = 요청 `@Size(max)` | `D8` | 문서가 `ScreenLengthTest` 를 불렀는데 **없다**(`G7c` 가 찾았다). 화면에 `maxLength` 0개 | `G9` — 세울지부터 정한다 |
 
 **대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 `/wrapup` 대조와 독립 리뷰가 본다.
 

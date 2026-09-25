@@ -12,12 +12,15 @@ export function Field({
   type = "text",
   autoComplete,
   required = true,
+  maxLength,
 }: {
   name: string;
   label: string;
   type?: string;
   autoComplete?: string;
   required?: boolean;
+  /** 서버 요청의 `@Size(max)` 와 같은 수를 **리터럴로** 적는다 — `ScreenLengthTest`(`G9`)가 글자로 읽는다 */
+  maxLength?: number;
 }) {
   return (
     <p>
@@ -28,6 +31,7 @@ export function Field({
         type={type}
         autoComplete={autoComplete}
         required={required}
+        maxLength={maxLength}
       />
     </p>
   );

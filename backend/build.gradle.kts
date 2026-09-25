@@ -189,6 +189,8 @@ tasks.test {
 		rootProject.file("build.gradle.kts"),
 		// `SeatLimitConsistencyTest`(41-1)가 화면의 좌석 상한을 글자로 읽는다.
 		rootProject.file("../frontend/src/components/seat-map.tsx"),
+		// `ScreenLengthTest`(G9)가 폼의 `maxLength` 를 글자로 읽는다.
+		fileTree("../frontend/src/app") { include("**/*-form.tsx") },
 		rootProject.file("../.github/workflows/ci.yml"),
 		rootProject.file("../.github/workflows/codeql.yml"),
 		rootProject.file("../.github/workflows/claude-review.yml"),
