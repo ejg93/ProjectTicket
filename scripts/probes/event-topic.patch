@@ -1,0 +1,16 @@
+# 게이트: EventTopicTest
+# 명령: cd backend && ./gradlew test --tests '*EventTopicTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*EventTopicTest.xml 2>/dev/null; exit $r
+# 문구: ticket.performances
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/outbox/EventTopics.kt b/backend/src/main/kotlin/com/projectticket/ticket/outbox/EventTopics.kt
+index eef914c..854506a 100644
+--- a/backend/src/main/kotlin/com/projectticket/ticket/outbox/EventTopics.kt
++++ b/backend/src/main/kotlin/com/projectticket/ticket/outbox/EventTopics.kt
+@@ -14,7 +14,7 @@ package com.projectticket.ticket.outbox
+ object EventTopics {
+ 
+     const val RESERVATION = "ticket.reservation"
+-    const val PERFORMANCE = "ticket.performance"
++    const val PERFORMANCE = "ticket.performances"
+ 
+     /** 집합체 타입 → 토픽. 새 집합체가 생기면 상수도 같이 는다 */
+     fun of(aggregateType: AggregateType): String = "$PREFIX${aggregateType.code}"

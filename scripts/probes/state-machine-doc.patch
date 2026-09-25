@@ -1,0 +1,15 @@
+# 게이트: StateMachineDocTest
+# 명령: cd backend && ./gradlew test --tests '*StateMachineDocTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*StateMachineDocTest.xml 2>/dev/null; exit $r
+# 문구: 문서의 전이표와 전이 트리거가 갈렸다
+diff --git a/doc/reference/state-machines.md b/doc/reference/state-machines.md
+index f10567c..07623d3 100644
+--- a/doc/reference/state-machines.md
++++ b/doc/reference/state-machines.md
+@@ -31,7 +31,6 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
+ | 에서 | 로 | 조건 | 어디서 |
+ |---|---|---|---|
+ | — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 활성 토큰이 있다 | 13 |
+-| `held` | `paying` | `held_until` 이 안 지났다 | 16 |
+ | `held` | `expired` | `held_until < now()` | 14 스윕 |
+ | `paying` | `reserved` | 결제 승인. `paying_until` 이 안 지났다 | 16 |
+ | `paying` | `held` | 결제 거절·실패. `held_until` 이 안 지났다 | 16 |

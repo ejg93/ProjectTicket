@@ -1,0 +1,16 @@
+# 게이트: screen-text.test.ts
+# 명령: cd frontend && npx --no-install vitest run src/test/screen-text.test.ts
+# 문구: 좌석이 풀렸다
+diff --git a/frontend/src/components/countdown.tsx b/frontend/src/components/countdown.tsx
+index ed2c865..cef4759 100644
+--- a/frontend/src/components/countdown.tsx
++++ b/frontend/src/components/countdown.tsx
+@@ -30,7 +30,7 @@ export function Countdown({ deadline, label }: { deadline: string; label: string
+ 
+   if (remaining === 0) {
+     return (
+-      <p role="alert">시간이 지나 좌석이 풀렸습니다. 좌석을 다시 골라 주세요.</p>
++      <p role="alert">시간이 지나 좌석이 풀렸다.</p>
+     );
+   }
+ 

@@ -364,6 +364,11 @@ git update-index --chmod=+x backend/gradlew
 MSYS 경로 변환이 `ref/x:.dir/file` 꼴(슬래시 든 ref + 점으로 시작하는 경로)을 경로 목록으로 읽어 고친다. `git rev-parse -q --verify` 가 오류 없이 빈손으로 끝나 「그 경로 없음」과 구별이 안 된다.
 `HEAD:.claude/…` 는 멀쩡해서 한쪽만 틀린다 — 옛 `verify-fingerprint.sh` 가 이것으로 윈도에서 backend·tools 레인을 늘 「바뀜」으로 셌다(`G1`).
 `ref:path` 인자를 안 쓴다 — `git ls-tree <ref> -- <path>` 로 받거나, 꼭 써야 하면 `MSYS_NO_PATHCONV=1` 을 앞에 둔다.
+같은 변환이 `cmd` 의 슬래시 옵션도 먹는다 — `cmd //c mklink /J` 의 `/J` 가 `J:\` 가 되어 「구문이 틀립니다」로 죽는다(`G2`). 역시 `MSYS_NO_PATHCONV=1`.
+
+### `npx` 는 로컬에 없는 도구를 말없이 받아 온다
+
+`node_modules` 가 없는 자리(워크트리·새 클론)에서 `npx eslint` 를 부르면 레지스트리에서 받아서 돈다 — 우리 설정이 아닌 판이 돌고 오류는 모듈 해석 쪽으로 난다(`G2`). 스크립트의 `npx` 는 `--no-install` 을 붙인다.
 
 ### 훅이 산문을 명령으로 읽는 자리가 둘이다
 
@@ -381,7 +386,7 @@ MSYS 경로 변환이 `ref/x:.dir/file` 꼴(슬래시 든 ref + 점으로 시작
 
 ### `main` 가지 보호는 admin 을 기본으로 안 막는다
 
-`enforce_admins` 가 `false` 면 저장소 주인은 그대로 민다. `gh api -X POST repos/<소유자>/<이름>/branches/main/protection/enforce_admins` 로 켠다. 켜져 있다(「현재 상태」).
+`enforce_admins` 가 `false` 면 저장소 주인은 그대로 민다. `gh api -X POST repos/<소유자>/<이름>/branches/main/protection/enforce_admins` 로 켠다. **지금 꺼져 있다**(`G2` 가 2026-09-25 에 읽었다) — 이 줄이 「켜져 있다」고 적고 있었다. 켤지는 `G6`.
 
 ### Dependabot 경보는 가지에 밀어도 안 닫힌다
 

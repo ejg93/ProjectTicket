@@ -1,0 +1,16 @@
+# 게이트: eslint jsx-a11y
+# 명령: cd frontend && npx --no-install eslint src/components/countdown.tsx
+# 문구: jsx-a11y/alt-text
+diff --git a/frontend/src/components/countdown.tsx b/frontend/src/components/countdown.tsx
+index ed2c865..543d7b0 100644
+--- a/frontend/src/components/countdown.tsx
++++ b/frontend/src/components/countdown.tsx
+@@ -25,7 +25,7 @@ export function Countdown({ deadline, label }: { deadline: string; label: string
+   }, [deadline]);
+ 
+   if (remaining === null) {
+-    return <p role="timer">{label}</p>;
++    return <p role="timer"><img src="/probe.png" />{label}</p>;
+   }
+ 
+   if (remaining === 0) {
