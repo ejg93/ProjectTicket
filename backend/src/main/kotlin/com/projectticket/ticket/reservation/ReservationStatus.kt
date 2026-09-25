@@ -12,6 +12,6 @@ enum class ReservationStatus {
     companion object {
         /** 모르는 값이면 터진다. 조용히 넘기면 새 상태가 제약에 늘었을 때 그 예매만 이유 없이 화면에서 빠진다 */
         fun of(code: String): ReservationStatus =
-            entries.firstOrNull { it.code == code } ?: throw IllegalStateException("모르는 예매 상태다: $code")
+            entries.firstOrNull { it.code == code } ?: error("모르는 예매 상태다: $code")
     }
 }

@@ -98,7 +98,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 | 기본 인자 | 오버로드 여럿 |
 
 **`when` 에 `else` 를 안 둔다** — 열거값이 늘면 컴파일러가 빠진 가지를 짚어 준다. `else` 를 두면 새 값이 조용히 기본 가지로 간다.
-열거·sealed·Boolean 주어면 `detektMain`(`detekt-typed.yml` 의 `ElseCaseInsteadOfExhaustiveWhen`)이 막는다(`G7a`). 주어 없는 `when {}` 의 `else` 는 「나머지 전부」라 둔다.
+열거·sealed·Boolean 주어면 `detektMain`(`detekt.yml` 의 `ElseCaseInsteadOfExhaustiveWhen`)이 막는다(`G7a`·`G8`). 주어 없는 `when {}` 의 `else` 는 「나머지 전부」라 둔다.
 
 ## SQL
 

@@ -62,6 +62,8 @@ import org.springframework.web.filter.OncePerRequestFilter
 class SecurityConfig {
 
     @Bean
+    // 필터 체인 하나가 보안 구성 전부를 든다 — 빈 일곱은 Spring 이 넣고, 가르면 체인이 둘이 된다(`G8`).
+    @Suppress("LongParameterList")
     fun filterChain(
         http: HttpSecurity,
         jdbc: JdbcClient,

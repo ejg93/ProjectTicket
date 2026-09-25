@@ -92,7 +92,7 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
     }
 
     private fun <T : Any> replay(accountId: Long, key: String, hash: String, responseType: Class<T>): T {
-        val stored = findStored(accountId, key) ?: throw IllegalStateException("선점에 실패했는데 행이 없다: $key")
+        val stored = findStored(accountId, key) ?: error("선점에 실패했는데 행이 없다: $key")
         if (stored.requestHash != hash) {
             throw TicketException(ErrorCode.IDEMPOTENCY_KEY_REUSED)
         }
@@ -111,7 +111,7 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
 
     /** 커밋된 행에는 반드시 응답이 있다 — `idempotency_key_response_check` 가 커밋 때 본다(`V7`). 없으면 그 트리거가 빠진 것이다 */
     private fun <T : Any> deserialize(stored: Stored, key: String, responseType: Class<T>): T =
-        json.readValue(stored.responseBody ?: throw IllegalStateException("저장된 멱등 응답이 비었다: $key"), responseType)
+        json.readValue(stored.responseBody ?: error("저장된 멱등 응답이 비었다: $key"), responseType)
 
     data class Stored(val requestHash: String, val responseBody: String?)
 

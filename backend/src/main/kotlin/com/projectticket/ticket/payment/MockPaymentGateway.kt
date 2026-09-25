@@ -2,6 +2,7 @@ package com.projectticket.ticket.payment
 
 import org.springframework.stereotype.Component
 import java.security.SecureRandom
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -84,13 +85,13 @@ class MockPaymentGateway {
      */
     fun refund(refundKey: String, amount: Int): RefundResult {
         require(amount >= 0) { "환불 금액이 음수다" }
-        return refundsByKey.computeIfAbsent(refundKey) { RefundResult("MR%d%04d".format(System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))) }
+        return refundsByKey.computeIfAbsent(refundKey) { RefundResult("MR%d%04d".format(Locale.ROOT, System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))) }
     }
 
     private fun approved(last4: String) = Result(issueApprovalNumber(), last4, null)
 
     /** 시각을 앞에 둬서 재기동해도 안 겹친다 — 일련번호만 쓰면 다시 뜬 뒤 1번부터라 `payment_approval_number_key` 에 걸린다 */
-    private fun issueApprovalNumber(): String = "M%d%04d".format(System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))
+    private fun issueApprovalNumber(): String = "M%d%04d".format(Locale.ROOT, System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))
 
     /** 셈은 [CardNumbers] 가 든다. 여기 `require` 는 **우리 잘못을 잡는 그물**이다 — 입구가 이미 거른 값만 온다 */
     private fun digitsOf(cardNumber: String): String {

@@ -3,6 +3,7 @@ package com.projectticket.ticket.observability
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
@@ -56,7 +57,7 @@ class RequestLogFilter : OncePerRequestFilter() {
         SILENT_PREFIXES.any { request.requestURI.startsWith(it) }
 
     private companion object {
-        val log = LoggerFactory.getLogger(RequestLogFilter::class.java)
+        val log: Logger = LoggerFactory.getLogger(RequestLogFilter::class.java)
 
         /**
          * 이 경로들은 안 찍는다. 컨테이너 헬스체크가 `/actuator/health` 를 30초마다 두드린다 —

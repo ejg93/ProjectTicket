@@ -218,16 +218,12 @@ configurations.named("detekt") {
 }
 
 
-// 타입 해석 규칙은 `detekt` 태스크에서 안 돈다 — detekt 2.0 은 그것을 `detektMain` 에서만 돌린다(`G7a` 실측).
-// 켜도 조용히 안 도는 규칙이 되지 않게 `check` 에 `detektMain` 을 걸고, 거기는 `detekt-typed.yml` 에 고른 규칙만 돌린다.
-tasks.named<dev.detekt.gradle.Detekt>("detektMain") {
-	config.setFrom(files("$rootDir/config/detekt/detekt-typed.yml"))
-	buildUponDefaultConfig = false
-}
+// 타입 해석 규칙은 `detekt` 태스크에서 안 돈다 — detekt 2.0 은 그것을 `detektMain`·`detektTest` 에서만 돌린다(`G7a` 실측).
+// 켜도 조용히 안 도는 규칙이 되지 않게 둘을 `check` 에 건다. 설정은 위 `detekt {}` 하나다(`G8` — 둘로 나누면 한쪽만 고쳐진다).
 
 // `gradlew build` 가 두 레인을 다 돈다. 빠른 레인만 보고 push 하면 DB 결함이 CI 에서야 드러난다.
 tasks.check {
-	dependsOn(tasks.test, integrationTest, "detektMain")
+	dependsOn(tasks.test, integrationTest, "detektMain", "detektTest")
 }
 
 tasks.withType<Test> {

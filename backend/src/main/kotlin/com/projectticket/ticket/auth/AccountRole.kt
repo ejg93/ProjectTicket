@@ -17,6 +17,6 @@ enum class AccountRole {
     companion object {
         /** 모르는 값이면 터진다. 조용히 기본 역할로 떨어지면 새 역할이 제약에 늘었을 때 그 계정만 이유 없이 권한을 잃는다 */
         fun of(code: String): AccountRole =
-            entries.firstOrNull { it.code == code } ?: throw IllegalStateException("모르는 역할이다: $code")
+            entries.firstOrNull { it.code == code } ?: error("모르는 역할이다: $code")
     }
 }

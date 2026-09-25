@@ -41,7 +41,7 @@ class MeController(
         @AuthenticationPrincipal user: TicketUser,
         @Valid @RequestBody request: WithdrawRequest,
         http: HttpServletRequest,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<Unit> {
         val email = withdrawals.withdraw(user.id, request.password, http.remoteAddr)
         sessions.expireAll(email)
         return ResponseEntity.noContent().build()

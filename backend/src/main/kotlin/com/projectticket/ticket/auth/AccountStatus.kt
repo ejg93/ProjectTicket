@@ -16,6 +16,6 @@ enum class AccountStatus {
          * 새 상태가 제약에 늘면 그 계정이 이유 없이 로그인만 막힌다 — 오류도 로그도 안 남는다.
          */
         fun of(code: String): AccountStatus =
-            entries.firstOrNull { it.code == code } ?: throw IllegalStateException("모르는 계정 상태다: $code")
+            entries.firstOrNull { it.code == code } ?: error("모르는 계정 상태다: $code")
     }
 }
