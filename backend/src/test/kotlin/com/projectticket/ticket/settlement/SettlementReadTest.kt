@@ -39,16 +39,7 @@ class SettlementReadTest : PostgresTestBase() {
 
     @Test
     fun my_settlement_reads_with_lines_that_sum_to_the_amount() {
-        val settlementId = jdbc.sql(
-            """
-            insert into settlement (performance_id, settlement_policy_id, settle_at, status, amount, settled_at)
-            values (:performance, (select settlement_policy_id from settlement_policy where organizer_id is null order by effective_at desc limit 1),
-                    now(), 'pending', 90000, now())
-            returning settlement_id
-            """,
-        ).param("performance", performanceId).query(Long::class.java).single()
-        jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, 'sale', 100000), (:id, 'platform_fee', -10000)")
-            .param("id", settlementId).update()
+        settle()
 
         mvc.get("/api/organizer/settlements?performanceId=$performanceId") { with(user(mine)) }.andExpect {
             status { isOk() }
@@ -67,7 +58,25 @@ class SettlementReadTest : PostgresTestBase() {
             status { isNotFound() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-found") }
         }
-        mvc.get("/api/organizer/settlements?performanceId=$performanceId") { with(user(stranger)) }.andExpect { status { isNotFound() } }
+        // 남은 **정산서가 있는 회차**로 잰다 — 없는 회차로 재면 소속 조인을 지워도 404 라 이 줄이 아무것도 안 막는다(마무리 14차 리뷰).
+        settle()
+        mvc.get("/api/organizer/settlements?performanceId=$performanceId") { with(user(stranger)) }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-found") }
+        }
+    }
+
+    private fun settle() {
+        val settlementId = jdbc.sql(
+            """
+            insert into settlement (performance_id, settlement_policy_id, settle_at, status, amount, settled_at)
+            values (:performance, (select settlement_policy_id from settlement_policy where organizer_id is null order by effective_at desc limit 1),
+                    now(), 'pending', 90000, now())
+            returning settlement_id
+            """,
+        ).param("performance", performanceId).query(Long::class.java).single()
+        jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, 'sale', 100000), (:id, 'platform_fee', -10000)")
+            .param("id", settlementId).update()
     }
 
     private fun organizerUser(email: String, organizerId: Long): TicketUser {

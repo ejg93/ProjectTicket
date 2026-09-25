@@ -23,13 +23,19 @@ const KIND: Record<string, string> = {
   adjustment: "조정",
 };
 
+/** 정산 칸이 받는 것 — 정산서, 아직 없음(`404`), 못 불러옴(그 밖). 빈 값에 뜻을 안 싣는다(`D14`) */
+export type SettlementSlot = Settlement | "none" | "failed";
+
 /**
  * 회차 하나의 정산 칸(`45c`). 따로 화면을 안 만든다 — 숫자 몇 개라 공연 화면 안의 한 칸이다(설계).
- * 정산서가 아직 없으면(`404`) 페이지가 `null` 을 넘긴다. 합계는 항목의 합이다(서버의 지연 제약).
+ * 합계는 항목의 합이다(서버의 지연 제약).
  */
-export function SettlementSummary({ settlement }: { settlement: Settlement | null }) {
-  if (!settlement) {
+export function SettlementSummary({ settlement }: { settlement: SettlementSlot }) {
+  if (settlement === "none") {
     return <p className="muted">정산서가 아직 없습니다.</p>;
+  }
+  if (settlement === "failed") {
+    return <p className="muted">정산을 불러오지 못했습니다. 잠시 후 새로 고쳐 주세요.</p>;
   }
   return (
     <details>

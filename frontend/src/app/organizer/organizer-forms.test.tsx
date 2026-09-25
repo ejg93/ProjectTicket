@@ -89,7 +89,7 @@ describe("회차 등록", () => {
 describe("회차 조작", () => {
   it("취소는 확인을 한 번 더 받은 뒤에만 보낸다", async () => {
     const spy = respond({}, 200);
-    render(<PerformanceActions performanceId={7} status="open" />);
+    render(<PerformanceActions performanceId={7} status="open" label="10월 1일 1관" />);
 
     await userEvent.click(screen.getByRole("button", { name: "회차 취소" }));
     expect(spy).not.toHaveBeenCalled();
@@ -100,17 +100,17 @@ describe("회차 조작", () => {
   });
 
   it("오픈 전 회차는 오픈만, 닫힌 회차는 아무 버튼도 없다", () => {
-    const { rerender } = render(<PerformanceActions performanceId={7} status="draft" />);
+    const { rerender } = render(<PerformanceActions performanceId={7} status="draft" label="10월 1일 1관" />);
     expect(screen.getByRole("button", { name: "오픈" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "회차 취소" })).toBeNull();
 
-    rerender(<PerformanceActions performanceId={7} status="closed" />);
+    rerender(<PerformanceActions performanceId={7} status="closed" label="10월 1일 1관" />);
     expect(screen.queryByRole("button")).toBeNull();
   });
 });
 
 describe("정산 칸(`45c`)", () => {
-  it("상태·합계와 항목을 그리고, 정산서가 없으면 그렇게 말한다", async () => {
+  it("상태·합계와 항목을 그리고, 정산서가 없거나 못 불러왔으면 그렇게 말한다", async () => {
     const { container, rerender } = render(
       <SettlementSummary
         settlement={{ status: "pending", amount: 90000, settle_at: "2026-10-02T00:00:00Z", settled_at: "2026-10-02T00:00:00Z", lines: [{ kind: "sale", amount: 100000 }, { kind: "platform_fee", amount: -10000 }] }}
@@ -120,7 +120,10 @@ describe("정산 칸(`45c`)", () => {
     expect(screen.getByText(/플랫폼 수수료/)).toHaveTextContent("-10,000원");
     await expectNoAxeViolations(container);
 
-    rerender(<SettlementSummary settlement={null} />);
+    rerender(<SettlementSummary settlement="none" />);
     expect(screen.getByText("정산서가 아직 없습니다.")).toBeInTheDocument();
+
+    rerender(<SettlementSummary settlement="failed" />);
+    expect(screen.getByText(/정산을 불러오지 못했습니다/)).toBeInTheDocument();
   });
 });

@@ -62,13 +62,29 @@ class WithdrawalService(
             .orElseThrow { TicketException(ErrorCode.ACCOUNT_NOT_FOUND, "이미 탈퇴했거나 없는 계정이다: account_id=$accountId") }
 
         // 막혀 있으면 대조도 안 한다 — 로그인과 같은 순서다. 막혔다고 따로 말하지 않는다(`D9`).
-        if (loginAttempts.isBlocked(account.email, ip)) throw TicketException(ErrorCode.LOGIN_FAILED)
+        if (loginAttempts.isBlocked(account.email, ip)) {
+            recordFailure(accountId, ip, "withdraw_blocked")
+            throw TicketException(ErrorCode.LOGIN_FAILED)
+        }
         if (!passwordEncoder.matches(password, account.passwordHash)) {
             loginAttempts.recordFailure(account.email, ip)
+            recordFailure(accountId, ip, "withdraw_bad_credentials")
             throw TicketException(ErrorCode.LOGIN_FAILED)
         }
         loginAttempts.reset(account.email, ip)
     }
+
+    /**
+     * 로그인 실패와 **같은 이름**으로 남긴다(`AuthController.recordLoginFailure`) — 카운터가 하나이니 「이 계정에 시도가 몇 번 왔나」도
+     * 한 줄로 답해야 한다. 별도 트랜잭션이라 탈퇴가 롤백돼도 남는다(`ATTEMPT`, 마무리 14차).
+     */
+    private fun recordFailure(accountId: Long, ip: String, reason: String) =
+        auditLog.record(
+            AuditLog.Kind.ATTEMPT,
+            "account.login_failed",
+            actorAccountId = accountId,
+            detail = mapOf("ip" to ip, "reason" to reason),
+        )
 
     private data class Credentials(val email: String, val passwordHash: String)
 }

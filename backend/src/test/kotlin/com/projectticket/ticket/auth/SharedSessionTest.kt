@@ -2,7 +2,6 @@ package com.projectticket.ticket.auth
 
 import com.projectticket.ticket.PostgresTestBase
 import com.projectticket.ticket.TicketApplication
-import java.net.ServerSocket
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -45,10 +44,11 @@ class SharedSessionTest {
     fun startTwoInstances() {
         postgres.start()
         redis.start()
-        portA = freePort()
-        portB = freePort()
-        instanceA = boot(portA)
-        instanceB = boot(portB)
+        // 포트는 톰캣이 고른다(`0`). 빈 포트를 먼저 재고 넘기면 닫은 사이에 다른 프로세스가 가져간다 — 마무리 14차 `--full` 이 그것으로 섰다.
+        instanceA = boot()
+        instanceB = boot()
+        portA = portOf(instanceA)
+        portB = portOf(instanceB)
     }
 
     @AfterAll
@@ -107,9 +107,9 @@ class SharedSessionTest {
      * 설정을 **명령행 인자로** 넘긴다. `properties()` 는 기본값이라 `application.yml` 이 이기고,
      * 그러면 컨테이너가 아니라 로컬 5432 를 찾다가 인증에서 죽는다.
      */
-    private fun boot(port: Int): ConfigurableApplicationContext =
+    private fun boot(): ConfigurableApplicationContext =
         SpringApplicationBuilder(TicketApplication::class.java).run(
-            "--server.port=$port",
+            "--server.port=0",
             "--ticket.scheduling.enabled=false",
             "--spring.datasource.url=${postgres.jdbcUrl}",
             "--spring.datasource.username=${postgres.username}",
@@ -158,7 +158,8 @@ class SharedSessionTest {
             ?: throw AssertionError("응답에 $name 쿠키가 없다: ${response.headers().allValues("set-cookie")}")
 
     /** 포트를 먼저 잡아 두고 그 번호로 띄운다. 띄운 뒤에 번호를 캐내려면 Boot 내부 타입을 알아야 한다 */
-    private fun freePort(): Int = ServerSocket(0).use { it.localPort }
+    private fun portOf(context: ConfigurableApplicationContext): Int =
+        checkNotNull(context.environment.getProperty("local.server.port", Int::class.java)) { "톰캣이 고른 포트를 못 읽었다" }
 
     private companion object {
         const val EMAIL = "shared-session@test.local"

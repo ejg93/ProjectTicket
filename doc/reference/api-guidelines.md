@@ -124,14 +124,14 @@
 
 | 슬러그 | 상태 | 뜻 | 추가 필드 | 청크 |
 |---|---|---|---|---|
-| `login-failed` | 401 | 이메일·비밀번호가 안 맞거나 정지된 계정. **셋을 안 가른다** | | 있다 |
+| `login-failed` | 401 | 이메일·비밀번호가 안 맞거나 정지된 계정. **셋을 안 가른다**. 탈퇴의 비밀번호 재확인도 같은 이름·같은 카운터다(`44c`) | | 있다 |
 | `unauthenticated` | 401 | 로그인 필요 | | 있다 |
 | `forbidden` | 403 | 권한 없음·CSRF 실패 | | 있다 |
 | `email-taken` | 409 | 가입된 이메일 | | 있다 |
 | `account-not-found` | 404 | 없거나 이미 탈퇴한 계정. **관리자에게도 404 다**(아래 「403 이냐 404 냐」) | | 5b |
 | `unknown-consent-item` · `required-consent-missing` | 422 | 동의 | | 있다 |
 | `consent-item-not-found` | 404 | 그런 코드의 동의 항목이 없다(약관·처리방침 화면) | | 39-1 |
-| `performance-not-found` | 404 | 회차 없음 | | 있다 |
+| `performance-not-found` | 404 | 회차 없음. 기획사 정산 조회는 남의 회차·정산서가 아직 없는 회차도 이 이름이다(`45c` — 둘을 가르면 남의 회차 존재가 샌다) | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
 | `validation-failed` | 400 | Bean Validation | `errors[{field, message}]` | 있다 |
 | `malformed-request` · `method-not-allowed` · `unsupported-media-type` · `endpoint-not-found` · `internal` | 400·405·415·404·500 | 프레임워크 | | 있다 |

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { apiSession } from "@/lib/api-session";
+
 import { WithdrawForm } from "./withdraw-form";
 
 export const metadata: Metadata = {
@@ -9,9 +11,11 @@ export const metadata: Metadata = {
 
 /**
  * 회원 탈퇴(`44c`, 개인정보 보호법 제21조). **무엇이 사라지고 무엇이 남는지 먼저 말한다** — 누르고 나서 알면 늦다.
- * 로그인은 폼의 입구(`DELETE /api/me`)가 확인한다 — 세션이 없으면 `api.ts` 가 로그인 화면으로 보낸다.
+ * **첫 요청에서 로그인을 본다**(`D16` 「로그인해야만 뜻이 있는 화면」) — 비밀번호를 치고 나서 튕기면 늦다(마무리 14차).
  */
-export default function WithdrawPage() {
+export default async function WithdrawPage() {
+  await apiSession("/api/me");
+
   return (
     <div>
       <h1>회원 탈퇴</h1>

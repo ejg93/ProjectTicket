@@ -51,6 +51,16 @@ class WithdrawTest : PostgresTestBase() {
         }
 
         assertThat(withdrawn()).isFalse()
+        // 로그인 실패와 같은 이름으로 시도가 남는다 — 탈퇴는 롤백돼도 이것은 별도 트랜잭션이다.
+        assertThat(
+            jdbc.sql(
+                """
+                select count(*) from audit_log
+                 where event_type = 'account.login_failed' and detail->>'reason' = 'withdraw_bad_credentials'
+                   and actor_account_id = (select account_id from account where email = :email)
+                """,
+            ).param("email", EMAIL).query(Long::class.java).single(),
+        ).isEqualTo(1)
         // 세션도 그대로다 — 틀린 한 번이 로그아웃이 되면 안 된다.
         mvc.get("/api/me") { cookie(login) }.andExpect { status { isOk() } }
     }
@@ -70,6 +80,12 @@ class WithdrawTest : PostgresTestBase() {
         // 잠긴 뒤에는 맞는 비밀번호도 같은 401 이다 — 로그인과 같은 카운터라서다.
         withdraw(PASSWORD).andExpect { status { isUnauthorized() } }
         assertThat(withdrawn()).isFalse()
+        // 거꾸로도 잰다 — 탈퇴에서 쌓인 실패가 로그인을 막는다. 카운터가 따로면 탈퇴 입구가 대입 시도의 우회로가 된다(마무리 14차).
+        mvc.post("/api/auth/login") {
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$EMAIL","password":"$PASSWORD"}"""
+        }.andExpect { status { isUnauthorized() } }
     }
 
     @Test

@@ -81,6 +81,15 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
         <button type="button" onClick={() => setGrades((n) => n + 1)}>
           등급 추가
         </button>
+        {/* 칸이 전부 필수라 잘못 늘린 빈 줄이 제출을 영영 막는다 — 마지막 줄을 뺄 수 있어야 한다(마무리 14차). 끝 줄만 빼 번호가 안 비게 한다 */}
+        {grades > 1 ? (
+          <>
+            {" "}
+            <button type="button" onClick={() => setGrades((n) => n - 1)}>
+              마지막 등급 빼기
+            </button>
+          </>
+        ) : null}
       </p>
       {error ? (
         <p className="error" role="alert">

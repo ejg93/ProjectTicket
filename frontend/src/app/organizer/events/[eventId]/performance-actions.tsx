@@ -25,9 +25,10 @@ function messageOf(error: unknown): string {
 
 /**
  * 회차 하나의 조작(`45b`). `draft` 는 「오픈」, `open` 은 「취소」.
+ * 폼 이름에 회차를 싣는다(`label`) — 회차가 여럿이면 같은 이름의 폼 표지가 겹친다(axe `landmark-unique`, 마무리 14차).
  * **취소는 두 단계다** — 회차 취소는 그 회차의 모든 예매를 전액 환불한다(`17a`). 한 번 누름으로 끝나면 실수가 돈이 된다.
  */
-export function PerformanceActions({ performanceId, status }: { performanceId: number; status: string }) {
+export function PerformanceActions({ performanceId, status, label }: { performanceId: number; status: string; label: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -51,7 +52,7 @@ export function PerformanceActions({ performanceId, status }: { performanceId: n
 
   if (status === "draft") {
     return (
-      <form action={() => run("open")} aria-label="회차 오픈">
+      <form action={() => run("open")} aria-label={`${label} 오픈`}>
         {alert}
         <SubmitButton label="오픈" pendingLabel="여는 중입니다" />
       </form>
@@ -74,7 +75,7 @@ export function PerformanceActions({ performanceId, status }: { performanceId: n
   }
 
   return (
-    <form action={() => run("cancel")} aria-label="회차 취소 확인">
+    <form action={() => run("cancel")} aria-label={`${label} 취소 확인`}>
       <p>이 회차의 모든 예매를 전액 환불하고 판매를 닫습니다. 되돌릴 수 없습니다.</p>
       {alert}
       <SubmitButton label="모두 환불하고 취소" pendingLabel="취소하는 중입니다" />
