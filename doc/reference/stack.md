@@ -119,7 +119,7 @@ RFC 9110 이 422 를 「Unprocessable Content」로 고쳤다. `HttpStatus.UNPRO
 ### Kotlin 의 검증 애너테이션은 `@field:` 로 붙인다
 
 `data class` 생성자 파라미터에 `@Size` 를 그냥 붙이면 파라미터에 붙어 Bean Validation 이 못 본다. 이 저장소는 `@field:NotBlank` 처럼 대상을 명시하고,
-`build.gradle.kts` 의 `-Xannotation-default-target=param-property` 가 명시 없는 자리를 받친다. `ScreenLengthTest`(39)가 `@Size(max)` 를 리플렉션으로 읽을 때 이 자리를 본다.
+`build.gradle.kts` 의 `-Xannotation-default-target=param-property` 가 명시 없는 자리를 받친다. `AppDbConstraintTest`(`I4-1`)가 `@Size(max)` 를 필드에서 리플렉션으로 읽을 때 이 자리를 본다.
 
 ### `@Transactional` 은 자기 호출에 안 먹는다
 

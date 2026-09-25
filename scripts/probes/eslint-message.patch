@@ -1,0 +1,15 @@
+# 게이트: eslint no-restricted-syntax(.message)
+# 명령: cd frontend && npx --no-install eslint src/app/error.tsx
+# 문구: no-restricted-syntax
+diff --git a/frontend/src/app/error.tsx b/frontend/src/app/error.tsx
+index 2afa886..1da7921 100644
+--- a/frontend/src/app/error.tsx
++++ b/frontend/src/app/error.tsx
+@@ -27,6 +27,7 @@ export default function ErrorScreen({
+         </button>
+       </p>
+       {error.digest ? <p className="muted">오류 번호: {error.digest}</p> : null}
++      <p>{error.message}</p>
+       <p className="muted">
+         <Link href="/">처음으로</Link>
+       </p>

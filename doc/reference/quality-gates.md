@@ -45,7 +45,9 @@
 | eslint 입구 규칙 | 4 테스트 | `npm run lint`(로컬·CI) | `api.ts`·`api-session.ts` 밖의 `fetch` 와 `next/headers`(`39`). **문서에만 있던 `D16` 규칙을 여기서 내렸다** — 우회하면 CSRF·오류 변환을 안 거친 응답이 화면에 닿는다 | `G2` 2026-09-25 — 컴포넌트에 `fetch(` 를 넣으니 `no-restricted-globals`. 탐침 `eslint-fetch` |
 | eslint `jsx-a11y` 전체 | 4 테스트 | `npm run lint`(로컬·CI) | 라벨 없는 입력칸·키보드로 못 누르는 요소 같은 **빠뜨린 것**(`D17` 「접근성」). `eslint-config-next` 가 켜는 것은 부분집합이라 규칙을 통째로 얹었다(`39`). **화면을 만들기 전에 켰다** — 나중에 켜면 이미 나온 마크업을 되돌리는 일이 된다 | `G2` 2026-09-25 — `alt` 없는 `<img>` 에 `jsx-a11y/alt-text`. 탐침 `jsx-a11y` |
 | eslint `react/no-danger` | 4 테스트 | 〃 | `dangerouslySetInnerHTML`(`D9`, OWASP A03). React 는 기본으로 글자를 이스케이프하는데 그것이 끈다 — 남이 쓴 글이 닿으면 남의 스크립트가 우리 페이지에서 돈다. **`39-1` 의 약관 화면이 첫 소비자다**(`consent_item.body` 가 마크다운이다) | `G2` 2026-09-25 — `dangerouslySetInnerHTML` 한 줄에 빨강. 탐침 `no-danger` |
+| eslint `.message` 금지 | 4 테스트 | `npm run lint`(로컬·CI) | `src/app`·`src/components` 의 `.message` 읽기(`D16` 「원인을 화면에 안 적는다」, `G7c`). **변수 이름으로 안 가린다** — `catch` 변수가 `thrown` 이라 `error`·`err`·`e` 로 가리면 하나도 못 문다 | `G7c` 2026-09-25 — `error.tsx` 에 `{error.message}` 를 넣으니 빨강. 탐침 `eslint-message` |
 | `screen-text.test.ts` | 4 테스트 | `npm test` | 화면 문구의 **반말**(`D17`). `doc-lint.sh` 의 거울이다 — 그쪽은 개발자 글의 존댓말을 막는다. 주석이 평서형이라 정규식으로는 못 재고 AST 로 걷는다 | `G2` 2026-09-25 — 「좌석이 풀렸다」(반말)로 바꾸니 빨강. 탐침 `screen-text` |
+| `error-types.test.ts` | 4 테스트 | `npm test` | 화면이 가르는 오류 슬러그(`case`·`.slug ===`)가 `api-guidelines.md` 계약표 밖인 것(`G7c`). 표 = `ErrorCode` 는 `ErrorContractTest` 가 재서 둘이 이어진다 | `G7c` 2026-09-25 — `case "no-such-type":` 을 넣으니 빨강. 탐침 `error-type-slug` |
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | `G2` 2026-09-25 — 이름 없는 `<button>` 에 `button-name`. 탐침 `axe` |
 | 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
 | 변이 시험(PIT) | 5 문서 | `gradlew mutationTest` — **손으로**, `build` 밖 | **아무것도 못 막는다** — 초록인 시험이 무엇을 무는지 잰다(`G4`). 대상 여덟은 틀려도 흐름 시험이 초록인 순수 계산이다. 목록과 처분은 `doc/notes/mutation-2026-09.md` | `G4` 2026-09-25 — 첫 판 산 것 7·덮지 않음 23 → 시험 둘 신설·사례 둘 추가 뒤 산 것 3, 셋 다 동치. PIT 기본 변이가 못 만드는 `HALF_UP → HALF_DOWN` 은 손으로 넣어 `RefundPolicyTest` 가 잡았다 |
@@ -143,10 +145,9 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 
 | # | 규칙 | 문서 | 지금 실물 | 처분 |
 |---|---|---|---|---|
-| ① | 화면은 오류 `type` 으로 분기하고 그 슬러그는 표 안에 있다 | `D5`·`D16` | 문서가 `ErrorTypeScreenTest` 를 불렀는데 **없다** | `G7c` — vitest `error-types.test.ts` |
 | ② | 레인·태그·바탕 이름은 `build.gradle.kts` 와 같다 | `D8` | 문서가 「`P4` 의 대조 테스트」를 불렀는데 **없다** | `G7d` — `TestConventionTest`(ProjectShop `Q30` 이식) |
-| ⑩ | 화면이 `error.message` 를 안 적는다 | `D16` | `app/` 에 1곳 | `G7c` — eslint `no-restricted-syntax` |
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
+| ⑬ | 화면 입력칸 `maxLength` = 요청 `@Size(max)` | `D8` | 문서가 `ScreenLengthTest` 를 불렀는데 **없다**(`G7c` 가 찾았다). 화면에 `maxLength` 0개 | `G9` — 세울지부터 정한다 |
 
 **대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 `/wrapup` 대조와 독립 리뷰가 본다.
 

@@ -1,0 +1,16 @@
+# 게이트: error-types.test.ts
+# 명령: cd frontend && npx --no-install vitest run src/test/error-types.test.ts
+# 문구: no-such-type
+diff --git a/frontend/src/app/performances/[performanceId]/hold-form.tsx b/frontend/src/app/performances/[performanceId]/hold-form.tsx
+index 8a52147..5a24bf9 100644
+--- a/frontend/src/app/performances/[performanceId]/hold-form.tsx
++++ b/frontend/src/app/performances/[performanceId]/hold-form.tsx
+@@ -25,6 +25,8 @@ function messageOf(error: unknown): string {
+       return "이 회차에 진행 중인 예매가 이미 있습니다. 그 예매를 먼저 마쳐 주세요.";
+     case "performance-not-open":
+       return "지금은 예매할 수 없는 회차입니다.";
++    case "no-such-type":
++      return "probe";
+     case "admission-required":
+       // 대기열이 켜진 회차다. 줄을 서는 화면은 `43` 이 붙인다.
+       return "대기 인원이 많아 순서를 기다려야 합니다. 잠시 후 다시 시도해 주세요.";

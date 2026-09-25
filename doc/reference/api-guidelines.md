@@ -245,5 +245,5 @@
 
 ## 이 문서를 고칠 때
 
-**`type` 을 더하면 `ErrorCode` 와 이 표를 같이 고친다.** 화면의 분기가 이 표 안에 있는지는 `G7c` 의 `error-types.test.ts` 가 잰다 — 그 전에는 재는 것이 없다(`G5` 원장 ①. `39` 가 `ErrorTypeScreenTest` 를 세운다고 적혀 있었는데 실물이 없었다).
+**`type` 을 더하면 `ErrorCode` 와 이 표를 같이 고친다.** 화면의 분기(`switch (…slug)` 의 `case`·`….slug === "…"`)가 이 표 안에 있는지는 `frontend/src/test/error-types.test.ts` 가 잰다(`G7c`).
 경로를 바꾸는 것은 화면·e2e 가 같이 가는 것이라 청크로 세운다.

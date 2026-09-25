@@ -156,12 +156,12 @@ abstract class ConcurrencyTestBase
 ## 두 층에 흩어진 문자열의 대조
 
 화면이 `error.type` 으로 분기하고 백엔드가 그 슬러그를 바꾸면 **그 가지는 죽고 사용자는 영영 기본 문구만 본다.** 빌드도 타입 검사도 통과한다.
-그래서 이 대조는 화면이 아니라 **백엔드 테스트**로 둔다 — 실물 목록(`ErrorCode`)이 거기 있어서다. 39 가 세운다.
+**둘을 한 번에 안 잇고 문서 표를 가운데 둔다** — `ErrorContractTest`(백엔드)가 `ErrorCode` = 계약표를 재고, `error-types.test.ts`(화면)가 화면 분기 ⊆ 계약표를 잰다(`G7c`).
 
 | 테스트 | 무엇을 대조하나 |
 |---|---|
-| `ErrorTypeScreenTest` | 화면이 분기하는 슬러그 ⊆ `ErrorCode` 의 슬러그 |
-| `ScreenLengthTest` | 화면 입력칸의 `maxLength` = 요청 `data class` 의 `@Size(max)` |
+| `error-types.test.ts`(`G7c`) | 화면이 분기하는 슬러그 ⊆ `api-guidelines.md` 계약표의 슬러그 |
+| (없다) | 화면 입력칸의 `maxLength` = 요청 `data class` 의 `@Size(max)`. `ScreenLengthTest` 로 적혀 있었는데 실물이 없고 화면에 `maxLength` 가 0개다 — 세울지는 `G9` |
 | `StateMachineDocTest`(`I3-1`) | `state-machines.md` 의 전이표 = 전이 트리거가 허용하는 짝 |
 | `AppDbConstraintTest`(`I4-1`) | 요청 `data class` 의 제약 = 마이그레이션의 `check` (길이 셋·정규식 둘·`price >= 0`) |
 
