@@ -39,6 +39,12 @@ export default async function MePage() {
       <p>
         <Link href="/me/reservations">내 예매</Link> · <Link href="/me/withdraw">회원 탈퇴</Link>
       </p>
+      {/* 기획사 링크는 여기서만 건다(`45b`) — 머리글이 세션을 읽으면 모든 화면이 백엔드를 한 번 더 두드린다(`layout.tsx`) */}
+      {me.role === "organizer" ? (
+        <p>
+          <Link href="/organizer">기획사 화면</Link>
+        </p>
+      ) : null}
     </div>
   );
 }
