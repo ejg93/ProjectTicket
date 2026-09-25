@@ -6,9 +6,13 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 tree=${1:-HEAD}
+# 「경로 해시」 줄(없으면 `-`)을 인자 순서대로 모아 해시한다. `git ls-tree` 한 번으로 — 경로마다 `rev-parse` 를 부르면
+# 윈도에서 레인 셋에 4~5초가 들고, 이것을 부르는 훅(commit·push·Stop)이 매번 두 번씩 낸다(`G1` 실측).
 lane() {
   local name=$1; shift
-  for p in "$@"; do printf '%s %s\n' "$p" "$(git rev-parse -q --verify "$tree:$p" 2>/dev/null || echo -)"; done \
+  git ls-tree "$tree" -- "$@" 2>/dev/null \
+    | awk -F'\t' -v paths="$*" 'BEGIN{n=split(paths, p, " ")} {split($1, m, " "); h[$2]=m[3]}
+        END{for (i = 1; i <= n; i++) printf "%s %s\n", p[i], (p[i] in h ? h[p[i]] : "-")}' \
     | git hash-object --stdin | sed "s/^/$name /"
 }
 # `backend/config` 는 detekt 설정이다(`backend/config/detekt/detekt.yml`). **빌드 결과를 바꾼다** —

@@ -359,6 +359,12 @@ git update-index --chmod=+x backend/gradlew
 파일로 두고 `--data-binary @body.json` 으로 보낸다. 파일은 Write 도구로 만든다 — 셸 heredoc 도 같은 자리에서 깨진다.
 **heredoc 은 백슬래시도 먹는다** — `\\d` 가 `\d` 로 들어간다. 정규식이 든 소스는 Write 도구로 쓴다.
 
+### Git Bash 가 `origin/main:.claude/…` 인자를 경로로 바꿔 버린다
+
+MSYS 경로 변환이 `ref/x:.dir/file` 꼴(슬래시 든 ref + 점으로 시작하는 경로)을 경로 목록으로 읽어 고친다. `git rev-parse -q --verify` 가 오류 없이 빈손으로 끝나 「그 경로 없음」과 구별이 안 된다.
+`HEAD:.claude/…` 는 멀쩡해서 한쪽만 틀린다 — 옛 `verify-fingerprint.sh` 가 이것으로 윈도에서 backend·tools 레인을 늘 「바뀜」으로 셌다(`G1`).
+`ref:path` 인자를 안 쓴다 — `git ls-tree <ref> -- <path>` 로 받거나, 꼭 써야 하면 `MSYS_NO_PATHCONV=1` 을 앞에 둔다.
+
 ### 훅이 산문을 명령으로 읽는 자리가 둘이다
 
 ① 훅 입력은 JSON(`{"tool_input":{"command":"…"}}`)이라 원문에 `grep` 을 걸면 설명문까지 읽힌다 — 명령만 꺼내고 본다.
