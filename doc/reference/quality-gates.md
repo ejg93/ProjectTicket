@@ -36,6 +36,7 @@
 | `SqlTextTest` | 4 테스트 | 〃 | `where` 에 좌석 `status` 조건이 없는 `update performance_seat`(`G7b`, `D4`). 흐름 시험은 한 사람씩 돌아서 덮어쓰기를 못 본다. **원시 문자열 밖에서 조립한 SQL 은 못 본다** | `G7b` 2026-09-25 — 조건 없는 좌석 UPDATE 를 넣으니 빨강. 탐침 `sql-seat-update` |
 | `SchemaNamingTest` | 4 테스트 | `gradlew integrationTest` | 도는 스키마의 이름(`D15`) — snake_case·기본키 `<표>_id`·`_at`/`_until`↔`timestamptz`·`is_`(`G7b`). 첫 실행이 `account_consent.granted` 를 찾았다 — `naming-rules.md` 에 적고 이름으로 봐준다 | `G7b` 2026-09-25 — camelCase 컬럼을 새 `V` 로 넣으니 빨강. 탐침 `schema-naming`(재사용 컨테이너를 안 쓴다) |
 | `QualityGateDocTest` | 4 테스트 | 〃 | 이 문서의 「CI 잡과 필수 검사」 표와 `.github/workflows/` 의 잡이 갈리는 것(`P10`). 잡을 더하고 표를 안 고치면 어느 잡이 머지를 막는지 아무도 모른다 | `P10` 2026-09-19 — `secrets` 행을 빼니 빨갛고 되돌리니 초록 |
+| `TestConventionTest` | 4 테스트 | 〃 | 레인·태그·바탕의 약속이 갈리는 것(`G7d`, `D8`) — 바탕 없이 DB·`MockMvc` 를 쓰는 테스트(빠른 레인에서 컨테이너 없이 돈다), 사유 없이 손으로 단 `@Tag("db")`, 「레인」 표와 `build.gradle.kts` 의 태스크·태그 | `G7d` 2026-09-25 — 셋 각자 위반을 넣으니 셋 다 빨강. 탐침 `test-without-base`·`test-hand-tag`·`test-lane-name` |
 | `ComposeContractTest` | 4 테스트 | 〃 | nginx 가 대수를 안 나누는 것과 healthcheck 가 이미지에 없는 도구를 쓰는 것(마무리 6차). **둘 다 기동은 되고 오류도 안 냈다** | 마무리 6차 2026-09-18 — 결함 둘을 되살리니 셋이 다 빨갰다. `G3` 2026-09-25 — `proxy_pass` 줄을 지우니 초록(공허 통과)이던 것이 「못 읽었다」로 선다 |
 | `MetricNamesTest` | 4 테스트 | 〃 | `D10` 의 지표 이름 표와 `TicketMetrics` 가 갈리는 것(`30`). 갈리면 대시보드 패널만 조용히 빈다 | `G3` 2026-09-25 — 표 머리를 바꾸니 빨갛긴 했는데 「갈렸다」 문구에 `[]` 였다. 이제 「못 읽었다」로 가른다 |
 | `StackVersionConsistencyTest` | 4 테스트 | 〃 | `stack.md` 버전 표가 `build.gradle.kts`·compose·`frontend/package.json` 과 갈리는 것 | `G3` 2026-09-25 — Grafana 버전 칸을 비우니 `image: grafana/grafana:` 가 그대로 들어 있어 초록이던 것이 「못 읽었다」로 선다 |
@@ -145,7 +146,6 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 
 | # | 규칙 | 문서 | 지금 실물 | 처분 |
 |---|---|---|---|---|
-| ② | 레인·태그·바탕 이름은 `build.gradle.kts` 와 같다 | `D8` | 문서가 「`P4` 의 대조 테스트」를 불렀는데 **없다** | `G7d` — `TestConventionTest`(ProjectShop `Q30` 이식) |
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
 | ⑬ | 화면 입력칸 `maxLength` = 요청 `@Size(max)` | `D8` | 문서가 `ScreenLengthTest` 를 불렀는데 **없다**(`G7c` 가 찾았다). 화면에 `maxLength` 0개 | `G9` — 세울지부터 정한다 |
 

@@ -1,0 +1,23 @@
+# 게이트: TestConventionTest 바탕
+# 명령: cd backend && ./gradlew test --tests '*TestConventionTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*TestConventionTest.xml 2>/dev/null; exit $r
+# 문구: 안 물려받았다
+diff --git a/backend/src/test/kotlin/com/projectticket/ticket/ProbeStrayTest.kt b/backend/src/test/kotlin/com/projectticket/ticket/ProbeStrayTest.kt
+new file mode 100644
+index 0000000..d9f2322
+--- /dev/null
++++ b/backend/src/test/kotlin/com/projectticket/ticket/ProbeStrayTest.kt
+@@ -0,0 +1,14 @@
++package com.projectticket.ticket
++
++import org.junit.jupiter.api.Test
++import org.springframework.beans.factory.annotation.Autowired
++import org.springframework.test.web.servlet.MockMvc
++
++class ProbeStrayTest {
++    @Autowired private lateinit var mvc: MockMvc
++
++    @Test
++    fun probe() {
++        mvc.hashCode()
++    }
++}
