@@ -22,7 +22,8 @@ type Preview = {
 function messageOf(slug: string | null): string {
   switch (slug) {
     case "cancel-window-closed":
-      return "관람일 당일에는 취소할 수 없습니다.";
+      // 서버는 관람일 당일과 지난 공연을 같은 이름으로 막는다(구간이 없다)
+      return "관람일 당일이거나 지난 공연은 취소할 수 없습니다.";
     case "invalid-transition":
       return "지금 상태에서는 취소할 수 없습니다.";
     case "reservation-not-found":
@@ -38,7 +39,8 @@ const slugOf = (thrown: unknown) => (thrown instanceof ApiError ? thrown.slug : 
  * 예매 취소 — **두 단계다**(`44b`, `D6` 고지). 「취소」가 미리보기를 받아 결제액·수수료·환불액을 보여 주고,
  * 「이 금액으로 취소」가 그제야 `POST …/cancel` 을 보낸다. 한 번에 취소하면 수수료를 못 보고 누른다.
  *
- * 미리보기와 실제 환불은 서버의 같은 함수라(`RefundQuote`) 여기서 본 금액이 환불 행과 같다.
+ * 미리보기와 실제 환불은 서버의 같은 함수다(`RefundQuote`). **같은 시각이면 같다** — 화면을 띄운 채 KST 자정을 넘기거나
+ * 구간표 새 판이 효력을 얻으면 취소가 다른 수수료로 확정될 수 있다. 그 틈을 막을지는 `44a-1`.
  */
 export function CancelForm({ reservationId }: { reservationId: number }) {
   const router = useRouter();

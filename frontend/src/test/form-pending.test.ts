@@ -28,8 +28,12 @@ const FORM_ONSUBMIT = /<form[^>]*\sonSubmit=\{/;
 /** 공용 제출 버튼을 쓰는가 */
 const SUBMIT_BUTTON = /\bSubmitButton\b/;
 
-/** `const [pending, setPending] = useState(` — 이름이 제출 중을 뜻하는 것만 */
-const PENDING_STATE = /const\s*\[\s*(pending|sending|submitting|saving|posting)\s*,[^\]]*\]\s*=\s*useState\s*\(/i;
+/**
+ * `const [pending, setPending] = useState(` — 이름이 제출 중을 뜻하는 것만.
+ * `React.useState(`·`useState<boolean>(` 도 같은 꼴이다(마무리 13차 독립 리뷰가 빈틈을 짚었다).
+ */
+const PENDING_STATE =
+  /const\s*\[\s*(pending|sending|submitting|saving|posting)\s*,[^\]]*\]\s*=\s*(?:React\.)?useState\s*(?:<[^>]*>)?\s*\(/i;
 
 /** 2026-09-26 실측: 화면 `.tsx` 스물, `action=` 폼 넷(로그인·가입·선점·결제). 바닥은 그 절반과 그 수다 */
 const MIN_SCREENS = 10;

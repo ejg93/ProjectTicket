@@ -70,7 +70,7 @@ description: 이 세션에서 친 청크를 한꺼번에 정리하는 절차. `/
 
 | 무엇 | 어떻게 |
 |---|---|
-| 앞에 | **번들 끝 검증** — `bash scripts/verify.sh --full` 초록(push hook 이 요구한다) · 좌석 건드렸으면 `*Concurrency*` · 새 `V*` 있었으면 health 기동 · 화면 있었으면 e2e. 명령은 `/verify` 표의 「번들 끝」 줄 |
+| 앞에 | **번들 끝 검증** — `bash scripts/verify.sh --full` 초록(push hook 이 요구한다) · 좌석 건드렸으면 `*Concurrency*` · 새 `V*` 있었으면 health 기동 · 화면 있었으면 e2e · **`bash scripts/gate-probe.sh all` 「막았다」 전부** — 뒤 청크가 탐침이 대는 파일을 고치면 그 탐침이 조용히 안 붙는다(마무리 13차). 명령은 `/verify` 표의 「번들 끝」 줄 |
 | 본문 | 청크마다 시작 세 줄. `.github/pull_request_template.md` |
 | 머지 | `--merge`. squash 는 청크 다섯을 한 커밋으로 만들어 하나만 못 되돌린다 |
 | 언제 | CI 초록 뒤 |

@@ -28,6 +28,7 @@ class PerformanceDetailTest : PostgresTestBase() {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var openService: PerformanceOpenService
 
     private lateinit var fixture: EventFixture
     private lateinit var organizer: TicketUser
@@ -76,9 +77,9 @@ class PerformanceDetailTest : PostgresTestBase() {
         val performanceId = json.readTree(created.contentAsString)["performance_id"].asLong()
         val location = created.getHeader("Location")
 
-        // 받은 헤더를 그대로 따라간다. 막 만든 회차는 `draft` 라 판매 중만 보이게 하면 여기서 404 다.
+        // 받은 헤더를 그대로 따라간다. 막 만든 회차는 `draft` 라 등록한 기획사에게는 답해야 한다.
         assertThat(location).isEqualTo("/api/performances/$performanceId")
-        mvc.get(checkNotNull(location)).andExpect {
+        mvc.get(checkNotNull(location)) { with(user(organizer)) }.andExpect {
             status { isOk() }
             jsonPath("$.performance_id") { value(performanceId) }
             jsonPath("$.event_id") { value(eventId) }
@@ -92,6 +93,20 @@ class PerformanceDetailTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_draft_is_hidden_from_everyone_but_its_organizer() {
+        val draft = fixture.performance(fixture.event(organizerId), hallId)
+        val stranger = TicketUser(fixture.account("stranger@test.local"), "stranger@test.local", AccountRole.AUDIENCE, null, true)
+
+        // 번호가 순번이라 훑으면 미공개 공연이 드러난다. 남에게는 없는 회차와 한 이름이다(`D5`).
+        mvc.get("/api/performances/$draft").andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-found") }
+        }
+        mvc.get("/api/performances/$draft") { with(user(stranger)) }.andExpect { status { isNotFound() } }
+        mvc.get("/api/performances/$draft") { with(user(organizer)) }.andExpect { status { isOk() } }
+    }
+
+    @Test
     fun a_missing_performance_is_not_found() {
         mvc.get("/api/performances/-1").andExpect {
             status { isNotFound() }
@@ -101,9 +116,11 @@ class PerformanceDetailTest : PostgresTestBase() {
 
     @Test
     fun it_is_public_but_the_path_below_it_is_not() {
-        val performanceId = fixture.performance(fixture.event(organizerId), hallId)
+        val eventId = fixture.event(organizerId)
+        fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 1_000))
+        val performanceId = fixture.performance(eventId, hallId).also { openService.open(it, actorAccountId = null) }
 
-        // 로그인 없이 본다 — 보고 나서 로그인한다.
+        // 연 회차는 로그인 없이 본다 — 보고 나서 로그인한다.
         mvc.get("/api/performances/$performanceId").andExpect { status { isOk() } }
         // `PUBLIC_PATHS` 의 `*` 가 두 단계를 먹으면 선점이 열린다. 한 단계인지 여기서 본다.
         mvc.post("/api/performances/$performanceId/reservations") {

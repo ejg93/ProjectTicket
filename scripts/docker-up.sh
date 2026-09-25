@@ -14,7 +14,9 @@ case "$(uname -s)" in
 esac
 
 if docker desktop version >/dev/null 2>&1; then
-  docker desktop start >/dev/null 2>&1 || true
+  # `-d` 로 기다리지 않는다 — 기본은 끝날 때까지 시간 제한 없이 기다려서, Desktop 이 약관·업데이트 창에서 멈추면
+  # 여기서 끝없이 선다(마무리 13차 독립 리뷰). 기다림은 아래 3분 상한이 든다.
+  docker desktop start -d >/dev/null 2>&1 || true
 else
   powershell -NoProfile -Command 'Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"'
 fi

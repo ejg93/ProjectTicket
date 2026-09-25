@@ -74,7 +74,7 @@ describe("예매 취소", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "취소" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("관람일 당일에는 취소할 수 없습니다");
+    expect(await screen.findByRole("status")).toHaveTextContent("관람일 당일이거나 지난 공연은 취소할 수 없습니다");
     expect(screen.queryByRole("button", { name: "이 금액으로 취소" })).toBeNull();
   });
 

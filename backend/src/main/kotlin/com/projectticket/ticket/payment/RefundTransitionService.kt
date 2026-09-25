@@ -77,7 +77,10 @@ class RefundTransitionService(
                 mapOf("starts_at" to cancelled.startsAt),
             )
 
-        val (daysBefore, rate, fee, refundAmount) = amounts
+        val daysBefore = amounts.daysBefore
+        val rate = amounts.tierRate
+        val fee = amounts.feeAmount
+        val refundAmount = amounts.refundAmount
         val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, refundAmount)
 
         val released = jdbc.sql(

@@ -68,6 +68,23 @@ describe("대기열", () => {
     expect(replace).toHaveBeenCalledWith("/performances/7");
   });
 
+  it("탭이 숨어도 계속 묻는다 — 폴링이 하트비트다", async () => {
+    const spy = answers([{ state: "waiting", rank: 4, eta_seconds: 200 }, 200]);
+    render(<QueueStatus performanceId="7" />);
+    await screen.findByText(/대기 순서 4번째/);
+
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    const before = spy.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_MS * 2);
+    });
+    visibility.mockRestore();
+
+    // 멈추면 90초 뒤 서버가 줄에서 뺀다(24). 숨어 있어도 GET 이 계속 나간다.
+    expect(spy.mock.calls.length - before).toBeGreaterThanOrEqual(2);
+  });
+
   it("줄 나가기는 DELETE 를 보내고 토큰을 버린다", async () => {
     window.sessionStorage.setItem("admission:7", "old");
     const spy = answers([{ state: "waiting", rank: 1, eta_seconds: 10 }, 200], [null, 204]);

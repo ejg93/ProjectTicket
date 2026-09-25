@@ -44,8 +44,8 @@ function etaText(seconds: number | null | undefined): string | null {
 /**
  * 대기열의 지금(`43`, `D12`). 들어오면 줄에 서고(POST) 2초마다 순번을 묻는다(GET — 하트비트를 겸한다).
  *
- * **탭이 숨으면 멈춘다**(`visibilitychange`) — 안 보는 탭이 서버를 두드릴 이유가 없다. 오래 숨기면 하트비트가 끊겨 줄에서 빠지고,
- * 돌아오면 `not-in-queue` 로 알려 다시 서게 한다.
+ * **탭이 숨어도 계속 묻는다** — 이 폴링이 하트비트라(24) 멈추면 90초 뒤 줄에서 빠진다. 줄은 떠난 사람만 빼야 한다(마무리 13차 독립 리뷰).
+ * 브라우저가 숨은 탭의 타이머를 늦춰도(크롬은 5분 뒤 1분에 한 번) 90초 안이다. 돌아오면 바로 한 번 묻는다.
  * **입장하면** 토큰을 이 탭에 두고(`lib/admission.ts`) 좌석 화면으로 간다 — 선점이 그 토큰을 헤더로 싣는다.
  */
 export function QueueStatus({ performanceId }: { performanceId: string }) {
@@ -56,15 +56,18 @@ export function QueueStatus({ performanceId }: { performanceId: string }) {
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
-    let active = true;
+    // `live` 는 이 효과가 살아 있고 아직 실패하지 않았다는 뜻이다. 실패하면 폴링도 되살리기도 멈춘다.
+    let live = true;
+    let started = false;
     const path = `/api/queue/${performanceId}`;
     const stop = () => {
       clearInterval(timer.current);
       timer.current = undefined;
     };
     const settle = (next: Position) => {
-      if (!active) return;
+      if (!live) return;
       if (next.state === "admitted" && next.admission_token) {
+        live = false;
         stop();
         saveAdmission(performanceId, next.admission_token);
         router.replace(`/performances/${performanceId}`);
@@ -73,31 +76,28 @@ export function QueueStatus({ performanceId }: { performanceId: string }) {
       setPosition(next);
     };
     const fail = (thrown: unknown) => {
-      if (!active) return;
+      if (!live) return;
+      live = false;
       stop();
       setError(messageOf(thrown));
     };
     const poll = () => api<Position>(path).then(settle, fail);
-    const start = () => {
-      if (timer.current === undefined) timer.current = setInterval(poll, POLL_MS);
-    };
+    // 돌아오면 바로 한 번 묻는다 — 숨은 동안 브라우저가 타이머를 늦췄을 수 있다. 줄에 서기 전(첫 POST 전)에는 안 묻는다.
     const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void poll();
-        start();
-      } else {
-        stop();
-      }
+      if (live && started && document.visibilityState === "visible") void poll();
     };
 
     api<Position>(path, { method: "POST" }).then((first) => {
       settle(first);
-      if (active && first.state === "waiting" && document.visibilityState === "visible") start();
+      if (live && first.state === "waiting") {
+        started = true;
+        timer.current = setInterval(poll, POLL_MS);
+      }
     }, fail);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      active = false;
+      live = false;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };

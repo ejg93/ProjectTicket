@@ -9,8 +9,8 @@ import java.time.OffsetDateTime
 /**
  * 회차 하나 읽기(`D5` 「공개 조회」, `40c`). 트랜잭션을 안 연다 — 읽기 쪽이다(`D14`).
  *
- * **상태를 안 가린다.** 회차 등록 201 의 `Location` 이 이 주소를 가리키는데 막 만든 회차는 `draft` 다 —
- * 판매 중만 보이면 방금 받은 `Location` 이 404 가 된다(RFC 9110). 살 수 있는지는 `status` 가 말한다.
+ * **여기서는 상태를 안 가린다** — 막 만든 `draft` 도 읽는다. 누구에게 보이나는 [PerformanceController] 가 정한다(`draft` 는 그 기획사만).
+ * 살 수 있는지는 `status` 가 말한다.
  *
  * **공연 머리와 등급을 같이 싣는다** — 좌석 화면이 회차 번호 하나로 제목·공연장·가격표를 다 그리게.
  */
@@ -64,7 +64,7 @@ class PerformanceQuery(private val jdbc: JdbcClient) {
         val salesCloseAt: OffsetDateTime,
         val hallName: String,
         val venueName: String,
-        /** `draft`·`open`·`closed`(`V5`). 살 수 있는 것은 `open` 뿐이다 */
+        /** `draft`·`open`·`closed`(`V5`)·`cancelled`(`V17`). 살 수 있는 것은 `open` 뿐이다 */
         val status: String,
         val grades: List<EventQuery.Grade>,
     )

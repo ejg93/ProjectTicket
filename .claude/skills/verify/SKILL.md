@@ -14,7 +14,7 @@ description: 청크를 닫기 전에 무엇을 돌리나. `/verify` 또는 「�
 | **빠른 도장** | `bash scripts/verify.sh` | backend `gradlew test`(컨테이너 없음) · frontend `tsc`·lint·test | **Stop hook** — 청크를 닫을 때 |
 | **full 도장** | `bash scripts/verify.sh --full` | backend `gradlew build`(Testcontainers 레인 포함) · frontend `next build`·lint·test | **push hook** — 마무리 앞 한 번 |
 
-full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
+full 은 Docker 를 먼저 본다. 안 떠 있으면 `scripts/docker-up.sh` 가 켜고 3분까지 기다리고, 그래도 안 뜨면 한 줄로 끝낸다.
 
 ## 실제로 돌려본 것만 됐다고 한다
 
@@ -39,7 +39,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
 | 컨테이너 설정을 건드렸으면 | 청크 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
 | k8s 를 건드렸으면 | 청크 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
 | **문서를 고쳤으면** | — | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh <그 파일>` 을 돌린다(범위 모드, 1초 안). 전체는 `bash scripts/doc-lint.sh`(16초) — 마무리·CI | 통과하면 아무 말 없음 |
-| **검증 도구를 고쳤으면**(`scripts/`·`settings.json`) | 청크 | `tools` 레인(= `verify.sh`) — `bash -n` 전부 · `settings.json` 파싱 · `doc-lint` 전체 · `hooks-test.sh`(훅·린트 31경우, `G1`) | 초록. 경우를 더할 때는 `hooks-test.sh` 표에 한 줄 |
+| **검증 도구를 고쳤으면**(`scripts/`·`settings.json`) | 청크 | `tools` 레인(= `verify.sh`) — `bash -n` 전부 · `settings.json` 파싱 · `doc-lint` 전체 · `hooks-test.sh`(훅·린트 회귀 시험, `G1`) | 초록. 경우를 더할 때는 `hooks-test.sh` 표에 한 줄 |
 | **게이트를 고쳤으면**(`quality-gates.md` 표의 행) | 청크 | `bash scripts/gate-probe.sh <탐침>` — HEAD 워크트리에 위반을 대고 돈다(`G2`). 전부는 `all` | 「막았다」. 커밋 뒤에 돈다 — HEAD 를 부순다 |
 | 변이 시험 대상을 고쳤으면(`build.gradle.kts` `mutationTargets`) | 청크 — 손으로 | `./gradlew mutationTest` | 산 것을 `doc/notes/mutation-*.md` 에 처분(`G4`) |
 | 푸시했으면 | push 뒤 | 아래 「CI」 | 초록. 빨가면 다음 청크보다 먼저 친다 |
