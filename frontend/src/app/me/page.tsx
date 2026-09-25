@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { apiSession } from "@/lib/api-session";
 
@@ -35,6 +36,9 @@ export default async function MePage() {
         <dt>이메일</dt>
         <dd>{me.email}</dd>
       </dl>
+      <p>
+        <Link href="/me/reservations">내 예매</Link> · <Link href="/me/withdraw">회원 탈퇴</Link>
+      </p>
     </div>
   );
 }
