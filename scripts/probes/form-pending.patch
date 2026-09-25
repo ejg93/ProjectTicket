@@ -1,0 +1,15 @@
+# 게이트: form-pending.test.ts
+# 명령: cd frontend && npx --no-install vitest run src/test/form-pending.test.ts
+# 문구: hold-form
+diff --git a/frontend/src/app/performances/[performanceId]/hold-form.tsx b/frontend/src/app/performances/[performanceId]/hold-form.tsx
+index 8a52147..a3c9fd7 100644
+--- a/frontend/src/app/performances/[performanceId]/hold-form.tsx
++++ b/frontend/src/app/performances/[performanceId]/hold-form.tsx
+@@ -45,6 +45,7 @@ function messageOf(error: unknown): string {
+ export function HoldForm({ data, performanceId }: { data: SeatMapData; performanceId: string }) {
+   const [selected, setSelected] = useState<number[]>([]);
+   const [error, setError] = useState<string | null>(null);
++  const [pending, setPending] = useState(false);
+   const idempotencyKey = useRef<string | null>(null);
+   const router = useRouter();
+ 
