@@ -1,6 +1,7 @@
 package com.projectticket.ticket.event
 
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
+import com.projectticket.ticket.web.Paging
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.PositiveOrZero
 import jakarta.validation.constraints.Size
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -33,7 +35,18 @@ class OrganizerEventController(
     private val eventService: OrganizerEventService,
     private val openService: PerformanceOpenService,
     private val membership: OrganizerMembership,
+    private val query: OrganizerEventQuery,
 ) {
+
+    /** 내 기획사들의 공연(`45a`). 오픈 전 것도 보인다 — 공개 목록과 다르다 */
+    @GetMapping("/events")
+    fun events(@AuthenticationPrincipal user: TicketUser, paging: Paging): OrganizerEventQuery.OrganizerEventPage =
+        query.list(user.id, paging)
+
+    /** 공연 하나와 모든 상태의 회차·팔린 수(`45a`). 남의 공연은 404 `event-not-found` */
+    @GetMapping("/events/{eventId}")
+    fun event(@PathVariable eventId: Long, @AuthenticationPrincipal user: TicketUser): OrganizerEventQuery.OrganizerEventDetail =
+        query.detail(user.id, eventId)
 
     @PostMapping("/events")
     fun createEvent(@Valid @RequestBody request: CreateEventRequest, @AuthenticationPrincipal user: TicketUser): ResponseEntity<CreatedEvent> {
