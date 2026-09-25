@@ -7,7 +7,7 @@ description: 청크를 닫기 전에 무엇을 돌리나. `/verify` 또는 「�
 
 **무엇을 건드렸는지가 무엇을 돌릴지 정한다.** 청크를 닫기 전에 걸리는 줄을 **전부** 돌린다.
 
-**먼저 `bash scripts/verify.sh`.** `origin/main` 대비 레인 지문(코드·빌드 파일만 — `scripts/verify-fingerprint.sh`)이 다르면 그 레인을 돌리고 초록이면 `.git/verify-stamp` 에 찍는다.
+**먼저 `bash scripts/verify.sh`.** `origin/main` 대비 레인 지문(코드·빌드 파일만 — `scripts/verify-fingerprint.sh`)이 다르면 그 레인을 돌리고 초록이면 `.git/verify-stamp` 에 찍는다. 레인은 셋 — `backend`·`frontend`·`tools`(검증 도구 자체).
 
 | 단계 | 명령 | 무엇이 도나 | 누가 요구하나 |
 |---|---|---|---|
@@ -38,7 +38,8 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
 | 예매·대기열 화면을 건드렸으면 | 번들 끝 — **`46b` 뒤에만.** `verify.sh --full` 이 Playwright 와 `e2e` 스크립트가 있을 때만 돈다 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과. Playwright 는 있는데 백엔드가 안 떠 있으면 빨갛다 |
 | 컨테이너 설정을 건드렸으면 | 청크 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
 | k8s 를 건드렸으면 | 청크 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
-| **문서를 고쳤으면** | — | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh` 를 돌린다 | 통과하면 아무 말 없음 |
+| **문서를 고쳤으면** | — | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh <그 파일>` 을 돌린다(범위 모드, 1초 안). 전체는 `bash scripts/doc-lint.sh`(16초) — 마무리·CI | 통과하면 아무 말 없음 |
+| **검증 도구를 고쳤으면**(`scripts/`·`settings.json`) | 청크 | `tools` 레인(= `verify.sh`) — `bash -n` 전부 · `settings.json` 파싱 · `doc-lint` 전체 | 초록. 훅 본문은 `scripts/hooks/*.sh` 라 stdin 에 JSON 을 넣어 exit 코드를 직접 볼 수 있다 |
 | 푸시했으면 | push 뒤 | 아래 「CI」 | 초록. 빨가면 다음 청크보다 먼저 친다 |
 
 청크 verify 가 빨가면 고치기 둘까지. 그래도면 `wip/<청크>` 가지에 커밋하고 번들 가지로 돌아와 다음 행 — 번들이 한 행에 안 잡히게. `work/*` 에는 도장 없는 커밋이 못 올라간다(commit hook).

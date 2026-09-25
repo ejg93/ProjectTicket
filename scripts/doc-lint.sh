@@ -3,6 +3,9 @@
 # 「규칙을 읽는 것」과 「지켜졌는지 훑는 것」은 다른 일이다 — 후자를 기계가 하는 자리다.
 #
 # 잡는 것: 제목 손상, 문장 통째 중복, 기준 문서 제목의 날짜, 존댓말, 분할표 칸 누락, 이력 순서, 「현재 상태」 비대.
+#
+# 범위 모드(`B0-2`): 인자로 파일을 주면 그 파일만 본다 — 편집 훅이 쓴다(전체는 12초, 한 파일은 1초 안).
+# 인자 없으면 전체(CI·마무리). PLAN·PROGRESS 의 구조 검사는 그 파일이 범위에 들 때만 돈다.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -12,6 +15,19 @@ title_check_files=(CLAUDE.md backend/CLAUDE.md PLAN.md PROGRESS.md "${skill_file
 dup_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md frontend/CLAUDE.md frontend/AGENTS.md "${skill_files[@]}" doc/reference/*.md)
 honorific_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md frontend/CLAUDE.md frontend/AGENTS.md "${skill_files[@]}" doc/reference/*.md)
 dated_title_files=(doc/reference/*.md)
+
+# 범위: 인자를 저장소 상대 경로로 맞춰 두고, 목록마다 그 안에 든 것만 남긴다. 목록 밖 파일은 조용히 통과.
+scope=()
+root_posix=$(pwd); root_win=$(pwd -W 2>/dev/null || pwd)   # 훅은 `C:\...` 꼴을 준다. Git Bash 의 pwd 는 `/c/...`.
+for a in "$@"; do
+  a=${a//\\//}; a=${a#"$root_posix/"}; a=${a#"$root_win/"}; a=${a#./}; scope+=("$a")
+done
+in_scope() { [ "${#scope[@]}" -eq 0 ] && return 0; local x; for x in "${scope[@]}"; do [ "$x" = "$1" ] && return 0; done; return 1; }
+narrow() { local out=() f; for f in "$@"; do in_scope "$f" && out+=("$f"); done; printf '%s\n' "${out[@]}"; }
+mapfile -t title_check_files < <(narrow "${title_check_files[@]}")
+mapfile -t dup_check_files < <(narrow "${dup_check_files[@]}")
+mapfile -t honorific_check_files < <(narrow "${honorific_check_files[@]}")
+mapfile -t dated_title_files < <(narrow "${dated_title_files[@]}")
 
 fail=0
 
@@ -69,6 +85,7 @@ done
 
 # 분할표의 안 닫힌 행에 축·강제 지점·닫힘이 다 있나. 기준선은 내리기만 한다.
 # 행 판정: 번호 칸·이름 칸의 취소선, 선행 칸의 `완료` 면 닫힌 행. `#` 은 표 머리.
+if in_scope PLAN.md; then
 plan_open_incomplete_baseline=0
 plan_open_incomplete=$(awk '/^## 청크 분할표/{on=1} /^## 이 계획을 고칠 때/{on=0} on && /^\| [^-|*][^|]*\|/{
     n=split($0,c,"|"); id=c[2]; gsub(/^ +| +$/,"",id); nm=c[3]; gsub(/^ +/,"",nm);
@@ -82,7 +99,9 @@ if [ "$plan_open_incomplete" -gt "$plan_open_incomplete_baseline" ]; then
 elif [ "$plan_open_incomplete" -lt "$plan_open_incomplete_baseline" ]; then
   echo "[기준선 내릴 것] PLAN.md — 칸 빠진 행이 ${plan_open_incomplete}개로 줄었다. plan_open_incomplete_baseline 을 그 수로 내린다"
 fi
+fi
 
+if in_scope PROGRESS.md; then
 # 이력이 날짜순인가. 앞줄보다 이른 날짜가 오면 센다.
 history_unsorted_baseline=0
 history_unsorted=$(awk '/^## 이력/{on=1; next} on && /^## /{on=0} on && /^\| [0-9]{4}-[0-9]{2}-[0-9]{2} \|/{
@@ -98,6 +117,7 @@ state_lines=$(awk '/^## 현재 상태$/{on=1; next} /^## /{on=0} on' PROGRESS.md
 if [ "$state_lines" -gt 25 ]; then
   echo "[현재 상태 비대] PROGRESS.md — 「현재 상태」가 ${state_lines}줄이다(상한 25). 표만 남기고 서사는 이력으로"
   fail=1
+fi
 fi
 
 [ "$fail" -eq 0 ] && echo "이상 없음 — 검사한 파일 전부 통과"

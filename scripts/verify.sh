@@ -41,7 +41,7 @@ stamped() {
 }
 docker_up() { docker info >/dev/null 2>&1; }
 
-ran=0; ok=1; lv_backend=; lv_frontend=
+ran=0; ok=1; lv_backend=; lv_frontend=; lv_tools=
 if changed backend && [ -d backend ]; then
   if lv_backend=$(stamped backend); then
     echo "== backend: 같은 지문을 $lv_backend 로 찍어 뒀다 → 건너뜀"
@@ -95,11 +95,23 @@ if changed frontend && [ -d frontend ]; then
     fi
   fi
 fi
+if changed tools; then
+  if lv_tools=$(stamped tools); then
+    echo "== tools: 같은 지문을 $lv_tools 로 찍어 뒀다 → 건너뜀"
+  else
+    # 검증 도구 자체(`B0-2`): 셸 문법 · settings.json 파싱 · doc-lint 전체. 빠름·full 이 같다.
+    ran=1; lv_tools=$level
+    echo "== tools 지문이 origin/main 과 다르다 → bash -n scripts · settings.json 파싱 · doc-lint 전체"
+    { for f in scripts/*.sh scripts/hooks/*.sh; do bash -n "$f" || { echo "문법: $f"; false; }; done; } || ok=0
+    node -e 'JSON.parse(require("fs").readFileSync(".claude/settings.json","utf8"))' || { echo "settings.json 이 JSON 이 아니다"; ok=0; }
+    bash scripts/doc-lint.sh >/dev/null || ok=0
+  fi
+fi
 [ "$ran" -eq 0 ] && echo "돌릴 것이 없다 — 지문이 origin/main 과 같거나 도장이 이미 있다"
 [ "$ok" -eq 1 ] || { echo "빨갛다 — 도장을 안 찍는다"; exit 1; }
 
 # 안 돈 레인(origin/main 과 같은 것)은 full 로 적는다 — 돌릴 것이 없어서다. 건너뛴 레인은 도장의 단계를 그대로 둔다.
-for d in backend frontend; do
+for d in backend frontend tools; do
   h=$(fp_of "$d")
   if changed "$d"; then eval "echo \"$d $h \$lv_$d\""; else echo "$d $h full"; fi
 done > "$st"

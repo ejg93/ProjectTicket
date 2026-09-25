@@ -149,7 +149,7 @@ ProjectShop 의 Java 를 포팅할 때는 **옮기면서 Kotlin 답게 고치고
 
 ## 검증
 
-절차와 명령 표는 `/verify` 스킬에 있다. `bash scripts/verify.sh` 가 건드린 레인을 골라 돌리고 도장을 찍는다. **세 층이다.**
+절차와 명령 표는 `/verify` 스킬에 있다. `bash scripts/verify.sh` 가 건드린 레인(`backend`·`frontend`·`tools`)을 골라 돌리고 도장을 찍는다. 훅 본문은 `scripts/hooks/*.sh` 에 있다 — `settings.json` 은 부르기만 한다. **세 층이다.**
 
 | 층 | 언제 | 무엇 |
 |---|---|---|
