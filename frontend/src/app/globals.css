@@ -67,6 +67,28 @@ a {
   font-size: 0.875rem;
 }
 
+/* 본문으로 건너뛰기(`39-1`). 평소엔 화면 밖에 두고 **초점이 오면 보인다** — `display: none` 이면 탭이 못 닿는다 */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+}
+
+footer {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
 .error {
   border: 1px solid #b42318;
   border-radius: 0.25rem;

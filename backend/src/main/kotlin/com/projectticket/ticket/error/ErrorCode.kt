@@ -40,6 +40,8 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     ORGANIZER_FORBIDDEN(HttpStatus.FORBIDDEN, "organizer-forbidden", "기획사 권한이 필요하다"),
     ORGANIZER_NOT_FOUND(HttpStatus.NOT_FOUND, "organizer-not-found", "그런 기획사가 없다"),
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "event-not-found", "그런 공연이 없다"),
+    // 약관·처리방침 화면이 코드로 한 항목을 읽는다(`39-1`). 가입의 `unknown-consent-item`(422)은 「받은 동의가 틀렸다」라 뜻이 다르다.
+    CONSENT_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "consent-item-not-found", "그런 동의 항목이 없다"),
     // 같은 홀·같은 시각에 회차가 둘일 수 없다(`performance_hall_slot_key`). 형식이 아니라 지금 상태가 못 받는 것이라 409 다(`D5`).
     PERFORMANCE_SLOT_TAKEN(HttpStatus.CONFLICT, "performance-slot-taken", "그 홀의 그 시각에 회차가 이미 있다"),
 

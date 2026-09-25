@@ -1,0 +1,14 @@
+# 게이트: screen-map.test.ts
+# 명령: cd frontend && npx --no-install vitest run src/test/screen-map.test.ts
+# 문구: /probe-nowhere
+diff --git a/doc/reference/screen-rules.md b/doc/reference/screen-rules.md
+--- a/doc/reference/screen-rules.md
++++ b/doc/reference/screen-rules.md
+@@ -43,6 +43,7 @@
+ | `/login`·`/signup` | 로그인·가입(약관 동의가 같이 있다) | 비로그인 | `39` **완료** |
+ | `/terms`·`/privacy` | 이용약관(`consent_item.body`)·개인정보처리방침(정형 넷). `GET /api/consent-items/{code}` 를 그린다 | 누구나 | `39-1` **완료** |
+ | `/organizer/*` | 공연·회차 등록·오픈·매출 | 기획사 | `45b`·`45c`(자리표시 `39-1`) |
++| `/probe-nowhere` | 탐침 — 파일 없는 경로 | 누구나 | — |
+ | (지도에 없는 주소) | `not-found.tsx` — 공연 목록으로 가는 길을 준다 | 누구나 | `40b` **완료** |
+ 
+ **기획사 경로를 접두어로 가른다.** 서버의 `/api/organizer/**` 와 같은 모양이라 권한 판정 자리가 한 군데다(아래 「권한 없는 것은 숨긴다」).

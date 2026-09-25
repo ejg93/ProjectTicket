@@ -31,6 +31,7 @@
 | `POST /api/auth/signup` · `login` · `logout` | 가입·로그인·로그아웃 | 공개·공개·세션 | 있다 |
 | `GET /api/me` | 내 계정 | 세션 | 있다 |
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
+| `GET /api/consent-items/{code}` | 항목 하나의 지금 판과 본문 — 약관은 `body`(마크다운), 개인정보는 정형 넷. 목록은 본문을 안 싣는다 | 공개 | 39-1 |
 | `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 있다(`40a`) |
 | `GET /api/performances/{id}` | 회차 하나 + 공연 머리 + 등급. 회차 등록 201 의 `Location` 이 이것을 가리킨다(11) — 그래서 `draft` 도 답하고 `status` 가 살 수 있는지를 말한다 | 공개 | 40c |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
@@ -125,6 +126,7 @@
 | `email-taken` | 409 | 가입된 이메일 | | 있다 |
 | `account-not-found` | 404 | 없거나 이미 탈퇴한 계정. **관리자에게도 404 다**(아래 「403 이냐 404 냐」) | | 5b |
 | `unknown-consent-item` · `required-consent-missing` | 422 | 동의 | | 있다 |
+| `consent-item-not-found` | 404 | 그런 코드의 동의 항목이 없다(약관·처리방침 화면) | | 39-1 |
 | `performance-not-found` | 404 | 회차 없음 | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
 | `validation-failed` | 400 | Bean Validation | `errors[{field, message}]` | 있다 |
