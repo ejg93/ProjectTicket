@@ -127,6 +127,29 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 **gitleaks 는 문서의 예시 키를 안 잡는다**(ProjectShop 실측). `AKIAIOSFODNN7EXAMPLE` 은 allowlist 라 그것으로 부수면
 게이트가 고장 난 것처럼 보인다. 아무 값이나 만든 키로 부순다.
 
+## 규칙 원장 — 문서에만 있는 규칙
+
+**D 문서의 굵은 규칙을 위 게이트 표에 대조해, 기계가 안 보는 것만 여기 적는다**(`G5`, 2026-09-25 Fable).
+규칙이 문서에만 있으면 「지켜졌다」는 사람 기억이고, 그 기억은 하루를 못 간다(`/warmup`).
+줄이 하나 없어질 때마다 그 규칙은 표로 올라간다 — 이 절이 비는 것이 목표다.
+
+| # | 규칙 | 문서 | 지금 실물 | 처분 |
+|---|---|---|---|---|
+| ① | 화면은 오류 `type` 으로 분기하고 그 슬러그는 표 안에 있다 | `D5`·`D16` | 문서가 `ErrorTypeScreenTest` 를 불렀는데 **없다** | `G7c` — vitest `error-types.test.ts` |
+| ② | 레인·태그·바탕 이름은 `build.gradle.kts` 와 같다 | `D8` | 문서가 「`P4` 의 대조 테스트」를 불렀는데 **없다** | `G7d` — `TestConventionTest`(ProjectShop `Q30` 이식) |
+| ③ | 열거값 `when` 에 `else` 를 안 둔다 | `D14` | `else ->` 5곳, detekt 규칙 꺼짐 | `G7a` — detekt `ElseCaseInsteadOfExhaustiveWhen` |
+| ④ | 의존 방향 `payment → reservation → event → settlement` | `D14` | `ArchitectureTest` 6규칙에 순환 금지만 | `G7a` — ArchUnit 방향 규칙 |
+| ⑤ | 시드를 마이그레이션에 안 넣는다 | `D14` | `V3`·`V10`·`V16` 에 `insert into` — 셋은 데이터가 아니라 **규약 표**(동의 항목·환불 요율·정산 정책) | `G7b` — `MigrationTextTest`, 허용 표 목록 밖이면 실패. **목록이 곧 규칙이다** |
+| ⑥ | 표준이 옥텟으로 말하면 길이 `check` 는 `octet_length` | `D14` | `V5`·`V7` 에 `length(` 셋 — 옥텟 표준 컬럼인지 미확인 | `G7b` — 같은 테스트. 이름 컬럼이면 글자 수가 맞다(실패 사다리) |
+| ⑦ | 상태 변경은 하위 경로 `POST`, `PATCH`·`PUT` 없음 | `D5` | 0개, 막는 것 없음 | `G7a` — ArchUnit 한 줄 |
+| ⑧ | 좌석 상태를 바꾸는 SQL 은 조건부 UPDATE | `D4` | 독립 리뷰가 눈으로 | `G7b` — `SqlTextTest`(`Q30` 이식) |
+| ⑨ | 만료·마감 판정은 SQL `now()`, 앱 시계 안 씀 | `D7` | `OffsetDateTime.now()` 둘(`DemoSeeder`·`HealthController` — 판정 아님) | `G7a` — ArchUnit 호출 금지, 예외 둘 명시 |
+| ⑩ | 화면이 `error.message` 를 안 적는다 | `D16` | `app/` 에 1곳 | `G7c` — eslint `no-restricted-syntax` |
+| ⑪ | 컬럼 snake_case, 기본키 `<표>_id` | `D15` | `SchemaNamingTest` 없음(ProjectShop `Q31` 이 있다) | `G7b` — 이식, 컨테이너 레인 |
+| ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
+
+**대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 `/wrapup` 대조와 독립 리뷰가 본다.
+
 ## 문턱
 
 ### 정해진 것
