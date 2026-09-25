@@ -85,6 +85,17 @@ describe("api()", () => {
     expect((thrown as ApiError).traceId).toBe("abc");
   });
 
+  it("비밀번호가 틀린 401(`login-failed`)은 로그인으로 안 보내고 던진다(`44c`)", async () => {
+    document.cookie = "XSRF-TOKEN=token-value";
+    mockFetch(jsonResponse({ type: "tag:projectticket.example,2026:login-failed", detail: "틀렸다" }, 401));
+
+    // 탈퇴 입구는 `/api/auth/` 밖이다. 세션이 멀쩡한데 로그인으로 튕기면 안 된다.
+    const thrown = await api("/api/me", { method: "DELETE", body: { password: "x" } }).catch((e) => e);
+
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect((thrown as ApiError).slug).toBe("login-failed");
+  });
+
   it("남이 낸 problem+json 은 우리 이름으로 안 읽는다", async () => {
     mockFetch(jsonResponse({ type: "about:blank", detail: "Gateway Timeout" }, 504));
 

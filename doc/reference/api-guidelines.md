@@ -49,7 +49,7 @@
 | `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11 (취소 서비스는 17a 가 세웠다) |
 | `GET /api/organizer/settlements` | 정산 | 세션(기획사) | 27 |
 | `POST /api/admin/accounts/{id}/suspend` · `unsuspend` | 계정 정지·해제 | 세션(관리자) | 5b |
-| `DELETE /api/me` | 탈퇴 | 세션 | 5a |
+| `DELETE /api/me` | 탈퇴. 본문 `{ "password" }` 로 **비밀번호를 다시 받는다** — 틀리면 로그인과 같은 401 `login-failed`, 로그인 실패 카운터를 같이 센다(`44c`) | 세션 | 5a·44c |
 
 **선점이 회차 아래에 있는 이유**: 대기열 관문(23)이 **회차 id 를 경로에서 읽는다.** 본문에 두면 필터가 JSON 을 파싱해야 하고, 그러면 본문 스트림을 두 번 읽는 문제가 따라온다.
 예매가 만들어진 뒤에는 `/api/reservations/{id}` 로 평평하게 간다 — 그때는 예매가 회차를 안다.
