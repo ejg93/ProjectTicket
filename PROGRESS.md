@@ -2,17 +2,17 @@
 
 ## 현재 상태
 
-**대상**: 공연 예매 시스템 (Kotlin + Spring Boot 4 + Next.js, 로컬 전용). **가지**: `work/2026-09-19-b`
+**대상**: 공연 예매 시스템 (Kotlin + Spring Boot 4 + Next.js, 로컬 전용). **가지**: `work/2026-09-25`
 
 | 무엇 | 상태 | 다음 손 |
 |---|---|---|
 | 진행중 청크 | 없음 | |
-| **작업 단위** | `B0`(2026-09-25)부터 **번들**이다 — `/design`(Fable, plan mode)이 4~8행에 갈림·절차·실패 사다리를 적고, 실행(Opus)이 `번들 해` 로 순서대로 친다. 검증은 청크 빠름 · 번들 끝 full — `B0-1`~`B0-5` 가 도구를 손봤다(WIP 는 `wip/*` 가지 · commit hook · 도장 건너뛰기 · 훅은 `scripts/hooks/` · `tools` 레인 · `doc-lint` 범위 모드와 검사 다섯 · `HealthControllerTest` 파일 수 · `audit` 잡 필수 아님). `#23` 으로 머지됐다. **번들 0·1 이 설계됐다**(2026-09-25, `PLAN.md` 「번들」 표). **번들 0 이 먼저** — 게이트 자체의 맹점 여덟(`G1`·`G3`·`G2`·`G4`·`G7a`~`G7d`), 설치 없음. 그다음 번들 1(`40c`…`44b`). **다음 첫 손은 `/model opus` 뒤 `번들 해`.** 번들 2(`44c`·`45a`~`45c`·`46b`·배포)는 번들 1 뒤 `/design` 이 연다 — Playwright·kind·helm·k6 설치가 그 앞 | `번들 해` |
+| **작업 단위** | `B0`(2026-09-25)부터 **번들**이다 — `/design`(Fable, plan mode)이 4~8행에 갈림·절차·실패 사다리를 적고, 실행(Opus)이 `번들 해` 로 순서대로 친다. 검증은 청크 빠름 · 번들 끝 full — `B0-1`~`B0-5` 가 도구를 손봤다(WIP 는 `wip/*` 가지 · commit hook · 도장 건너뛰기 · 훅은 `scripts/hooks/` · `tools` 레인 · `doc-lint` 범위 모드와 검사 다섯 · `HealthControllerTest` 파일 수 · `audit` 잡 필수 아님). `#23` 으로 머지됐다. **번들 0 끝**(2026-09-25, 마무리 12차) — 게이트 맹점 여덟을 닫고 탐침 스물둘(`scripts/probes/` · `gate-probe.sh`)·`hooks-test.sh`·`mutationTest` 가 섰다. **사용자 결정 셋이 남았다** — `G6`(`enforce_admins`)·`G8`(detekt 타입 해석 24건)·`G9`(`ScreenLengthTest`). **다음 첫 손은 PR 머지 뒤 `번들 해`** — 번들 1(`40c`…`44b`, 설계됨). 번들 2(`44c`·`45a`~`45c`·`46b`·배포)는 번들 1 뒤 `/design` 이 연다 — Playwright·kind·helm·k6 설치가 그 앞 | `번들 해` |
 | 다음 첫 손 | 화면이 `39`~`42` 로 예매 흐름까지 이어졌고 `P10`·`P9` 로 **기준 문서 21개가 전부 닫혔다**. **다음은 `40c`** — 회차 등록 201 의 `Location` 이 가리키는 `GET /api/performances/{id}` 가 없어 404 다(표준 위반이라 1순위). 그다음 `39-1`·`39-2`·`41-1`·`46c`, 화면 `43`~`45`. 배포(`36`~`38`·`48`)·`46b` 는 **설치 승인이 먼저**(kind·helm·k6·Playwright) | `PLAN.md` 8장 |
-| PR | `#23` 머지됨(`0c4a98f`, `B0`~`B0-5` 여섯 + 마무리 11차 — CI 다섯 잡(`audit` 신설 포함)·CodeQL 셋 초록, 리뷰 봇 코멘트 0, 머지는 사용자가 `!` 로). 그전 `#21` 머지됨(`e59bc1f`, `P10`·`P9`). **필수 검사 일곱이 push 실행으로 채워지는 것을 그 PR 이 실측했다** — `codeql.yml` 은 `pull_request:` 를 안 켰는데 `CLEAN` 이었다. 이 가지(`work/2026-09-25`)는 비었다 | |
+| PR | `#23` 머지됨(`0c4a98f`, `B0`~`B0-5` 여섯 + 마무리 11차 — CI 다섯 잡(`audit` 신설 포함)·CodeQL 셋 초록, 리뷰 봇 코멘트 0, 머지는 사용자가 `!` 로). 그전 `#21` 머지됨(`e59bc1f`, `P10`·`P9`). **필수 검사 일곱이 push 실행으로 채워지는 것을 그 PR 이 실측했다** — `codeql.yml` 은 `pull_request:` 를 안 켰는데 `CLEAN` 이었다. 이 가지(`work/2026-09-25`)는 설계 둘 + 번들 0 여덟 + 마무리 12차 — PR 을 연다(번호는 머지 뒤 상태 줄이 적는다) | |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
-| GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(**일곱 잡 필수** — CI 넷 + CodeQL 셋, `P10`). 그 뒤로는 `work/<날짜>` + PR | |
+| GitHub 저장소 | `https://github.com/ejg93/ProjectTicket`. `main` 가지 보호 걸림(**일곱 잡 필수** — CI 넷 + CodeQL 셋, `P10`). **`enforce_admins` 는 꺼져 있다** — 주인은 안 막힌다(`G2` 실측), 켤지는 `G6`. 그 뒤로는 `work/<날짜>` + PR | |
 | 로컬 포트 | ProjectShop 컨테이너가 5432·6379 를 쥐고 있어 `.env` 는 5433·6380 | `README.md` |
 | 기준 문서 | **21개 전부 완료.** 마지막 둘(D16·D17)은 `P9`, `D18` 머리말은 `P10` 이 닫았다 | — |
 | 이식 원본 | `C:\workspace\ProjectShop` 읽기 전용. 가져온 것·안 가져온 것은 ADR 0002 | |

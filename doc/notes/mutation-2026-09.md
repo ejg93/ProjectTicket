@@ -25,4 +25,4 @@
 `RefundPolicy` 는 변이가 둘(`daysBefore`·`fee` 가 0 을 돌려준다)뿐이다. 기본 변이는 `RoundingMode.HALF_UP` 같은 열거 상수를 안 바꾼다.
 그래서 반올림 모드는 손으로 바꿔 봤다 — `HALF_DOWN` 이면 `fee_is_rounded_once_on_the_total_half_up` 가 `expected: 1 but was: 0` 으로 빨갛다.
 
-**다음 판에서 볼 것**: Arcmutate 의 Kotlin 플러그인이 위 동치 둘(널 검사 호출·인라인 `is Collection`)을 걸러 준다고 PIT 가 알린다 — 유료라 안 들였다.
+PIT 는 Arcmutate 의 Kotlin 플러그인이 위 동치 둘(널 검사 호출·인라인 `is Collection`)을 걸러 준다고 알린다. 들이지 않았다 — 유료이고, 동치는 이 표에 근거를 적어 둔 것으로 끝난다.

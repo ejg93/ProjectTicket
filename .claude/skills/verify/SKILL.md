@@ -27,7 +27,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
 | 언제 | 시점 | 명령 | 통과 기준 |
 |---|---|---|---|
 | backend 를 건드렸으면 | 청크 | `./gradlew test`(= `verify.sh`) | 실패 0 |
-| backend 를 건드렸으면 | 번들 끝 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 |
+| backend 를 건드렸으면 | 번들 끝 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 · `detekt` · `detektMain`(타입 해석, `G7a`) |
 | **새 `V*` 를 더했으면** | 청크 — `verify.sh` 가 지문에서 보고 **스스로** 돈다 | `./gradlew test integrationTest` | 실패 0. 빠른 레인만 돌리면 열거형·길이 대조가 번들 끝에서 처음 빨개진다. **Docker 가 없으면** `test` 만 돌고 도장이 `fast-nodb` — 번들 끝 `--full` 이 잡는다 |
 | 스키마·서비스만 볼 때 | 아무 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
 | **좌석·예매를 건드렸으면** | 번들 끝 | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |
@@ -39,7 +39,9 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
 | 컨테이너 설정을 건드렸으면 | 청크 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
 | k8s 를 건드렸으면 | 청크 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
 | **문서를 고쳤으면** | — | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh <그 파일>` 을 돌린다(범위 모드, 1초 안). 전체는 `bash scripts/doc-lint.sh`(16초) — 마무리·CI | 통과하면 아무 말 없음 |
-| **검증 도구를 고쳤으면**(`scripts/`·`settings.json`) | 청크 | `tools` 레인(= `verify.sh`) — `bash -n` 전부 · `settings.json` 파싱 · `doc-lint` 전체 | 초록. 훅 본문은 `scripts/hooks/*.sh` 라 stdin 에 JSON 을 넣어 exit 코드를 직접 볼 수 있다 |
+| **검증 도구를 고쳤으면**(`scripts/`·`settings.json`) | 청크 | `tools` 레인(= `verify.sh`) — `bash -n` 전부 · `settings.json` 파싱 · `doc-lint` 전체 · `hooks-test.sh`(훅·린트 31경우, `G1`) | 초록. 경우를 더할 때는 `hooks-test.sh` 표에 한 줄 |
+| **게이트를 고쳤으면**(`quality-gates.md` 표의 행) | 청크 | `bash scripts/gate-probe.sh <탐침>` — HEAD 워크트리에 위반을 대고 돈다(`G2`). 전부는 `all` | 「막았다」. 커밋 뒤에 돈다 — HEAD 를 부순다 |
+| 변이 시험 대상을 고쳤으면(`build.gradle.kts` `mutationTargets`) | 청크 — 손으로 | `./gradlew mutationTest` | 산 것을 `doc/notes/mutation-*.md` 에 처분(`G4`) |
 | 푸시했으면 | push 뒤 | 아래 「CI」 | 초록. 빨가면 다음 청크보다 먼저 친다 |
 
 청크 verify 가 빨가면 고치기 둘까지. 그래도면 `wip/<청크>` 가지에 커밋하고 번들 가지로 돌아와 다음 행 — 번들이 한 행에 안 잡히게. `work/*` 에는 도장 없는 커밋이 못 올라간다(commit hook).
