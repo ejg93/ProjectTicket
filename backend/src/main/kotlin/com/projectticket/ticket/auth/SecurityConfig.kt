@@ -226,6 +226,8 @@ class SecurityConfig {
             // 공연 목록·상세도 로그인 전에 본다 — 무엇을 파는지 보고 나서 로그인한다(`40a`).
             "/api/events",
             "/api/events/*",
+            // 회차 하나(`40c`). `*` 는 한 단계라 `/api/performances/*/reservations` 는 안 열린다 — `PerformanceDetailTest` 가 본다.
+            "/api/performances/*",
             // 좌석도는 로그인 전에 본다 — 자리를 보고 나서 로그인한다.
             "/api/performances/*/seats",
             // 델타도 같은 그림이다(10a). 로그인 전에 좌석을 보고 나서 로그인한다.

@@ -32,7 +32,7 @@
 | `GET /api/me` | 내 계정 | 세션 | 있다 |
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
 | `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 있다(`40a`) |
-| `GET /api/performances/{id}` | 회차 하나. **회차 등록 201 의 `Location` 이 이미 이것을 가리킨다**(11) — **지금 없어서 그 `Location` 이 404 다**(마무리 9차) | 공개 | 40c |
+| `GET /api/performances/{id}` | 회차 하나 + 공연 머리 + 등급. 회차 등록 201 의 `Location` 이 이것을 가리킨다(11) — 그래서 `draft` 도 답하고 `status` 가 살 수 있는지를 말한다 | 공개 | 40c |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
 | `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |
 | `POST /api/queue/{performanceId}` · `GET` · `DELETE` | 대기열 진입·순번·이탈(`D12`) | 세션 | 21·24 |
