@@ -396,7 +396,7 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 
 ### `main` 가지 보호는 admin 을 기본으로 안 막는다
 
-`enforce_admins` 가 `false` 면 저장소 주인은 그대로 민다. `gh api -X POST repos/<소유자>/<이름>/branches/main/protection/enforce_admins` 로 켠다. **지금 꺼져 있다**(`G2` 가 2026-09-25 에 읽었다) — 이 줄이 「켜져 있다」고 적고 있었다. 켤지는 `G6`.
+`enforce_admins` 가 `false` 면 저장소 주인은 그대로 민다. `gh api -X POST repos/<소유자>/<이름>/branches/main/protection/enforce_admins` 로 켜고 `-X DELETE` 로 끈다. **켜져 있다**(`G6`, 2026-09-26) — 주인의 머지도 필수 일곱을 기다린다.
 
 ### Dependabot 경보는 가지에 밀어도 안 닫힌다
 
