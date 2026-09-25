@@ -187,6 +187,8 @@ tasks.test {
 		// `TestConventionTest`(G7d)가 레인 표와 이 빌드 파일을 글자로 읽는다(마무리 12차 독립 리뷰).
 		rootProject.file("../doc/reference/testing-strategy.md"),
 		rootProject.file("build.gradle.kts"),
+		// `SeatLimitConsistencyTest`(41-1)가 화면의 좌석 상한을 글자로 읽는다.
+		rootProject.file("../frontend/src/components/seat-map.tsx"),
 		rootProject.file("../.github/workflows/ci.yml"),
 		rootProject.file("../.github/workflows/codeql.yml"),
 		rootProject.file("../.github/workflows/claude-review.yml"),
