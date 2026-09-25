@@ -39,7 +39,8 @@ stamped() {
   if [ "$lvl" = full ] || { [ "$level" = fast ] && [ "$lvl" = fast ]; }; then echo "$lvl"; return 0; fi
   return 1
 }
-docker_up() { docker info >/dev/null 2>&1; }
+# 안 떠 있으면 켜고 기다린다(`docker-up.sh`, 밤샘 플랜) — 사용자가 없는 밤에 「켜고 다시 돌린다」로 서지 않게.
+docker_up() { bash scripts/docker-up.sh; }
 
 ran=0; ok=1; lv_backend=; lv_frontend=; lv_tools=
 if changed backend && [ -d backend ]; then

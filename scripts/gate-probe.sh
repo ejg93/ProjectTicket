@@ -46,6 +46,10 @@ for name in "$@"; do
   [ -f "$probe" ] || { echo "[$name] 탐침 파일이 없다: $probe"; bad=1; continue; }
   command=$(sed -n 's/^# 명령: //p' "$probe" | head -1)
   expect=$(sed -n 's/^# 문구: //p' "$probe" | head -1)
+  # 컨테이너를 쓰는 탐침(gitleaks·컨테이너 레인)은 Docker 부터 — 꺼져 있으면 「다른 이유로 빨강」이 되어 판정이 안 된다.
+  case "$command" in *docker*|*integrationTest*)
+    bash scripts/docker-up.sh || { echo "[$name] Docker 가 안 뜬다 — 이 탐침은 못 잰다"; bad=1; continue; } ;;
+  esac
 
   wt="$(mktemp -d)/wt"
   git worktree add -q --detach "$wt" HEAD || { echo "[$name] 워크트리를 못 만들었다"; bad=1; continue; }

@@ -60,6 +60,7 @@ docker info --format "{{.ServerVersion}}"
 ```
 
 이것이 실패하면 코드를 보지 말고 Docker Desktop 을 띄운다. 기동에 시간이 걸려서 바로 다시 돌리면 같은 오류가 난다.
+`bash scripts/docker-up.sh` 가 그 둘을 한다 — `docker desktop start` 뒤 5초 간격으로 최대 3분 기다린다(밤샘 플랜, 2026-09-26). `verify.sh`·`gate-probe.sh` 가 컨테이너 앞에서 부른다. Desktop 의 `AutoStart` 설정은 꺼져 있다.
 
 ### `bootRun` 을 죽여도 8080 은 안 풀린다
 
