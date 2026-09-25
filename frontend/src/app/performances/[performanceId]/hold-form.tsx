@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 
 import { SeatMap, type SeatMapData } from "@/components/seat-map";
 import { SubmitButton } from "@/components/submit-button";
+import { dropAdmission, readAdmission } from "@/lib/admission";
 import { ApiError, api } from "@/lib/api";
 
 type Reservation = { reservation_id: number };
@@ -26,8 +27,9 @@ function messageOf(error: unknown): string {
     case "performance-not-open":
       return "지금은 예매할 수 없는 회차입니다.";
     case "admission-required":
-      // 대기열이 켜진 회차다. 줄을 서는 화면은 `43` 이 붙인다.
-      return "대기 인원이 많아 순서를 기다려야 합니다. 잠시 후 다시 시도해 주세요.";
+    case "admission-mismatch":
+      // 제출이 대기열 화면으로 보낸다(`43`). 문구는 이동이 늦을 때 잠깐 보인다.
+      return "대기 인원이 많아 순서를 기다려야 합니다. 대기열로 이동합니다.";
     // `unauthenticated` 를 여기서 안 본다 — 401 은 `api.ts` 가 로그인 화면으로 보내고 예외를 안 던진다.
     // 적어 두면 안 닿는 분기가 되고, 다음 사람이 그 자리를 고치면서 있는 줄 안다.
     default:
@@ -64,15 +66,24 @@ export function HoldForm({ data, performanceId }: { data: SeatMapData; performan
 
     idempotencyKey.current ??= crypto.randomUUID();
 
+    // 대기열을 지나온 탭이면 입장 토큰이 있다(`43`). 없으면 헤더를 안 싣고, 관문이 켜진 회차면 서버가 줄로 보낸다.
+    const admission = readAdmission(performanceId);
+
     try {
       const reservation = await api<Reservation>(`/api/performances/${performanceId}/reservations`, {
         method: "POST",
         body: { seat_ids: selected },
         idempotencyKey: idempotencyKey.current,
+        headers: admission ? { "X-Admission-Token": admission } : undefined,
       });
       router.push(`/reservations/${reservation.reservation_id}`);
     } catch (thrown) {
       setError(messageOf(thrown));
+      // 토큰이 없거나 만료·다른 회차 것이다. 낡은 토큰을 버리고 줄로 간다 — 줄에서 새 토큰을 받는다(`D12`).
+      if (thrown instanceof ApiError && (thrown.slug === "admission-required" || thrown.slug === "admission-mismatch")) {
+        dropAdmission(performanceId);
+        router.push(`/queue/${performanceId}`);
+      }
     }
   }
 
