@@ -30,6 +30,7 @@
 | `GET /api/health` | 앱·DB·마이그레이션 수 | 공개 | 있다 |
 | `POST /api/auth/signup` · `login` · `logout` | 가입·로그인·로그아웃 | 공개·공개·세션 | 있다 |
 | `GET /api/me` | 내 계정 | 세션 | 있다 |
+| `GET /api/me/reservations?page&size` | 내 예매 목록. 만든 시각 내림차순 고정(`sort` 없음), 목록 규약(`items`·`page`·`size`·`total`) | 세션 | 44a |
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
 | `GET /api/consent-items/{code}` | 항목 하나의 지금 판과 본문 — 약관은 `body`(마크다운), 개인정보는 정형 넷. 목록은 본문을 안 싣는다 | 공개 | 39-1 |
 | `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 있다(`40a`) |
@@ -42,6 +43,7 @@
 | `GET /api/me/reservations` | 내 예매 목록 | 세션 | 44 |
 | `POST /api/reservations/{id}/payments` | 결제 시작·결과 | 세션(본인) | 16 |
 | `POST /api/reservations/{id}/cancel` | 취소 | 세션(본인) | 17 |
+| `GET /api/reservations/{id}/refund-preview` | 지금 취소하면 얼마인가 — 결제액·D-며칠·율·수수료·환불액. 취소할 수 없으면 `cancellable: false` 와 취소가 받을 `type` 슬러그(`reason`). **계산은 취소와 같은 함수다**(`RefundQuote`) | 세션(본인) | 44a |
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
