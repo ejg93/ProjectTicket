@@ -6,9 +6,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "c=$(node -e 'let d=\"\";process.stdin.on(\"data\",x=>d+=x).on(\"end\",()=>{try{process.stdout.write(String(JSON.parse(d).tool_input.command||\"\"))}catch(e){}})' 2>/dev/null); if printf '%s\\n' \"$c\" | grep -qE '(^|[;&|])[[:space:]]*git push([[:space:]]+-[-A-Za-z=]+)*([[:space:]]+[A-Za-z0-9_./-]+)?[[:space:]]+([A-Za-z0-9_./-]+:)?main([[:space:]]|$)'; then echo 'main 에 직접 안 민다(CLAUDE.md 「재개 프로토콜」 6번). work/<날짜> 가지에 밀고 마무리가 PR 을 연다.' >&2; exit 2; fi; if printf '%s\\n' \"$c\" | grep -qE '(^|[;&|])[[:space:]]*git push([[:space:]]|$)'; then if [ \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null)\" = main ]; then echo '현재 가지가 main 이다. work/<날짜> 가지를 따고 민다(CLAUDE.md 「재개 프로토콜」 6번).' >&2; exit 2; fi; cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; git rev-parse -q --verify origin/main >/dev/null 2>&1 || exit 0; st=\"$(git rev-parse --git-dir)/verify-stamp\"; head=$(bash scripts/verify-fingerprint.sh HEAD); main=$(bash scripts/verify-fingerprint.sh origin/main); fail=''; for d in backend frontend; do h=$(echo \"$head\" | grep \"^$d \"); [ \"$h\" = \"$(echo \"$main\" | grep \"^$d \")\" ] && continue; grep -qx \"$h full\" \"$st\" 2>/dev/null || fail=\"$fail $d\"; done; if [ -n \"$fail\" ]; then echo \"full 도장이 없다:$fail — push 앞엔 bash scripts/verify.sh --full 이 HEAD 에서 초록이어야 한다(/verify).\" >&2; exit 2; fi; fi; exit 0",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/push-guard.sh\"",
             "timeout": 10,
             "statusMessage": "push 검사 — main 금지·full 도장"
+          },
+          {
+            "type": "command",
+            "timeout": 20,
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/commit-guard.sh\"",
+            "statusMessage": "커밋 검사 — work/* 는 도장이 있어야"
           }
         ]
       },
@@ -17,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "export PATH=\"$PATH:/c/Program Files/GitHub CLI\"; c=$(node -e 'let d=\"\";process.stdin.on(\"data\",x=>d+=x).on(\"end\",()=>{try{process.stdout.write(String(JSON.parse(d).tool_input.command||\"\"))}catch(e){}})' 2>/dev/null); if printf '%s\\n' \"$c\" | grep -qE '(^|[;&|])[[:space:]]*gh pr create'; then b=$(printf '%s\\n' \"$c\" | sed -n 's/.*--base[= ][= ]*\\([A-Za-z0-9._/-][A-Za-z0-9._/-]*\\).*/\\1/p' | head -1); if [ -n \"$b\" ] && [ \"$b\" != main ]; then echo 'PR 의 base 는 언제나 main 이다. 쌓아 올리면 아래가 머지될 때 GitHub 이 base 없는 PR 을 닫는다.' >&2; exit 2; fi; fi; exit 0",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/pr-base-guard.sh\"",
             "timeout": 10,
             "statusMessage": "PR base 검사"
           }
@@ -28,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "c=$(node -e 'let d=\"\";process.stdin.on(\"data\",x=>d+=x).on(\"end\",()=>{try{process.stdout.write(String(JSON.parse(d).tool_input.command||\"\"))}catch(e){}})' 2>/dev/null); if printf '%s\\n' \"$c\" | perl -CS -ne 'print unless /\\p{Hangul}/' | grep -qE '(^|[;&|])[[:space:]]*(\\./)?gradlew([[:space:]]|$)' && ! printf '%s' \"$c\" | grep -qE 'JAVA_HOME[[:space:]]*=|\\\\$env:JAVA_HOME'; then echo 'backend 명령 앞에 JDK 를 지정한다(CLAUDE.md 「검증」). 이 환경의 기본은 JDK 11 이라 Gradle 이 안 뜬다. Bash 는 JAVA_HOME=\"C:/Program Files/Java/jdk-25\" 를 앞에 붙이고, PowerShell 은 $env:JAVA_HOME = \"C:/Program Files/Java/jdk-25\"; 를 앞에 둔다.' >&2; exit 2; fi; exit 0",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/java-home-guard.sh\"",
             "timeout": 5,
             "statusMessage": "JAVA_HOME 검사"
           }
@@ -41,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=$(node -e 'let d=\"\";process.stdin.on(\"data\",x=>d+=x).on(\"end\",()=>{try{process.stdout.write(String(JSON.parse(d).tool_input.file_path||\"\"))}catch(e){}})' 2>/dev/null); case \"$f\" in *CLAUDE.md|*AGENTS.md|*PLAN.md|*PROGRESS.md|*doc*reference*.md|*skills*SKILL.md) out=$(bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/doc-lint.sh\") || { echo \"$out\" >&2; exit 2; } ;; esac; exit 0",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/doc-lint-edit.sh\"",
             "timeout": 60,
             "statusMessage": "문서 린트"
           }
@@ -52,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "c=$(node -e 'let d=\"\";process.stdin.on(\"data\",x=>d+=x).on(\"end\",()=>{try{process.stdout.write(String(JSON.parse(d).tool_input.command||\"\"))}catch(e){}})' 2>/dev/null); case \"$c\" in *doc-lint*) exit 0 ;; esac; if printf '%s\\n' \"$c\" | grep -qE '(^|[;&|])[[:space:]]*(sed -i|tee |cp |mv |Set-Content|Add-Content|Out-File|Copy-Item|Move-Item)|(^|[;&|])[^;&|\"]*>>?[[:space:]]*[^&|;[:space:]]*\\.md' && printf '%s\\n' \"$c\" | grep -qE 'CLAUDE\\.md|AGENTS\\.md|PLAN\\.md|PROGRESS\\.md|doc.{0,4}reference|skills.{0,4}[a-z-]+.{0,4}SKILL'; then out=$(bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/doc-lint.sh\") || { echo \"$out\" >&2; exit 2; }; fi; exit 0",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/doc-lint-bash.sh\"",
             "timeout": 60,
             "statusMessage": "문서 린트"
           }
@@ -64,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; sed -n '/^## 현재 상태/,/^## 이력/p' PROGRESS.md | sed '$d'; exit 0",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/session-state.sh\"",
             "timeout": 15,
             "statusMessage": "현재 상태 주입"
           }
@@ -76,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "j=$(cat); echo \"$j\" | grep -qE '\"stop_hook_active\"[[:space:]]*:[[:space:]]*true' && exit 0; cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; s=$(git status --porcelain 2>/dev/null); [ -z \"$s\" ] && exit 0; printf '커밋 안 된 작업물이 있다 — 청크 하나 = 커밋 하나, 미완이면 WIP 커밋을 남긴다(CLAUDE.md 「청크 규칙」). 버릴 것이면 git stash 로 치운다.\\n%s\\n' \"$s\" >&2; exit 2",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/stop-uncommitted.sh\"",
             "timeout": 15,
             "statusMessage": "커밋 안 된 작업물 검사"
           }
@@ -86,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "j=$(cat); echo \"$j\" | grep -qE '\"stop_hook_active\"[[:space:]]*:[[:space:]]*true' && exit 0; cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; git rev-parse -q --verify origin/main >/dev/null 2>&1 || exit 0; st=\"$(git rev-parse --git-dir)/verify-stamp\"; head=$(bash scripts/verify-fingerprint.sh HEAD); main=$(bash scripts/verify-fingerprint.sh origin/main); fail=''; for d in backend frontend; do h=$(echo \"$head\" | grep \"^$d \"); [ \"$h\" = \"$(echo \"$main\" | grep \"^$d \")\" ] && continue; [ \"$h\" = \"$(grep \"^$d \" \"$st\" 2>/dev/null | cut -d' ' -f1,2)\" ] || fail=\"$fail $d\"; done; [ -z \"$fail\" ] && exit 0; echo \"검증 도장이 없다:$fail — HEAD 의 코드가 origin/main 과 다른데 bash scripts/verify.sh 가 그 상태에서 돈 적이 없다(/verify). 돌리고 나서 멈춘다.\" >&2; exit 2",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/hooks/stop-stamp.sh\"",
             "timeout": 15,
             "statusMessage": "검증 도장 검사"
           }
