@@ -22,20 +22,26 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 한 줄로 끝낸다.
 
 **backend 명령은 앞에 `JAVA_HOME="C:/Program Files/Java/jdk-25"` 를 붙인다.** 안 붙이면 훅이 막는다.
 
-| 언제 | 명령 | 통과 기준 |
-|---|---|---|
-| backend 를 건드렸으면, 청크를 닫을 때 | `./gradlew test`(= `verify.sh`) | 실패 0 |
-| backend 를 건드렸으면, push 앞에 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 |
-| 스키마·서비스만 볼 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
-| **좌석·예매를 건드렸으면** | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |
-| **수치를 남길 때**(락 비교·부하) | `./gradlew measure` | `build` 밖이다(`D8`). 표를 `doc/notes/` 에 기계 사양과 같이 적고 ADR 이 읽는다. 늘 다시 돈다 — 건너뛰면 지난 숫자를 이번 것으로 읽는다 |
-| **마이그레이션을 더했으면** | 빈 DB 로 `POSTGRES_DB=ticket_check ./gradlew bootRun --args='--spring.profiles.active=local'` 후 `curl localhost:8080/api/health` | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
-| 화면을 건드렸으면, push 앞에 | `cd frontend && npm run build && npm run lint && npm test` | 초록. 청크를 닫을 땐 `tsc --noEmit` 만 |
-| 예매·대기열 화면을 건드렸으면 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과 |
-| 컨테이너 설정을 건드렸으면 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
-| k8s 를 건드렸으면 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
-| **문서를 고쳤으면** | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh` 를 돌린다 | 통과하면 아무 말 없음 |
-| 푸시했으면 | 아래 「CI」 | 초록. 빨가면 다음 청크보다 먼저 친다 |
+**시점이 셋이다** — 청크(커밋 앞) · 번들 끝(`/wrapup`) · push 뒤. `CLAUDE.md` 「검증」이 층을 정하고 이 표가 명령을 든다.
+
+| 언제 | 시점 | 명령 | 통과 기준 |
+|---|---|---|---|
+| backend 를 건드렸으면 | 청크 | `./gradlew test`(= `verify.sh`) | 실패 0 |
+| backend 를 건드렸으면 | 번들 끝 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 |
+| **새 `V*` 를 더했으면** | 청크 — `verify.sh` 가 지문에서 보고 **스스로** 돈다 | `./gradlew test integrationTest` | 실패 0. 빠른 레인만 돌리면 열거형·길이 대조가 번들 끝에서 처음 빨개진다 |
+| 스키마·서비스만 볼 때 | 아무 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
+| **좌석·예매를 건드렸으면** | 번들 끝 | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |
+| **수치를 남길 때**(락 비교·부하) | 그 청크 | `./gradlew measure` | `build` 밖이다(`D8`). 표를 `doc/notes/` 에 기계 사양과 같이 적고 ADR 이 읽는다. 늘 다시 돈다 — 건너뛰면 지난 숫자를 이번 것으로 읽는다 |
+| **새 `V*` 가 있었으면** | 번들 끝 | 빈 DB 로 `POSTGRES_DB=ticket_check ./gradlew bootRun --args='--spring.profiles.active=local'` 후 `curl localhost:8080/api/health` | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
+| 화면을 건드렸으면 | 청크 | `tsc --noEmit`(= `verify.sh`) | 초록 |
+| 화면을 건드렸으면 | 번들 끝 | `cd frontend && npm run build && npm run lint && npm test`(= `verify.sh --full`) | 초록 |
+| 예매·대기열 화면을 건드렸으면 | 번들 끝 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과 |
+| 컨테이너 설정을 건드렸으면 | 청크 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
+| k8s 를 건드렸으면 | 청크 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
+| **문서를 고쳤으면** | — | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh` 를 돌린다 | 통과하면 아무 말 없음 |
+| 푸시했으면 | push 뒤 | 아래 「CI」 | 초록. 빨가면 다음 청크보다 먼저 친다 |
+
+청크 verify 가 빨가면 고치기 둘까지. 그래도면 WIP 커밋하고 다음 행 — 번들이 한 행에 안 잡히게.
 
 **새 구역이 생기면 그 명령을 이 표에 더한다.**
 

@@ -5,6 +5,7 @@
 # 단계가 둘이다. 기본은 빠른 도장 — backend `gradlew test`(컨테이너 없음), frontend `tsc`·lint·test.
 # `--full` 은 backend `gradlew build`(Testcontainers 레인 포함), frontend `next build`·lint·test.
 # 청크를 닫을 땐 빠른 도장이면 되고(Stop hook), push 앞엔 full 이어야 한다(push hook).
+# 빠른 단계라도 origin/main 에 없는 새 `V*` 가 있으면 backend 는 `integrationTest` 까지 돈다(`B0`).
 #
 # 통과하면 `.git/verify-stamp` 에 「레인 지문 단계」를 적는다.
 set -uo pipefail
@@ -38,6 +39,15 @@ if changed backend && [ -d backend ]; then
     fi
     echo "== backend 지문이 origin/main 과 다르다 → ./gradlew build (두 레인)"
     (cd backend && ./gradlew build -q) || ok=0
+  elif [ -n "$(git diff-tree -r --name-only --diff-filter=A origin/main "$tree" -- backend/src/main/resources/db/migration)" ]; then
+    # 새 `V*` 가 있으면 컨테이너 레인도 같이 돈다. 빠른 레인만 돌리면 열거형·길이 대조(`integrationTest`)가
+    # 번들 끝 `--full` 에서 처음 빨개진다 — ProjectShop 번들 A 가 그랬다(`B0`).
+    if ! docker info >/dev/null 2>&1; then
+      echo "새 V* 가 있는데 Docker 가 안 떴다. 이 청크는 컨테이너 레인(integrationTest)이 걸린다 — Docker Desktop 을 켜고 다시 돌린다."
+      exit 1
+    fi
+    echo "== backend 지문이 다르고 새 V* 가 있다 → ./gradlew test integrationTest (빠른 레인 + 컨테이너 레인)"
+    (cd backend && ./gradlew test integrationTest -q) || ok=0
   else
     echo "== backend 지문이 origin/main 과 다르다 → ./gradlew test (빠른 레인)"
     (cd backend && ./gradlew test -q) || ok=0
