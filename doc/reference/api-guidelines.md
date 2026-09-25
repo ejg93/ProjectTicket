@@ -44,6 +44,7 @@
 | `POST /api/reservations/{id}/cancel` | 취소 | 세션(본인) | 17 |
 | `GET /api/reservations/{id}/refund-preview` | 지금 취소하면 얼마인가 — 결제액·D-며칠·율·수수료·환불액. 취소할 수 없으면 `cancellable: false` 와 취소가 받을 `type` 슬러그(`reason`). **계산은 취소와 같은 함수다**(`RefundQuote`) | 세션(본인) | 44a |
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
+| `GET /api/organizer/organizers` · `GET /api/organizer/halls` | 공연을 올릴 내 기획사 · 회차를 올릴 홀(공용 — 공연장·구역 코드·구역별 좌석 수). 등록 폼이 고른다 | 세션(기획사) | 45a-1 |
 | `GET /api/organizer/events?page&size` | 내 기획사들의 공연(오픈 전 포함). 만든 시각 내림차순 고정, 목록 규약 | 세션(기획사) | 45a |
 | `GET /api/organizer/events/{id}` | 공연 하나 + 모든 상태의 회차(판매 기간·홀 좌석 수·팔린 수 — `reserved` 만). 남의 공연은 404 `event-not-found` | 세션(기획사) | 45a |
 | `POST /api/organizer/events` | 공연 등록 | 세션(기획사) | 11 |

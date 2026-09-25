@@ -36,7 +36,16 @@ class OrganizerEventController(
     private val openService: PerformanceOpenService,
     private val membership: OrganizerMembership,
     private val query: OrganizerEventQuery,
+    private val catalog: OrganizerCatalogQuery,
 ) {
+
+    /** 공연을 올릴 내 기획사(`45a-1`) */
+    @GetMapping("/organizers")
+    fun organizers(@AuthenticationPrincipal user: TicketUser): List<OrganizerCatalogQuery.Organizer> = catalog.organizers(user.id)
+
+    /** 회차를 올릴 홀 — 공용이라 다 낸다(`45a-1`). 구역과 좌석 수를 같이 싣는다 */
+    @GetMapping("/halls")
+    fun halls(): List<OrganizerCatalogQuery.Hall> = catalog.halls()
 
     /** 내 기획사들의 공연(`45a`). 오픈 전 것도 보인다 — 공개 목록과 다르다 */
     @GetMapping("/events")
