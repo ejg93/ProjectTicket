@@ -30,6 +30,8 @@ class CardNumberTest {
             "12345678901234567890",
             // 숫자·구분자가 아닌 것
             "4242-4242-4242-424a",
+            // ASCII 에서 `9` 바로 다음 글자. 상한 비교를 `<=` 로 바꾸면 숫자로 센다(`G4` 변이 시험이 찾았다)
+            "4242424242424242:",
             // 비ASCII 숫자. `Char.isDigit()` 가 유니코드 Nd 를 전부 받아서 새던 자리다(마무리 8차 독립 리뷰)
             "٤٢٤٢٤٢٤٢٤٢٤٢٤٢٤٢",
         ],
@@ -41,7 +43,8 @@ class CardNumberTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["4242424242424242", "4242 4242 4242 4242", "4242-4242-4242-4242", "123456789012"])
+    // 위아래 끝(12·19 자리)을 다 든다 — 19 가 없으면 상한의 `<=` 를 `<` 로 바꾼 변이가 산다(`G4`)
+    @ValueSource(strings = ["4242424242424242", "4242 4242 4242 4242", "4242-4242-4242-4242", "123456789012", "1234567890123456789"])
     fun a_well_shaped_card_number_passes(cardNumber: String) {
         assertThat(validator.validate(PaymentController.PayRequest(cardNumber))).isEmpty()
     }
