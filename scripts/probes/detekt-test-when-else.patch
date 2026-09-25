@@ -1,0 +1,17 @@
+# 게이트: detekt 타입 해석 규칙의 테스트 소스(check → detektTest, 마무리 15차). `check` 로 부른다
+# 명령: cd backend && ./gradlew check -x test -x integrationTest --no-daemon --build-cache -q
+# 문구: ElseCaseInsteadOfExhaustiveWhen
+diff --git a/backend/src/test/kotlin/com/projectticket/ticket/ProbeTestWhen.kt b/backend/src/test/kotlin/com/projectticket/ticket/ProbeTestWhen.kt
+new file mode 100644
+index 0000000..dab4787
+--- /dev/null
++++ b/backend/src/test/kotlin/com/projectticket/ticket/ProbeTestWhen.kt
+@@ -0,0 +1,8 @@
++package com.projectticket.ticket
++
++/** 탐침 — 테스트 소스의 열거·Boolean `when` 에 `else` 가 `check` 를 세우나(`detektTest`, 마무리 15차) */
++internal fun probeTestWhen(flag: Boolean): Int =
++    when (flag) {
++        true -> 1
++        else -> 0
++    }

@@ -1,0 +1,16 @@
+# 게이트: ScreenLengthTest
+# 명령: cd backend && ./gradlew test --tests '*ScreenLengthTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*ScreenLengthTest.xml 2>/dev/null; exit $r
+# 문구: 칸은 `maxLength={60}`
+diff --git a/frontend/src/app/signup/signup-form.tsx b/frontend/src/app/signup/signup-form.tsx
+index b812310..da14fa9 100644
+--- a/frontend/src/app/signup/signup-form.tsx
++++ b/frontend/src/app/signup/signup-form.tsx
+@@ -72,7 +72,7 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
+   return (
+     <form action={submit}>
+       <Field name="email" label="이메일" type="email" autoComplete="email" maxLength={254} />
+-      <Field name="display_name" label="이름" autoComplete="name" maxLength={50} />
++      <Field name="display_name" label="이름" autoComplete="name" maxLength={60} />
+       <Field name="password" label="비밀번호" type="password" autoComplete="new-password" maxLength={64} />
+       <p className="muted">비밀번호는 15자 이상으로 정해 주세요.</p>
+ 

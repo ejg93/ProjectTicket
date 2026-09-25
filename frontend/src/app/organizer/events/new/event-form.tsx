@@ -63,7 +63,7 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
           ))}
         </select>
       </p>
-      <Field name="title" label="공연 제목" />
+      <Field name="title" label="공연 제목" maxLength={200} />
       {Array.from({ length: grades }, (_, i) => (
         <fieldset key={i}>
           <legend>등급 {i + 1}</legend>

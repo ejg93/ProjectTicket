@@ -33,6 +33,7 @@
 | `StateMachineDocTest` | 4 테스트 | 〃 | `state-machines.md` 의 전이표와 전이 트리거가 갈리는 것(`I3-1`). 문서만 고치면 다음 사람이 낡은 쪽을 믿는다 | `G2` 2026-09-25 — 전이표에서 `held → paying` 한 줄을 지우니 「갈렸다」로 빨강. 탐침 `state-machine-doc` |
 | `AppDbConstraintTest` | 4 테스트 | 〃 | 앱 검증과 DB 제약이 같은 규칙을 두 벌 드는 자리가 갈리는 것(`I4-1`) — 앱이 느슨해지면 400 이 500 이 된다. **역방향도 본다**(`I4-2`): 마이그레이션의 길이·정규식 `check` 전부가 표에 있거나 짝이 없는 근거를 들어야 한다 | `I4-2` 2026-09-19 — 표에서 한 줄 빼니 빨갛고 되돌리니 초록 |
 | `SeatLimitConsistencyTest` | 4 테스트 | `gradlew test`(빠른 레인) | 화면 `SeatMap.MAX_SEATS` 와 서버 `MAX_SEATS_PER_HOLD` 가 갈리는 것(`41-1`). 언어가 달라 컴파일이 못 묶어 `seat-map.tsx` 를 글자로 읽는다 — 그 파일이 `inputs.files`·backend 지문에 있다 | `41-1` 2026-09-26 — `MAX_SEATS` 를 5 로 바꾸니 빨강, backend 지문도 바뀌었다. 탐침 `seat-limit` |
+| `ScreenLengthTest` | 4 테스트 | `gradlew test`(빠른 레인) | 화면 폼의 `maxLength` 와 요청 `@Size(max)` 가 갈리는 것(`G9`) — 서버가 400 으로 돌려보낼 글자를 화면이 받아 준다. 서버는 리플렉션(메타 애너테이션까지), 화면은 `*-form.tsx` 글자라 그 파일들이 `inputs.files`·backend 지문에 있다 | `G9` 2026-09-26 — 탐침 `screen-length`(가입 이름 50→60) 빨강 「칸에 `maxLength={50}` 가 없다」 |
 | `MigrationTextTest` | 4 테스트 | `gradlew test`(빠른 레인) | 마이그레이션의 시드(규약 표 셋 밖의 `insert`)와 옥텟 표준 컬럼의 `length`(`G7b`). 주석은 `MigrationSql` 이 걷는다 | `G7b` 2026-09-25 — 허용 밖 `insert`·`length(email)` 를 새 `V` 로 넣으니 각자 빨강. 탐침 `migration-seed`·`migration-octet` |
 | `SqlTextTest` | 4 테스트 | 〃 | `where` 에 좌석 `status` 조건이 없는 `update performance_seat`(`G7b`, `D4`). 흐름 시험은 한 사람씩 돌아서 덮어쓰기를 못 본다. **원시 문자열 밖에서 조립한 SQL 은 못 본다** | `G7b` 2026-09-25 — 조건 없는 좌석 UPDATE 를 넣으니 빨강. 탐침 `sql-seat-update` |
 | `SchemaNamingTest` | 4 테스트 | `gradlew integrationTest` | 도는 스키마의 이름(`D15`) — snake_case·기본키 `<표>_id`·`_at`/`_until`↔`timestamptz`·`is_`(`G7b`). 첫 실행이 `account_consent.granted` 를 찾았다 — `naming-rules.md` 에 적고 이름으로 봐준다 | `G7b` 2026-09-25 — camelCase 컬럼을 새 `V` 로 넣으니 빨강. 탐침 `schema-naming`(재사용 컨테이너를 안 쓴다) |
@@ -55,12 +56,12 @@
 | axe(`src/test/axe.ts`) | 4 테스트 | 〃 | 그려진 DOM 의 접근성 위반(`41`). `jsx-a11y` 가 못 보는 조건부 DOM 과 이어진 이름을 본다. **색 대비는 jsdom 에 CSS 가 없어 안 돈다** — 되돌아가는 것을 막는 물건이지 보증하는 물건이 아니다 | `G2` 2026-09-25 — 이름 없는 `<button>` 에 `button-name`. 탐침 `axe` |
 | 나머지 테스트 | 4 테스트 | `gradlew build` · `npm test` | backend 356 중 `build` 가 도는 것 — 빠른 레인 59·컨테이너 레인 297 이다(`build/test-results/` 실측, 2026-09-19). `measure` 는 **`build` 밖이라**(`D8`) 여기 안 든다. frontend 는 33(`39`~`42`) | 마무리 9차 2026-09-19 — 「카드를 바꾸면 새 멱등키」가 `declined` 로 재서 **판정을 지워도 초록**이었다. 초록인 테스트가 무엇을 무는지는 부숴 봐야 안다 |
 | 변이 시험(PIT) | 5 문서 | `gradlew mutationTest` — **손으로**, `build` 밖 | **아무것도 못 막는다** — 초록인 시험이 무엇을 무는지 잰다(`G4`). 대상 여덟은 틀려도 흐름 시험이 초록인 순수 계산이다. 목록과 처분은 `doc/notes/mutation-2026-09.md` | `G4` 2026-09-25 — 첫 판 산 것 7·덮지 않음 23 → 시험 둘 신설·사례 둘 추가 뒤 산 것 3, 셋 다 동치. PIT 기본 변이가 못 만드는 `HALF_UP → HALF_DOWN` 은 손으로 넣어 `RefundPolicyTest` 가 잡았다 |
-| detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml`. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다. **타입 해석 규칙은 `detekt` 가 조용히 건너뛴다** — `check` 가 `detektMain` 을 따로 돌리고 거기는 `detekt-typed.yml` 에 고른 규칙만 돈다(`G7a`). 기본 규칙 전부를 타입 해석으로 올리는 것은 `G8` | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength`. `G7a` 2026-09-25 — 열거 주어 `when` 에 `else` 를 넣으니 `detektMain` 빨강. 탐침 `detekt-when-else` |
+| detekt | 4 테스트 | `gradlew build`(check) | Kotlin **소스**를 본다. 설정과 근거는 `backend/config/detekt/detekt.yml` 하나. 문턱은 「새 검출 0건」이고 기준선 파일을 안 만든다. **타입 해석 규칙은 `detekt` 가 조용히 건너뛴다** — `check` 가 `detektMain`·`detektTest` 를 같은 설정(기본 규칙 전부 + 우리 것)으로 돌린다(`G8`) | `47` 2026-09-18 — 첫 측정 262건 중 222가 `MaxLineLength`. `G7a` 2026-09-25 — 열거 주어 `when` 에 `else` 를 넣으니 `detektMain` 빨강. 탐침 `detekt-when-else`. `G8` 2026-09-26 — main 에 `!!` 하나를 넣으니 `detektMain` 빨강(`UnsafeCallOnNullableType`). 탐침 `detekt-typed-nullable`. 마무리 15차 — 탐침 셋이 태스크를 바로 부르지 않고 `check` 로 부른다(바로 부르면 `check` 에서 빠져도 막는다) · `detektTest` 탐침 `detekt-test-when-else` |
 | `npm audit --audit-level=high` | 4 테스트 | CI(`audit` 잡, 필수 아님) | 화면 의존성의 알려진 취약점(`39`). `moderate` 이하는 알리기만 한다. 전이 의존성 권고가 우리 커밋과 무관하게 머지를 세우지 않게 필수에서 뺐다(`B0-5`) | 부수지 않는다 — 취약 판을 일부러 넣으면 잠금 파일이 더러워지고, 필수도 아니다(`B0-5`, `G2`) |
 | `doc-lint.sh` | 4 테스트 | **편집 직후 훅** + CI `docs` 잡 | 개발자 글의 존댓말과 표 파편. 고치는 순간 걸려서 커밋까지 안 간다 | `G1` 2026-09-25 — `hooks-test.sh` 가 위반 다섯(존댓말·표 셀 중복·설계 행·이력 해시·UTF-8)을 tools 레인마다 다시 부순다. 처음은 `B0-3` 이 손으로 |
 | `verify.sh` 도장 | 4 테스트 | **Stop 훅**(빠른) · **push 훅**(`--full`) | 안 돌려 보고 청크를 닫거나 미는 것. 레인 지문이 `origin/main` 과 다르면 그 레인을 돌리고 도장을 찍는다 | 마무리 6차 2026-09-18 — 도장 없이 밀려다 막혔다 |
 | gitleaks | 4 테스트 | **CI 만** | 커밋에 들어간 시크릿. 이력 전체를 본다 | `G2` 2026-09-25 — 실행 때 만든 `ghp_` 키를 로컬 gitleaks(Docker `v8.18.4`, 기본 규칙 — CI 와 같은 설정)가 잡았다. CI 잡 자체는 안 부쉈다. 탐침 `gitleaks` |
-| `main` 가지 보호 | 4 테스트 | GitHub | 필수 검사 일곱이 초록이 아닌 머지. **주인은 안 막는다** — `enforce_admins` 가 꺼져 있다 | `G2` 2026-09-25 — 부수는 대신 `gh api` 로 읽었다. 필수 일곱은 표와 같다. **`enforce_admins` 는 꺼져 있다 — 안 막혔다.** 켤지는 `G6` |
+| `main` 가지 보호 | 4 테스트 | GitHub | 필수 검사 일곱이 초록이 아닌 머지. **주인도 막는다** — `enforce_admins` 가 켜져 있다(`G6`) | `G2` 2026-09-25 — 부수는 대신 `gh api` 로 읽었다. 필수 일곱은 표와 같다. `G6` 2026-09-26 — `enforce_admins` 를 켜고 `gh api …/protection` 으로 `true` 를 읽었다. 이 아래 첫 머지는 마무리 15차 PR 이다 |
 | Dependabot 경보 | **5 문서** | GitHub | 알려 주기만 한다. **막지 않는다** — Gradle 쪽은 이것뿐이다 | 게이트가 아니다. **`P10` 이 켰다**(2026-09-19) — 표에 적힌 채로 저장소 설정이 꺼져 있었다 |
 | 독립 리뷰 에이전트 | 5 문서 | **마무리** | 같은 눈의 맹점. 대화를 안 주고 diff 만 준다 | 게이트가 아니다 — 마무리 9차에 지적 열둘 중 오탐 0 |
 
@@ -150,7 +151,6 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | # | 규칙 | 문서 | 지금 실물 | 처분 |
 |---|---|---|---|---|
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
-| ⑬ | 화면 입력칸 `maxLength` = 요청 `@Size(max)` | `D8` | 문서가 `ScreenLengthTest` 를 불렀는데 **없다**(`G7c` 가 찾았다). 화면에 `maxLength` 0개 | `G9` — 세울지부터 정한다 |
 
 **대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 `/wrapup` 대조와 독립 리뷰가 본다.
 
@@ -160,7 +160,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 
 | 게이트 | 문턱 | 근거가 된 측정 |
 |---|---|---|
-| **detekt** | **새 검출 0건** | `47` 첫 측정 262건. 문턱을 올린 것 다섯(줄 길이 200·반환 6·throw 8·긴 함수 120줄·함수 수 20)과 끈 것 하나(`TooGenericExceptionCaught` — 경계에서 `RuntimeException` 을 잡는 것이 우리 규약이다)에 **근거를 설정 파일에 같이 적었다**. 나머지 마흔은 고쳤다 |
+| **detekt** | **새 검출 0건** | `47` 첫 측정 262건. 문턱을 올린 것 다섯(줄 길이 200·반환 6·throw 8·긴 함수 120줄·함수 수 20)과 끈 것 하나(`TooGenericExceptionCaught` — 경계에서 `RuntimeException` 을 잡는 것이 우리 규약이다)에 **근거를 설정 파일에 같이 적었다**. 나머지 마흔은 고쳤다. `G8` 이 타입 해석 규칙 전부를 올리며 끈 것 하나(`SpreadOperator` — 펼침 넷이 전부 Java·Spring vararg)·예외 하나(`VarCouldBeVal` 의 `lateinit`)를 빼고 23건 — 열아홉을 고치고(`error()`·`Locale`·`Unit`·`checkNotNull`·필요 없는 `!!` 삭제·타입 명시) `@Suppress` 넷(긴 매개변수 둘·테스트 바탕 둘)에 근거를 적었다 |
 | **CodeQL** | **새 경보 0건** | `46a-1` 첫 측정(run `35443023092`): `java-kotlin` 규칙 76개·결과 0, `actions` 규칙 17개·결과 0, `javascript-typescript` 는 `39` 에서 켜 결과 0. **0 이 문턱이다 — 다만 0 이 「없다」가 아니라 「안 봤다」인 자리가 하나 있다.** 기본 질의는 `JdbcClient.sql()` 을 SQL 싱크로 모른다(ProjectShop `2e-4` 가 `JdbcTemplate` 은 잡고 `JdbcClient` 는 안 잡는 것을 같은 실행에서 쟀다). 이 저장소의 데이터 접근이 전부 `JdbcClient` 고 `EventQuery` 가 `order by` 를 문자열로 붙이므로, **싱크 목록을 늘린다(`46c`)**. `46c` 뒤 첫 측정(탐침 run `36158775415`): 우리 코드의 경보 **0** — 확장 뒤의 0 이라 이제 「봤다」의 0 이다 |
 | 테스트 | 실패 0 | — |
 | `npm audit` | **high 이상 0건** | `39` 첫 측정 0(전 등급). 처음 나오는 것부터 처분한다 |

@@ -31,7 +31,7 @@ class QueueController(private val queue: QueueService) {
 
     /** 이탈(24). 204 다 — 돌려줄 것이 없다(`D5`). 줄에 없어도 204 다: 끝난 상태가 같다 */
     @DeleteMapping("/{performanceId}")
-    fun leave(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): ResponseEntity<Void> {
+    fun leave(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): ResponseEntity<Unit> {
         queue.leave(performanceId, user.id)
         return ResponseEntity.noContent().build()
     }

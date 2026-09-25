@@ -13,6 +13,6 @@ enum class PerformanceSeatStatus(val letter: String) {
     companion object {
         /** 모르는 값이면 터진다. 조용히 `A` 로 떨어뜨리면 새 상태가 제약에 늘었을 때 그 좌석이 빈자리로 보인다 */
         fun of(code: String): PerformanceSeatStatus =
-            entries.firstOrNull { it.code == code } ?: throw IllegalStateException("모르는 좌석 상태다: $code")
+            entries.firstOrNull { it.code == code } ?: error("모르는 좌석 상태다: $code")
     }
 }

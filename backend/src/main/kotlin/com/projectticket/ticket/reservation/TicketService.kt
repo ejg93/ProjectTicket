@@ -60,7 +60,7 @@ class TicketService(private val jdbc: JdbcClient) {
                 .update()
             if (inserted == 1) return
         }
-        throw IllegalStateException("티켓 번호를 ${MAX_ATTEMPTS}번 뽑아도 겹쳤다: reservation_seat_id=$reservationSeatId")
+        error("티켓 번호를 ${MAX_ATTEMPTS}번 뽑아도 겹쳤다: reservation_seat_id=$reservationSeatId")
     }
 
     private fun ticketNumber(date: LocalDate): String {

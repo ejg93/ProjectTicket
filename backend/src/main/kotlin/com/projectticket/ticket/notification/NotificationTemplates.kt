@@ -3,6 +3,7 @@ package com.projectticket.ticket.notification
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * 알림 문구. **사용자가 읽는 글이라 존댓말이다**(`D17` 「화면 문구는 존댓말이다」) — 개발자가 읽는 글(문서·주석·커밋)의 평서형과 갈린다.
@@ -59,7 +60,8 @@ object NotificationTemplates {
 
     private fun kst(at: OffsetDateTime): String = at.atZoneSameInstant(KST).format(FORMAT)
 
-    private fun money(amount: Int): String = "%,d원".format(amount)
+    // 원 표기는 한국 관례로 고정한다 — 기본 로캘을 따르면 서버가 뜬 나라에 따라 구분자가 바뀐다(`G8`).
+    private fun money(amount: Int): String = "%,d원".format(Locale.KOREA, amount)
 
     private val KST: ZoneId = ZoneId.of("Asia/Seoul")
     private val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일 HH:mm")

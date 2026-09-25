@@ -27,7 +27,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 `scripts/docker-up.sh` 가 
 | 언제 | 시점 | 명령 | 통과 기준 |
 |---|---|---|---|
 | backend 를 건드렸으면 | 청크 | `./gradlew test`(= `verify.sh`) | 실패 0 |
-| backend 를 건드렸으면 | 번들 끝 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 · `detekt` · `detektMain`(타입 해석, `G7a`) |
+| backend 를 건드렸으면 | 번들 끝 | `./gradlew build`(= `verify.sh --full`) | `BUILD SUCCESSFUL`. `test`·`integrationTest` 두 레인 · `detekt` · `detektMain`·`detektTest`(타입 해석, `G7a`·`G8`) |
 | **새 `V*` 를 더했으면** | 청크 — `verify.sh` 가 지문에서 보고 **스스로** 돈다 | `./gradlew test integrationTest` | 실패 0. 빠른 레인만 돌리면 열거형·길이 대조가 번들 끝에서 처음 빨개진다. **Docker 가 없으면** `test` 만 돌고 도장이 `fast-nodb` — 번들 끝 `--full` 이 잡는다 |
 | 스키마·서비스만 볼 때 | 아무 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
 | **좌석·예매를 건드렸으면** | 번들 끝 | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |

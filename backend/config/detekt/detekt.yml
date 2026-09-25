@@ -21,6 +21,9 @@ style:
     # 입력 검증이 여러 이유로 거절한다 — **이유마다 다른 `type`** 을 주는 것이 `D5` 의 계약이고,
     # 선점 하나가 일곱 가지로 거절된다(남의 좌석·닫힌 회차·상한 초과·중복 선점…). 뭉치면 화면이 무엇을 말할지 못 정한다.
     max: 8
+  VarCouldBeVal:
+    # 테스트 바탕의 `@Autowired lateinit var` 는 필드 주입이라 `val` 이 될 수 없다(`G8`).
+    ignoreLateinitVar: true
   UnusedParameter:
     # 프레임워크가 서명을 정하는 자리가 있다 — `@ExceptionHandler` 는 예외를 받아야 하고 안 쓰는 경우가 있다.
     ignoreAnnotated: ["ExceptionHandler"]
@@ -67,3 +70,15 @@ naming:
   FunctionParameterNaming:
     # 테스트가 한글 이름을 쓰는 자리가 있다 — 읽는 사람이 한국어 화자다(`CLAUDE.md`).
     excludes: ["**/test/**"]
+
+potential-bugs:
+  ElseCaseInsteadOfExhaustiveWhen:
+    # `coding-rules.md` 「`when` 에 `else` 를 안 둔다」를 문서에서 여기로 내렸다(`G7a`). 열거·sealed·Boolean 주어만 본다 —
+    # 주어 없는 `when {}` 와 문자열 주어의 `else` 는 「나머지 전부」라는 뜻이라 안 걸린다. 타입 해석 규칙이라 `detektMain`·`detektTest` 에서만 돈다.
+    active: true
+
+performance:
+  SpreadOperator:
+    # 펼침이 나는 자리가 넷이고 전부 Java·Spring 의 vararg 다(`runApplication(*args)`·`requestMatchers(*…)`·`redis.execute(…, *args)`) —
+    # 다른 호출 꼴이 없고 배열이 10개를 안 넘어 복사 값이 없다(`G8`).
+    active: false

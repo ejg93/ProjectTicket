@@ -47,8 +47,9 @@ class NotificationSweeper(private val store: NotificationStore, private val send
                 store.markSent(row.notificationId)
                 sent++
             } else {
-                // 실패면 사유가 늘 있다(`Result.failed` 가 그렇게 만든다). 재시도·DLQ 는 29 가 든다.
-                store.markFailed(row.notificationId, result.failureReason!!)
+                // 재시도·DLQ 는 29 가 든다.
+                val reason = checkNotNull(result.failureReason) { "실패면 사유가 늘 있다 — `Result.failed` 가 그렇게 만든다" }
+                store.markFailed(row.notificationId, reason)
                 failed++
             }
         }

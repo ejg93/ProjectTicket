@@ -52,7 +52,7 @@ class SettlementStore(private val jdbc: JdbcClient) {
                 // 0행은 **이미 예약됨**이거나 **회차에 정책이 없음**이다. 뒤쪽은 결함이라 그 자리에서 드러낸다 —
                 // 안 그러면 「닫힌 회차 + 발행된 사건 + 정산서 없음」이 조용히 남고 사건은 다시 안 온다.
                 if (inserted == 0 && !isScheduled(envelope.aggregateId)) {
-                    throw IllegalStateException("정산을 예약 못 했다 — 회차에 정책이 없다: performance_id=${envelope.aggregateId}")
+                    error("정산을 예약 못 했다 — 회차에 정책이 없다: performance_id=${envelope.aggregateId}")
                 }
             }
     }

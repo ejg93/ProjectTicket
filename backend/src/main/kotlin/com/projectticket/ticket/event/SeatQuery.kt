@@ -131,7 +131,7 @@ class SeatQuery(
          */
         fun sectionName(code: String): String {
             val (floor, letter) = SECTION_CODE.matchEntire(code)?.destructured
-                ?: throw IllegalStateException("구역 코드 형식이 아니다: $code")
+                ?: error("구역 코드 형식이 아니다: $code")
             return "${floor}층 ${letter}구역"
         }
     }

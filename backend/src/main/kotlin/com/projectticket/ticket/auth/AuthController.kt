@@ -26,6 +26,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
+// 협력자 일곱은 컨테이너가 넣는다 — 가르면 로그인 반쪽만 드는 클래스가 생긴다(`G8`).
+@Suppress("LongParameterList")
 @RequestMapping("/api/auth")
 class AuthController(
     private val signupService: SignupService,
@@ -126,7 +128,7 @@ class AuthController(
         )
 
     @PostMapping("/logout")
-    fun logOut(http: HttpServletRequest, response: HttpServletResponse): ResponseEntity<Void> {
+    fun logOut(http: HttpServletRequest, response: HttpServletResponse): ResponseEntity<Unit> {
         logoutHandler.logout(http, response, SecurityContextHolder.getContext().authentication)
         return ResponseEntity.noContent().build()
     }

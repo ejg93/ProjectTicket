@@ -50,6 +50,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 @Transactional
 @Tag("db")
 @Import(PostgresTestBase.Containers::class)
+// JUnit 이 바탕 자체를 테스트로 줍지 않게 abstract 로 둔다(`TestConventionTest.BASES`, `G8`).
+@Suppress("AbstractClassCanBeConcreteClass")
 abstract class PostgresTestBase {
 
     /**

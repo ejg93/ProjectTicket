@@ -14,7 +14,7 @@ enum class EventType(val code: String, val aggregateType: AggregateType) {
 
     companion object {
         fun of(code: String): EventType =
-            entries.firstOrNull { it.code == code } ?: throw IllegalStateException("모르는 사건 이름이다: $code")
+            entries.firstOrNull { it.code == code } ?: error("모르는 사건 이름이다: $code")
     }
 }
 

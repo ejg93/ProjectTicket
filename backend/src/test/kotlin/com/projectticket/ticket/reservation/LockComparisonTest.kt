@@ -72,6 +72,7 @@ class LockComparisonTest : ConcurrencyTestBase() {
         jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id and status = 'available'")
             .param("id", SEAT).update() == 1
 
+    // `execute` 는 콜백의 타입을 그대로 돌려준다(Spring 7 — `<T extends @Nullable Object>`). 콜백이 `Boolean` 이라 널 검사가 필요 없다(`G8`).
     private fun pessimistic(): Boolean =
         TransactionTemplate(transactionManager).execute {
             val status = jdbc.sql("select status from lock_measure_seat where seat_id = :id for update")
@@ -79,7 +80,7 @@ class LockComparisonTest : ConcurrencyTestBase() {
             if (status != "available") return@execute false
             jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id").param("id", SEAT).update()
             true
-        }!!  // execute 는 콜백이 null 을 돌려줄 때만 null 이다 — 여기 콜백은 늘 Boolean 을 돌려준다
+        }
 
     private fun optimistic(): Boolean {
         val (status, version) = jdbc.sql("select status, version from lock_measure_seat where seat_id = :id")
