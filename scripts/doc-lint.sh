@@ -42,6 +42,10 @@ for f in "${title_check_files[@]}"; do
     "#"*) ;;
     *) echo "[제목 손상] $f — 첫 줄이 '#' 로 안 시작함: ${first_line:0:60}..."; fail=1 ;;
   esac
+  # 깨진 UTF-8 (`B0-3`). `awk -v` 가 `\…` 를 이스케이프로 먹은 행이 한 번 들어갔고, 아래 perl 검사가 죽으면서 「이상 없음」이 났다.
+  if ! iconv -f UTF-8 -t UTF-8 "$f" >/dev/null 2>&1; then
+    echo "[UTF-8 깨짐] $f — 유효하지 않은 바이트가 있다. 셸로 넣은 줄이면 awk -v·echo -e 의 이스케이프를 의심한다"; fail=1
+  fi
 done
 
 for f in "${dup_check_files[@]}"; do
@@ -54,6 +58,13 @@ for f in "${dup_check_files[@]}"; do
     | sort | uniq -d)
   if [ -n "$dups" ]; then
     echo "[중복 문장] $f:"; echo "$dups" | sed 's/^/    /'; fail=1
+  fi
+  # 표 셀도 본다(`B0-3`) — 이 저장소는 내용의 대부분이 표라 행을 빼면 검사가 거의 눈을 감는다. 30자 이상 셀의 완전 중복.
+  # `screen-rules.md` 는 화면 문구 정의라 같은 문구가 여러 행에 서는 것이 정상이다.
+  case "$f" in doc/reference/screen-rules.md) continue ;; esac
+  cell_dups=$(awk -F'|' '/^\|/{for(i=2;i<NF;i++){s=$i; gsub(/^ +| +$/,"",s); if(length(s)>=30) print s}}' "$f" | sort | uniq -d)
+  if [ -n "$cell_dups" ]; then
+    echo "[중복 셀] $f — 같은 말이 표의 두 칸에 있다. 한쪽을 지우거나 다르게 적는다:"; echo "$cell_dups" | sed 's/^/    /'; fail=1
   fi
 done
 
@@ -74,9 +85,13 @@ for f in "${honorific_check_files[@]}"; do
   case "$f" in doc/reference/screen-rules.md) continue ;; esac
   # 인용은 위반이 아니다 — 백틱·「」·큰따옴표 안을 걷어내고 본다.
   # 코드펜스는 빈 줄로 바꿔 줄 번호를 지킨다. perl -CSD 인 이유: sed 의 멀티바이트 문자 클래스가 조용히 안 먹는다.
+  # 어미 열(`B0-3`): ~니다(「아니다」는 평서형이라 뺀다)·세요·십시오·해요·어요·예요·네요·나요·까요·죠. 넓힐 때 전체 문서에 0건이었다.
+  # 마지막 단계가 perl 이라 「없음」이 0 으로 끝난다 — 그래서 파이프가 0 이 아니면 검사 자체가 죽은 것이다(`B0-3` ⑧).
+  # `-Mutf8` 이 없으면 정규식의 한글 리터럴이 바이트로 남아 아무것도 안 잡힌다 — `-CSD` 는 입출력만 풀지 소스는 안 푼다.
   hits=$(awk '/^```/{c=!c; print ""; next} c{print ""; next} {print}' "$f" \
     | perl -CSD -pe 's/`[^`]*`//g; s/\x{300C}.*?\x{300D}//g; s/"[^"]*"//g' \
-    | grep -nE '(습니다|합니다|하세요|입니다)')
+    | perl -CSD -Mutf8 -ne 'print "$.:$_" if /(?<!아)니다|세요|십시오|해요|어요|예요|네요|나요|까요|죠(?=[.,)!? ]|$)/') \
+    || { echo "[검사 실패] $f — 존댓말 검사 파이프가 죽었다(perl). 위에 [UTF-8 깨짐] 이 있으면 그것이 원인이다"; fail=1; }
   if [ -n "$hits" ]; then
     echo "[존댓말] $f — 개발자가 읽는 글은 평서형이다(CLAUDE.md 「글 작성 규칙」 4번):"
     echo "$hits" | sed 's/^/    /'; fail=1
@@ -99,6 +114,20 @@ if [ "$plan_open_incomplete" -gt "$plan_open_incomplete_baseline" ]; then
 elif [ "$plan_open_incomplete" -lt "$plan_open_incomplete_baseline" ]; then
   echo "[기준선 내릴 것] PLAN.md — 칸 빠진 행이 ${plan_open_incomplete}개로 줄었다. plan_open_incomplete_baseline 을 그 수로 내린다"
 fi
+
+# 설계 행(`/design`)의 형식(`B0-3`). 「번호 절차」가 있는 안 닫힌 행은 결정·실패 사다리도 있고, 닫힘이 ①~⑦ 하나를 가리킨다.
+# 하나라도 빠지면 실행 세션(Opus)이 그 행에서 멈춘다 — 설계가 없애려는 것이 바로 그 멈춤이다.
+plan_design_incomplete=$(awk '/^## 청크 분할표/{on=1} /^## 이 계획을 고칠 때/{on=0} on && /^\| [^-|*][^|]*\|/{
+    n=split($0,c,"|"); id=c[2]; gsub(/^ +| +$/,"",id); nm=c[3]; gsub(/^ +/,"",nm);
+    last=c[n-1]; gsub(/^ +| +$/,"",last);
+    if (id=="#" || id ~ /^~~/ || nm ~ /^~~/ || last=="완료") next;
+    if ($0 !~ /\*\*번호 절차\*\*/) next;
+    if ($0 !~ /\*\*결정\*\*/ || $0 !~ /\*\*실패 사다리\*\*/ || $0 !~ /\*\*닫힘\*\*:? *(①|②|③|④|⑤|⑥|⑦)/) k++
+  } END{print k+0}' PLAN.md)
+if [ "$plan_design_incomplete" -gt 0 ]; then
+  echo "[설계 행 누락] PLAN.md — 번호 절차가 있는 행 ${plan_design_incomplete}개에 결정·실패 사다리·「닫힘: ①~⑦」 중 빠진 것이 있다(/design 「행 형식」)"
+  fail=1
+fi
 fi
 
 if in_scope PROGRESS.md; then
@@ -109,6 +138,14 @@ history_unsorted=$(awk '/^## 이력/{on=1; next} on && /^## /{on=0} on && /^\| [
   } END{print k+0}' PROGRESS.md)
 if [ "$history_unsorted" -gt "$history_unsorted_baseline" ]; then
   echo "[이력 순서] PROGRESS.md — 앞줄보다 이른 날짜가 ${history_unsorted}곳 (기준선 ${history_unsorted_baseline}). 새 줄은 표 맨 아래에 붙인다"
+  fail=1
+fi
+
+# 완료 이력 행의 커밋 칸(`B0-3`). 마지막 행 하나는 면제 — 커밋 뒤에야 해시를 알아서 다음 커밋이 채운다.
+history_no_hash=$(awk '/^## 이력/{on=1; next} on && /^## /{on=0} on && /^\| [0-9]{4}-[0-9]{2}-[0-9]{2} \|/{rows[++n]=$0}
+  END{for(i=1;i<n;i++){m=split(rows[i],c,"|"); r=c[4]; gsub(/^ +/,"",r); h=c[m-1]; gsub(/ /,"",h); if(r ~ /^완료/ && h=="") k++} print k+0}' PROGRESS.md)
+if [ "$history_no_hash" -gt 0 ]; then
+  echo "[이력 해시 빈 칸] PROGRESS.md — 완료 행 ${history_no_hash}개의 커밋 칸이 비었다(마지막 행 제외). 커밋 해시를 채운다"
   fail=1
 fi
 

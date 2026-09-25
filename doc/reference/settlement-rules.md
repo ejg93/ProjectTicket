@@ -12,8 +12,8 @@
 | 요율 10% → 8% | `settlement_policy` 에 행 하나 | 없음 |
 | 취소 수수료 귀속 기획사 전부 → 7:3 | 같은 표의 `cancel_fee_share` | 없음 |
 | D+7 → D+14 | 같은 표의 `payout_delay_days` | 없음 |
-| 관객 부담 예매수수료 추가 | `settlement_line.kind` 에 `booking_fee` 추가 | 항목 만드는 자리 하나 |
-| 회차 취소 위약금 | `adjustment` 항목에 음수 | 항목 만드는 자리 하나 |
+| 관객 부담 예매수수료 추가 | `settlement_line.kind` 에 `booking_fee` 추가 | `kind` 값을 만드는 자리 하나 |
+| 회차 취소 위약금 | `adjustment` 항목에 음수 | 음수 `adjustment` 를 넣는 자리 하나 |
 
 ## 정책 표 `settlement_policy`
 
