@@ -33,9 +33,9 @@
 | `StateMachineDocTest` | 4 테스트 | 〃 | `state-machines.md` 의 전이표와 전이 트리거가 갈리는 것(`I3-1`). 문서만 고치면 다음 사람이 낡은 쪽을 믿는다 | — |
 | `AppDbConstraintTest` | 4 테스트 | 〃 | 앱 검증과 DB 제약이 같은 규칙을 두 벌 드는 자리가 갈리는 것(`I4-1`) — 앱이 느슨해지면 400 이 500 이 된다. **역방향도 본다**(`I4-2`): 마이그레이션의 길이·정규식 `check` 전부가 표에 있거나 짝이 없는 근거를 들어야 한다 | `I4-2` 2026-09-19 — 표에서 한 줄 빼니 빨갛고 되돌리니 초록 |
 | `QualityGateDocTest` | 4 테스트 | 〃 | 이 문서의 「CI 잡과 필수 검사」 표와 `.github/workflows/` 의 잡이 갈리는 것(`P10`). 잡을 더하고 표를 안 고치면 어느 잡이 머지를 막는지 아무도 모른다 | `P10` 2026-09-19 — `secrets` 행을 빼니 빨갛고 되돌리니 초록 |
-| `ComposeContractTest` | 4 테스트 | 〃 | nginx 가 대수를 안 나누는 것과 healthcheck 가 이미지에 없는 도구를 쓰는 것(마무리 6차). **둘 다 기동은 되고 오류도 안 냈다** | 마무리 6차 2026-09-18 — 결함 둘을 되살리니 셋이 다 빨갰다 |
-| `MetricNamesTest` | 4 테스트 | 〃 | `D10` 의 지표 이름 표와 `TicketMetrics` 가 갈리는 것(`30`). 갈리면 대시보드 패널만 조용히 빈다 | — |
-| `StackVersionConsistencyTest` | 4 테스트 | 〃 | `stack.md` 버전 표가 `build.gradle.kts`·compose·`frontend/package.json` 과 갈리는 것 | — |
+| `ComposeContractTest` | 4 테스트 | 〃 | nginx 가 대수를 안 나누는 것과 healthcheck 가 이미지에 없는 도구를 쓰는 것(마무리 6차). **둘 다 기동은 되고 오류도 안 냈다** | 마무리 6차 2026-09-18 — 결함 둘을 되살리니 셋이 다 빨갰다. `G3` 2026-09-25 — `proxy_pass` 줄을 지우니 초록(공허 통과)이던 것이 「못 읽었다」로 선다 |
+| `MetricNamesTest` | 4 테스트 | 〃 | `D10` 의 지표 이름 표와 `TicketMetrics` 가 갈리는 것(`30`). 갈리면 대시보드 패널만 조용히 빈다 | `G3` 2026-09-25 — 표 머리를 바꾸니 빨갛긴 했는데 「갈렸다」 문구에 `[]` 였다. 이제 「못 읽었다」로 가른다 |
+| `StackVersionConsistencyTest` | 4 테스트 | 〃 | `stack.md` 버전 표가 `build.gradle.kts`·compose·`frontend/package.json` 과 갈리는 것 | `G3` 2026-09-25 — Grafana 버전 칸을 비우니 `image: grafana/grafana:` 가 그대로 들어 있어 초록이던 것이 「못 읽었다」로 선다 |
 | `EventTopicTest` | 4 테스트 | 〃 | 토픽 상수와 `EventTopics.of` 가 갈리는 것(마무리 6차). `@KafkaListener` 의 `topics` 가 상수여야 해서 두 벌이 생긴다 | — |
 | `EventCatalogTest` | 4 테스트 | 〃 | `D11` 카탈로그와 `EventType` 이 갈리는 것 | — |
 | `SchedulerSingleRunTest` | 4 테스트 | `gradlew integrationTest` | 스케줄러가 인스턴스마다 도는 것(`33`). **입구를 손으로 적어 부른다** — 새 입구가 늘어도 여기는 초록이라, 락을 안 건 입구를 자동으로 찾지는 못한다 | `33` 2026-09-18 — 마무리 6차가 `HoldSweeper` 의 자기 호출을 여기서 잡았다 |
