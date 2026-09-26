@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 /**
  * 좌석 선택.
  *
- * **첫 그림은 서버가 읽는다**(`D16`) — 로그인 전에도 본다(`SecurityConfig.PUBLIC_PATHS`). 고르는 것만
+ * **첫 그림은 서버가 읽는다**(`D16`) — 로그인 전에도 본다(`SecurityConfig.PUBLIC_GET_PATHS`). 고르는 것만
  * 클라이언트로 내린다(`SeatMap`).
  *
  * **폴링을 여기서 안 켠다.** 델타(`/seats/changes`)와 카운트다운은 예매 흐름(`42`)이 붙인다 —

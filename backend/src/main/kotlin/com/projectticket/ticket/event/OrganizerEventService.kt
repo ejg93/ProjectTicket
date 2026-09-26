@@ -3,10 +3,12 @@ package com.projectticket.ticket.event
 import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.sql.SQLException
 import java.time.OffsetDateTime
 
 /**
@@ -47,9 +49,9 @@ class OrganizerEventService(
             .query(Long::class.java)
             .single()
 
-        command.grades.forEach { grade ->
-            val gradeId = insertGrade(eventId, grade)
-            grade.sections.forEach { section -> mapSection(eventId, section, gradeId) }
+        command.grades.forEachIndexed { index, grade ->
+            val gradeId = insertGrade(eventId, grade, index)
+            grade.sections.forEach { section -> mapSection(eventId, section, gradeId, index) }
         }
 
         auditLog.record(
@@ -85,8 +87,10 @@ class OrganizerEventService(
                 .single()
         } catch (e: DuplicateKeyException) {
             // `performance_hall_slot_key`(`V18`)가 막은 것이다. 형식은 맞는데 그 홀의 그 시각이 이미 찼으므로 409 다(`D5` 상태 코드 표) —
-            // `validation-failed` 는 Bean Validation 몫이고 그 계약이 `errors[{field, message}]` 라, 여기 쓰면 화면이 못 찾는 칸을 약속한다.
+            // `validation-failed` 는 틀린 칸을 `errors[{field, message}]` 로 짚는 계약이라, 짚을 칸이 없는 충돌에 쓰면 화면이 못 찾는 칸을 약속한다.
             throw TicketException(ErrorCode.PERFORMANCE_SLOT_TAKEN)
+        } catch (e: DataIntegrityViolationException) {
+            throw salesWindowRejected(e, command)
         }
 
         auditLog.record(
@@ -99,22 +103,54 @@ class OrganizerEventService(
         return performanceId
     }
 
-    private fun insertGrade(eventId: Long, grade: GradeCommand): Long =
-        jdbc.sql(
-            "insert into seat_grade (event_id, code, name, price) values (:event, :code, :code, :price) returning seat_grade_id",
-        )
-            .param("event", eventId)
-            .param("code", grade.code)
-            .param("price", grade.price)
-            .query(Long::class.java)
-            .single()
+    private fun insertGrade(eventId: Long, grade: GradeCommand, index: Int): Long =
+        try {
+            jdbc.sql(
+                "insert into seat_grade (event_id, code, name, price) values (:event, :code, :code, :price) returning seat_grade_id",
+            )
+                .param("event", eventId)
+                .param("code", grade.code)
+                .param("price", grade.price)
+                .query(Long::class.java)
+                .single()
+        } catch (e: DuplicateKeyException) {
+            // 한 공연 안에서 등급 코드는 하나다(`seat_grade_event_code_key`, `V5`).
+            throw fieldRejected("grades[$index].code", "등급 코드가 겹친다: ${grade.code}")
+        }
 
-    private fun mapSection(eventId: Long, section: String, gradeId: Long) =
+    private fun mapSection(eventId: Long, section: String, gradeId: Long, index: Int) =
         try {
             jdbc.sql("insert into seat_grade_map (event_id, section, seat_grade_id) values (:event, :section, :grade)")
                 .param("event", eventId).param("section", section).param("grade", gradeId).update()
         } catch (e: DuplicateKeyException) {
             // 구역 하나가 등급 둘을 가지면 그 구역의 가격이 안 정해진다(`V5` 기본키).
-            throw TicketException(ErrorCode.VALIDATION_FAILED, "같은 구역에 등급을 두 번 붙였다: $section")
+            throw fieldRejected("grades[$index].sections", "같은 구역에 등급을 두 번 붙였다: $section")
         }
+
+    /**
+     * 판매 창 제약 둘(`performance_sales_before_start_check` `V5` · `performance_sales_window_check` `V14`)만 400 으로 바꾼다.
+     * 다른 제약 위반은 우리가 모르는 결함이라 그대로 올린다(500).
+     * 드라이버가 `runtimeOnly` 라 `PSQLException` 을 못 읽는다 — 제약 이름은 PG 문구(`violates check constraint "…"`)에서 찾는다.
+     *
+     * **둘 다 받는다** — PG 는 check 를 이름 순으로 보고 첫 위반에서 멈춘다. 판매 시작이 관람 시각 뒤면 `before_start` 가 먼저 걸린다.
+     * 칸은 값으로 가른다: 마감을 줬고 그것이 관람 시각 이후면 `sales_close_at`, 아니면 `sales_open_at`.
+     */
+    private fun salesWindowRejected(e: DataIntegrityViolationException, command: PerformanceCommand): RuntimeException {
+        val message = (e.mostSpecificCause as? SQLException)?.message.orEmpty()
+        if (SALES_CHECKS.none { it in message }) return e
+        val closeAt = command.salesCloseAt
+        return if (closeAt != null && closeAt >= command.startsAt) {
+            fieldRejected("sales_close_at", "판매 마감은 관람 시각보다 앞이어야 한다")
+        } else {
+            fieldRejected("sales_open_at", "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다")
+        }
+    }
+
+    /** DB 제약이 막은 것도 Bean Validation 과 같은 꼴(`errors[{field, message}]`)로 낸다 — 화면이 같은 자리에서 칸을 찾는다(`D5`) */
+    private fun fieldRejected(field: String, message: String) =
+        TicketException(ErrorCode.VALIDATION_FAILED, message, mapOf("errors" to listOf(mapOf("field" to field, "message" to message))))
+
+    private companion object {
+        val SALES_CHECKS = listOf("performance_sales_before_start_check", "performance_sales_window_check")
+    }
 }

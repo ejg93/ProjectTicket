@@ -85,6 +85,24 @@ describe("api()", () => {
     expect((thrown as ApiError).traceId).toBe("abc");
   });
 
+  it("검증 실패가 실은 칸을 읽고, 모양이 틀린 칸은 버린다(`45d-b`)", async () => {
+    document.cookie = "XSRF-TOKEN=token-value";
+    mockFetch(
+      jsonResponse(
+        {
+          type: "tag:projectticket.example,2026:validation-failed",
+          detail: "등급 코드가 겹친다",
+          errors: [{ field: "grades[1].code", message: "등급 코드가 겹친다: VIP" }, { field: 3 }],
+        },
+        400,
+      ),
+    );
+
+    const thrown = (await api("/api/organizer/events", { method: "POST", body: {} }).catch((e) => e)) as ApiError;
+
+    expect(thrown.errors).toEqual([{ field: "grades[1].code", message: "등급 코드가 겹친다: VIP" }]);
+  });
+
   it("세션이 없는 401(`unauthenticated`)은 던지지 않고 로그인으로 넘어가는 동안 멈춘다", async () => {
     mockFetch(jsonResponse({ type: "tag:projectticket.example,2026:unauthenticated", detail: "로그인 필요" }, 401));
 

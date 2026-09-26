@@ -37,11 +37,12 @@
 | `GET /api/performances/{id}` | 회차 하나 + 공연 머리 + 등급 + `status`. 회차 등록 201 의 `Location` 이 이것을 가리킨다(11). **`draft` 는 그 기획사 사람에게만 답하고 남·비로그인에게는 404** — 아래 「기획사의 공연·회차 404」 | 공개(`draft` 제외) | 40c |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
 | `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |
+| `GET /api/refund-tiers` | 지금 효력 있는 취소 수수료 구간표 — `effective_at` 과 `tiers[{days_before_min, rate}]`(큰 것부터). 결제 전에 보여 준다(`D6`). 판을 고르는 조건은 취소 계산과 같다(`RefundQuote`) | 공개 | 42-1a |
 | `POST /api/queue/{performanceId}` · `GET` · `DELETE` | 대기열 진입·순번·이탈(`D12`) | 세션 | 21·24 |
 | **`POST /api/performances/{id}/reservations`** | 좌석 선점 | 세션 + 관문 | 13 |
 | `GET /api/reservations/{id}` | 예매 하나 | 세션(본인) | 13 |
 | `POST /api/reservations/{id}/payments` | 결제 시작·결과 | 세션(본인) | 16 |
-| `POST /api/reservations/{id}/cancel` | 취소 | 세션(본인) | 17 |
+| `POST /api/reservations/{id}/cancel` | 취소. 본문 `{ "refund_amount" }` 에 **미리보기에서 본 환불액**을 싣는다 — 지금 계산과 다르면 409 `quote-changed`(지금 금액을 같이 준다), 아무것도 안 움직인다(`44a-1a`) | 세션(본인) | 17·44a-1a |
 | `GET /api/reservations/{id}/refund-preview` | 지금 취소하면 얼마인가 — 결제액·D-며칠·율·수수료·환불액. 취소할 수 없으면 `cancellable: false` 와 취소가 받을 `type` 슬러그(`reason`). **계산은 취소와 같은 함수다**(`RefundQuote`) | 세션(본인) | 44a |
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
 | `GET /api/organizer/organizers` · `GET /api/organizer/halls` | 공연을 올릴 내 기획사 · 회차를 올릴 홀(공용 — 공연장·구역 코드·구역별 좌석 수). 등록 폼이 고른다 | 세션(기획사) | 45a-1 |
@@ -133,7 +134,7 @@
 | `consent-item-not-found` | 404 | 그런 코드의 동의 항목이 없다(약관·처리방침 화면) | | 39-1 |
 | `performance-not-found` | 404 | 회차 없음. 기획사 정산 조회는 남의 회차·정산서가 아직 없는 회차도 이 이름이다(`45c` — 둘을 가르면 남의 회차 존재가 샌다) | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
-| `validation-failed` | 400 | Bean Validation | `errors[{field, message}]` | 있다 |
+| `validation-failed` | 400 | Bean Validation. 칸을 짚을 수 있는 DB 제약 위반도 이 이름이다 — 판매 창·등급 코드·구역(`45d-a`) | `errors[{field, message}]` | 있다 |
 | `malformed-request` · `method-not-allowed` · `unsupported-media-type` · `endpoint-not-found` · `internal` | 400·405·415·404·500 | 프레임워크 | | 있다 |
 | **`seat-taken`** | 409 | 고른 좌석 중 이미 잡힌 것이 있다 | `taken_seat_ids` | 13 |
 | **`seat-not-in-performance`** | 422 | 좌석 id 가 그 회차 것이 아니다 | `seat_ids` | 13 |
@@ -144,6 +145,7 @@
 | **`invalid-transition`** | 409 | 지금 상태에서 못 하는 것 — 만료된 선점에 결제, 취소된 예매에 결제 | `from`, `action` | 16·17 |
 | **`hold-expired`** | 409 | `held_until` 이 지났다. `invalid-transition` 의 특수형 — 화면이 「다시 고르세요」로 가른다 | | 16 |
 | **`cancel-window-closed`** | 409 | 관람일 당일이라 취소 불가 | `starts_at` | 17 |
+| **`quote-changed`** | 409 | 취소 본문의 `refund_amount`(화면이 본 금액)가 지금 계산과 다르다 — 그사이 구간표가 개정됐거나 날이 넘어갔다. 아무것도 안 움직인다 | `refund_amount`(지금 금액) | 44a-1a |
 | **`admission-required`** | 429 | 활성 토큰이 없다. 대기열로 | `rank`, `eta_seconds` | 23 |
 | **`admission-mismatch`** | 403 | 토큰이 다른 계정·회차 것 | | 23 |
 | **`queue-closed`** | 410 | 회차가 닫혀 대기열이 없다 | | 21 |
@@ -167,6 +169,8 @@
 ```
 
 `field` 는 요청 본문의 이름 그대로 snake_case 다. 요청에 쓴 이름과 오류에 나온 이름이 갈리면 화면이 못 찾는다.
+
+**DB 제약이 막은 것도 같은 꼴이다**(`45d-a`) — 판매 창은 `sales_open_at`(준 마감이 관람 시각 이후면 `sales_close_at`), 등급 코드 중복은 `grades[i].code`, 한 구역에 등급 둘은 `grades[i].sections`. `i` 는 요청 배열의 0부터 센 자리다.
 
 ## 403 이냐 404 냐
 

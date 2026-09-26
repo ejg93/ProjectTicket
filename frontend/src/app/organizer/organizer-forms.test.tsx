@@ -62,6 +62,26 @@ describe("공연 등록", () => {
     });
   });
 
+  it("서버가 짚은 등급 줄을 문구로 가리킨다(`45d-b`)", async () => {
+    respond(
+      {
+        type: "tag:projectticket.example,2026:validation-failed",
+        detail: "등급 코드가 겹친다: VIP",
+        errors: [{ field: "grades[1].code", message: "등급 코드가 겹친다: VIP" }],
+      },
+      400,
+    );
+    render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
+
+    await userEvent.type(screen.getByLabelText("공연 제목"), "겨울 콘서트");
+    await userEvent.type(screen.getByLabelText("등급 코드(예: VIP)"), "VIP");
+    await userEvent.type(screen.getByLabelText("가격(원)"), "154000");
+    await userEvent.click(screen.getByRole("checkbox", { name: "F1-A" }));
+    await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("2번째 등급의 코드를 확인해 주세요.");
+  });
+
   it("접근성 위반이 없다", async () => {
     const { container } = render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
     await expectNoAxeViolations(container);
@@ -89,6 +109,25 @@ describe("회차 등록", () => {
       starts_at: "2026-10-01T19:30:00+09:00",
       sales_open_at: "2026-09-20T10:00:00+09:00",
     });
+  });
+
+  it("판매 창을 어긴 400 은 판매 마감 기준을 말한다(`45d-b`)", async () => {
+    respond(
+      {
+        type: "tag:projectticket.example,2026:validation-failed",
+        detail: "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다",
+        errors: [{ field: "sales_open_at", message: "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다" }],
+      },
+      400,
+    );
+    render(<PerformanceForm eventId={42} halls={[{ hall_id: 9, name: "1관", venue_name: "홀", sections: [] }]} />);
+
+    await userEvent.type(screen.getByLabelText("관람 시각(한국 시간)"), "2026-10-01T19:30");
+    await userEvent.type(screen.getByLabelText("판매 시작(한국 시간)"), "2026-10-01T19:00");
+    await userEvent.click(screen.getByRole("button", { name: "회차 등록" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
 

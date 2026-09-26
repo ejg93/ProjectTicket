@@ -9,6 +9,26 @@ import { ApiError, api } from "@/lib/api";
 
 import type { Organizer } from "../../types";
 
+/** 등급 줄을 가리키는 칸(`grades[1].code`)을 줄 번호와 칸으로 가른다(`45d-a` 가 싣는 꼴) */
+const GRADE_FIELD = /^grades\[(\d+)\]\.(code|sections)$/;
+
+/**
+ * 틀린 칸이 등급 줄이면 그 줄을 짚는 문구. 아니면 null — 슬러그 문구로 떨어진다.
+ * **같은 칸 이름을 두 원인이 낸다** — 형식(Bean Validation: 코드 꼴·구역 없음)과 DB 제약(코드 중복·한 구역에 등급 둘, `45d-a`).
+ * 칸 이름만으로는 못 가르니 문구가 둘 다 말한다.
+ */
+function gradeMessageOf(error: ApiError): string | null {
+  for (const { field } of error.errors) {
+    const match = GRADE_FIELD.exec(field);
+    if (!match) continue;
+    const row = Number(match[1]) + 1;
+    return match[2] === "code"
+      ? `${row}번째 등급의 코드를 확인해 주세요. 영문 대문자로 시작해야 하고, 앞 등급과 겹칠 수 없습니다.`
+      : `${row}번째 등급의 구역을 확인해 주세요. 하나 이상 골라야 하고, 앞 등급이 고른 구역은 고를 수 없습니다.`;
+  }
+  return null;
+}
+
 /** 서버가 준 오류를 화면 문구로 옮긴다. `slug` 로 갈린다(`D5`) */
 function messageOf(error: unknown): string {
   if (!(error instanceof ApiError)) {
@@ -16,7 +36,10 @@ function messageOf(error: unknown): string {
   }
   switch (error.slug) {
     case "validation-failed":
-      return "입력을 다시 확인해 주세요. 등급 코드는 영문 대문자로 시작하고, 등급마다 구역을 하나 이상 골라야 합니다.";
+      return (
+        gradeMessageOf(error) ??
+        "입력을 다시 확인해 주세요. 등급 코드는 영문 대문자로 시작하고, 등급마다 구역을 하나 이상 골라야 합니다."
+      );
     case "organizer-not-found":
       return "이 기획사로 등록할 권한이 없습니다.";
     default:

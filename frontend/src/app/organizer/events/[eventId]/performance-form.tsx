@@ -18,7 +18,10 @@ function messageOf(error: unknown): string {
     case "performance-slot-taken":
       return "그 홀의 그 시각에 이미 회차가 있습니다. 다른 시각을 골라 주세요.";
     case "validation-failed":
-      return "입력을 다시 확인해 주세요. 판매 시작은 관람 시각보다 앞이어야 합니다.";
+      // 판매 창 제약(`V14`)은 서버가 `sales_open_at` 칸으로 준다(`45d-a`). 마감을 안 받으니 기준은 관람 1시간 전이다.
+      return error.errors.some((e) => e.field === "sales_open_at")
+        ? "판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다."
+        : "입력을 다시 확인해 주세요.";
     case "event-not-found":
       return "공연을 찾을 수 없습니다.";
     default:

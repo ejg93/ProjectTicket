@@ -29,8 +29,9 @@ class RefundService(private val gateway: MockPaymentGateway, private val transit
         val status: String,
     )
 
-    fun cancel(accountId: Long, reservationId: Long): Result {
-        val requested = transitions.request(accountId, reservationId)
+    /** @param expectedRefund 화면이 본 환불액. 지금 계산과 다르면 ① 이 409 `quote-changed` 로 되돌린다(`44a-1a`) */
+    fun cancel(accountId: Long, reservationId: Long, expectedRefund: Int): Result {
+        val requested = transitions.request(accountId, reservationId, expectedRefund)
 
         val started = System.nanoTime()
         val refunded = gateway.refund(requested.refundId.toString(), requested.refundAmount)

@@ -1,9 +1,12 @@
 package com.projectticket.ticket.payment
 
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -15,6 +18,13 @@ import org.springframework.web.bind.annotation.RestController
 class RefundController(private val refundService: RefundService) {
 
     @PostMapping("/api/reservations/{reservationId}/cancel")
-    fun cancel(@PathVariable reservationId: Long, @AuthenticationPrincipal user: TicketUser): RefundService.Result =
-        refundService.cancel(user.id, reservationId)
+    fun cancel(
+        @PathVariable reservationId: Long,
+        @Valid @RequestBody request: CancelRequest,
+        @AuthenticationPrincipal user: TicketUser,
+    ): RefundService.Result =
+        refundService.cancel(user.id, reservationId, request.refundAmount)
+
+    /** 화면이 미리보기에서 본 환불액(`44a-1a`). 지금 계산과 다르면 409 `quote-changed` — 본 적 없는 금액으로 취소되지 않는다(`D6`) */
+    data class CancelRequest(@field:NotNull val refundAmount: Int)
 }

@@ -14,4 +14,4 @@
 
 표에 없는 것을 건드리면 D14 의 목차에서 절을 고르고 이 표에 행을 더한다.
 
-**Kotlin 으로 쓴다.** `data class`·널 안전·`when`·확장 함수. `!!` 는 근거를 주석으로 단다. Java 스타일 getter/setter·builder 를 안 만든다.
+**Kotlin 으로 쓴다.** `data class`·널 안전·`when`·확장 함수. `!!` 를 안 쓴다 — `checkNotNull(값) { 근거 }`, main 은 detekt 가 세운다. Java 스타일 getter/setter·builder 를 안 만든다.

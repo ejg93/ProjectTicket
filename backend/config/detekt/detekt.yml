@@ -41,8 +41,8 @@ exceptions:
     # (`coding-rules.md` 「예외」, `D11`). 규약과 싸우는 규칙은 끈다. 잡은 자리마다 **왜 잡는지는 주석이 있다.**
     active: false
   SwallowedException:
-    # 우리가 삼키는 것은 셋뿐이고 전부 **다른 말로 바꾸려고** 잡는다 — 중복 키를 409 로, 인증 실패를 같은 문구로(`D9`),
-    # 없는 행을 null 로. 원인을 그대로 올리면 그 자리에서 계약이 깨진다.
+    # 우리가 삼키는 것은 전부 **다른 말로 바꾸려고** 잡는다 — 중복 키를 409·400 으로, 인증 실패를 같은 문구로(`D9`),
+    # 없는 행을 null 로. 원인을 그대로 올리면 그 자리에서 계약이 깨진다. 앞 넷은 detekt 기본값이다.
     ignoredExceptionTypes:
       - InterruptedException
       - MalformedURLException
@@ -55,6 +55,8 @@ exceptions:
       # 우리 계약으로 바꾸려고 잡는 둘 — 잠금 경합은 409 `idempotency-in-progress` 로, PG 무응답은 상태 조회로(`D4`).
       - CannotAcquireLockException
       - TimedOut
+      # 판매 창 제약 위반을 400 `validation-failed` 로 바꾸려고 잡는다(`45d-a`). 다른 제약은 그대로 다시 던진다.
+      - DataIntegrityViolationException
 
 complexity:
   LongMethod:

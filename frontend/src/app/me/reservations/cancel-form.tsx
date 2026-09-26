@@ -28,6 +28,8 @@ function messageOf(slug: string | null): string {
       return "지금 상태에서는 취소할 수 없습니다.";
     case "reservation-not-found":
       return "예매를 찾을 수 없습니다.";
+    case "quote-changed":
+      return "환불 금액이 바뀌었습니다. 다시 확인해 주세요.";
     default:
       return "취소하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
@@ -40,7 +42,8 @@ const slugOf = (thrown: unknown) => (thrown instanceof ApiError ? thrown.slug : 
  * 「이 금액으로 취소」가 그제야 `POST …/cancel` 을 보낸다. 한 번에 취소하면 수수료를 못 보고 누른다.
  *
  * 미리보기와 실제 환불은 서버의 같은 함수다(`RefundQuote`). **같은 시각이면 같다** — 화면을 띄운 채 KST 자정을 넘기거나
- * 구간표 새 판이 효력을 얻으면 취소가 다른 수수료로 확정될 수 있다. 그 틈을 막을지는 `44a-1`.
+ * 구간표 새 판이 효력을 얻으면 금액이 바뀐다. 그래서 **본 금액을 싣는다**(`44a-1a`) — 다르면 서버가 409 `quote-changed` 로
+ * 아무것도 안 하고, 화면은 미리보기를 다시 받아 새 금액을 보여 준다.
  */
 export function CancelForm({ reservationId }: { reservationId: number }) {
   const router = useRouter();
@@ -48,24 +51,39 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  async function load() {
+  /** 미리보기를 받는다. 못 받으면 옛 미리보기를 걷는다 — 남겨 두면 옛 금액으로 다시 누를 수 있다 */
+  async function load(): Promise<boolean> {
     setError(null);
     try {
       setPreview(await api<Preview>(`/api/reservations/${reservationId}/refund-preview`));
+      return true;
     } catch (thrown) {
+      setPreview(null);
       setError(messageOf(slugOf(thrown)));
+      return false;
     }
   }
 
   async function cancel() {
     setError(null);
+    // 폼은 취소할 수 있을 때만 그려서 금액이 있다. 없으면 보낼 금액이 없으니 미리보기부터 다시 받는다
+    if (preview?.refund_amount == null) {
+      await load();
+      return;
+    }
     try {
       // 멱등키를 안 싣는다 — 취소는 조건부 UPDATE 라 둘째 요청이 0행이다(`D4`)
-      await api(`/api/reservations/${reservationId}/cancel`, { method: "POST" });
+      await api(`/api/reservations/${reservationId}/cancel`, {
+        method: "POST",
+        body: { refund_amount: preview.refund_amount },
+      });
       setDone(true);
       router.refresh();
     } catch (thrown) {
-      setError(messageOf(slugOf(thrown)));
+      const slug = slugOf(thrown);
+      // 그사이 금액이 바뀌었다 — 새 금액을 보여 주고 다시 누르게 한다. 새 금액을 못 받았으면 그 실패 문구가 남는다
+      if (slug === "quote-changed" && !(await load())) return;
+      setError(messageOf(slug));
     }
   }
 

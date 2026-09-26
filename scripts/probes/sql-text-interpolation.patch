@@ -1,0 +1,19 @@
+# 게이트: SqlTextTest 결합(`G10`) — 원시 문자열 안의 값 보간
+# 명령: cd backend && ./gradlew test --tests '*SqlTextTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*SqlTextTest.xml 2>/dev/null; exit $r
+# 문구: 결합했다
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeInterpolated.kt b/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeInterpolated.kt
+new file mode 100644
+index 0000000..d539f21
+--- /dev/null
++++ b/backend/src/main/kotlin/com/projectticket/ticket/reservation/ProbeInterpolated.kt
+@@ -0,0 +1,10 @@
++package com.projectticket.ticket.reservation
++
++import org.springframework.jdbc.core.simple.JdbcClient
++
++internal fun probeInterpolated(jdbc: JdbcClient, name: String): Int =
++    jdbc.sql(
++        """
++        update account set display_name = '${name}' where account_id = 1
++        """,
++    ).update()

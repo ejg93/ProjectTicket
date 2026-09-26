@@ -107,6 +107,7 @@
 | `/actuator` | `health` 하나. 상세는 인증된 요청에만 | `always` 면 아무나 DB·컴포넌트 목록을 본다. readiness/liveness 는 35a |
 | 남의 자원 | 예매·티켓·기획사 공연은 **404** | 판매량 지도가 새면 안 된다(`D5`) |
 | 없는 경로 | 로그인 전에는 **401** | 404 를 주면 어떤 경로가 있는지를 비로그인에게 알려 준다 |
+| 공개 경로 | **메서드까지 연다** — 조회는 GET(`PUBLIC_GET_PATHS`), 가입·로그인은 POST(`PUBLIC_POST_PATHS`). 그 밖의 메서드는 익명이면 401. `PublicPathMethodTest`(`S1`) | 경로만 열면 뒤에 붙는 DELETE·PUT 입구가 인증 없이 인가를 지난다 |
 | principal | `TicketUser` 가 인증 뒤 해시를 지운다(`CredentialsContainer`). `equals` 는 id 로만 | 해시가 세션 내내 메모리에 남으면 안 된다. `data class` 면 못 지운다 |
 | 요청 객체 `toString` | `SignupRequest`·`LoginRequest` 가 재정의 | `data class` 기본 `toString` 이 평문 비밀번호를 찍는다 |
 | 오류 본문 | `detail` 에 개인정보·SQL·스택 없음. `trace_id` 는 오류에만 | `D10` |

@@ -32,6 +32,9 @@
  */
 const ERROR_TYPE_PREFIX = "tag:projectticket.example,2026:";
 
+/** `validation-failed` 가 싣는 칸 하나(`D5`). `field` 는 요청 본문의 이름 그대로다 — `grades[1].code` 처럼 배열 자리까지 */
+export type FieldError = { field: string; message: string };
+
 export class ApiError extends Error {
   /**
    * 접두어를 뗀 오류 이름. **화면은 이것으로 분기한다**(`D5`).
@@ -46,6 +49,8 @@ export class ApiError extends Error {
     readonly type: string,
     readonly detail: string,
     readonly traceId?: string,
+    /** 어느 칸이 틀렸나(`45d-b`). 검증 실패가 아니거나 서버가 안 실었으면 빈 배열이다 */
+    readonly errors: readonly FieldError[] = [],
   ) {
     super(detail);
     this.name = "ApiError";
@@ -209,6 +214,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
       type?: string;
       detail?: string;
       trace_id?: string;
+      errors?: unknown;
     };
 
     return new ApiError(
@@ -216,8 +222,15 @@ export async function toApiError(response: Response): Promise<ApiError> {
       body.type ?? "about:blank",
       body.detail ?? "요청을 처리하지 못했습니다.",
       body.trace_id,
+      Array.isArray(body.errors) ? body.errors.filter(isFieldError) : [],
     );
   } catch {
     return new ApiError(response.status, "about:blank", `서버가 ${response.status} 로 답했습니다.`);
   }
+}
+
+/** 남이 낸 본문의 `errors` 는 모양을 믿지 않는다 — 문자열 둘이 아닌 칸은 버린다 */
+function isFieldError(value: unknown): value is FieldError {
+  const candidate = value as Partial<FieldError> | null;
+  return typeof candidate?.field === "string" && typeof candidate.message === "string";
 }

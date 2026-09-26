@@ -122,7 +122,7 @@ class PerformanceDetailTest : PostgresTestBase() {
 
         // 연 회차는 로그인 없이 본다 — 보고 나서 로그인한다.
         mvc.get("/api/performances/$performanceId").andExpect { status { isOk() } }
-        // `PUBLIC_PATHS` 의 `*` 가 두 단계를 먹으면 선점이 열린다. 한 단계인지 여기서 본다.
+        // `PUBLIC_GET_PATHS` 의 `*` 가 두 단계를 먹으면 선점이 열린다. 한 단계인지 여기서 본다.
         mvc.post("/api/performances/$performanceId/reservations") {
             with(csrf())
             contentType = MediaType.APPLICATION_JSON

@@ -17,7 +17,7 @@ import tools.jackson.databind.ObjectMapper
  * 둘은 **판매 중인 회차가 있는 공연만 보인다**는 규칙이다 — 그것이 깨지면 화면은 멀쩡한데
  * 들어가서야 살 것이 없다는 것을 안다.
  *
- * 로그인 없이 부른다. `SecurityConfig.PUBLIC_PATHS` 에 없으면 401 이라 이 테스트가 먼저 빨개진다.
+ * 로그인 없이 부른다. `SecurityConfig.PUBLIC_GET_PATHS` 에 없으면 401 이라 이 테스트가 먼저 빨개진다.
  */
 class EventListTest : PostgresTestBase() {
 
