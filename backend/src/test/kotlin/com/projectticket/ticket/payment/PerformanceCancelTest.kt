@@ -34,6 +34,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var openService: PerformanceOpenService
     @Autowired lateinit var txManager: PlatformTransactionManager
 
@@ -90,7 +91,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     fun a_reservation_the_audience_already_cancelled_keeps_its_own_refund() {
         val early = fixture.account("${PREFIX}early@test.local")
         val alreadyCancelled = reserve(early, seats = 1)
-        refunds.request(early, alreadyCancelled)
+        refunds.request(early, alreadyCancelled, quote.expectedRefundOf(alreadyCancelled, early))
         val late = fixture.account("${PREFIX}late@test.local")
         reserve(late, seats = 1, from = 1)
 
@@ -106,7 +107,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     fun an_early_canceller_is_not_told_it_was_full() {
         val early = fixture.account("${PREFIX}quit@test.local")
         val quit = reserve(early, seats = 1)
-        refunds.request(early, quit)
+        refunds.request(early, quit, quote.expectedRefundOf(quit, early))
         val stayed = fixture.account("${PREFIX}stay@test.local")
         reserve(stayed, seats = 1, from = 1)
 

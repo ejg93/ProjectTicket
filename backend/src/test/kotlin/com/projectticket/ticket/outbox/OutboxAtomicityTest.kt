@@ -5,7 +5,9 @@ import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.RefundQuote
 import com.projectticket.ticket.payment.RefundTransitionService
+import com.projectticket.ticket.payment.expectedRefundOf
 import com.projectticket.ticket.reservation.SeatHoldService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -25,6 +27,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var openService: PerformanceOpenService
     @Autowired lateinit var outbox: OutboxWriter
     @Autowired lateinit var json: ObjectMapper
@@ -66,7 +69,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
     fun cancellation_commits_its_own_event() {
         val (reservationId, _) = reserved(startsInDays = 8)
 
-        refunds.request(accountId, reservationId)
+        refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId))
 
         val payload = payloadOf(eventOf(reservationId, "reservation.cancelled"))
         assertThat(payload).containsOnlyKeys(
@@ -81,7 +84,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
         // 당일 취소는 조건부 UPDATE 가 돈 뒤 예외로 끝난다 — 사건 행도 같이 사라져야 한다.
         val (reservationId, _) = reserved(startsInDays = 0)
 
-        assertThatThrownBy { refunds.request(accountId, reservationId) }.hasMessageContaining("당일")
+        assertThatThrownBy { refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId)) }.hasMessageContaining("당일")
 
         assertThat(eventCount(reservationId, "reservation.cancelled")).isZero()
         assertThat(eventCount(reservationId, "reservation.reserved")).describedAs("확정 사건은 그대로다").isOne()

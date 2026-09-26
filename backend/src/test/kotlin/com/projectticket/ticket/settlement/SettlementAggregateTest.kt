@@ -8,7 +8,9 @@ import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.RefundQuote
 import com.projectticket.ticket.payment.RefundTransitionService
+import com.projectticket.ticket.payment.expectedRefundOf
 import com.projectticket.ticket.reservation.PerformanceCloser
 import com.projectticket.ticket.reservation.SeatHoldService
 import org.assertj.core.api.Assertions.assertThat
@@ -35,6 +37,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var openService: PerformanceOpenService
     @Autowired lateinit var cancelService: com.projectticket.ticket.payment.PerformanceCancelService
     @Autowired lateinit var transactionManager: PlatformTransactionManager
@@ -108,7 +111,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         val buyer = fixture.account("${PREFIX}buyer@test.local")
         val kept = reserve(buyer, seats = 1)
         val cancelled = reserve(fixture.account("${PREFIX}canceller@test.local"), seats = 1, from = 1)
-        refunds.request(accountOf(cancelled), cancelled)
+        refunds.request(accountOf(cancelled), cancelled, quote.expectedRefundOf(cancelled, accountOf(cancelled)))
         closeWithEvent()
 
         settleNow()

@@ -48,10 +48,10 @@ class RefundTransitionService(
      * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 그 밖의 상태 → 409 `invalid-transition`.
      * 당일이면 그 뒤에 던진다 — 예외가 이 트랜잭션을 통째로 되돌리므로 옮긴 상태도 사라진다. 본 금액이 다를 때(`44a-1a`)도 같은 자리다.
      *
-     * @param expectedRefund 화면이 본 환불액. `null` 이면 대조를 건너뛴다 — 입구([RefundService])는 늘 싣고, `null` 은 이 함수를 직접 부르는 시험 몫이다.
+     * @param expectedRefund 화면이 본 환불액. **필수다**(`44a-1c`) — 널로 대조를 건너뛰게 두면 새 호출자가 빼는 순간 검사가 조용히 빠진다.
      */
     @Transactional
-    fun request(accountId: Long, reservationId: Long, expectedRefund: Int? = null): Requested {
+    fun request(accountId: Long, reservationId: Long, expectedRefund: Int): Requested {
         val cancelled = jdbc.sql(
             """
             update reservation r
@@ -78,7 +78,7 @@ class RefundTransitionService(
                 "관람일 당일이라 취소할 수 없다: starts_at=${cancelled.startsAt}",
                 mapOf("starts_at" to cancelled.startsAt),
             )
-        if (expectedRefund != null && amounts.refundAmount != expectedRefund) {
+        if (amounts.refundAmount != expectedRefund) {
             throw TicketException(
                 ErrorCode.QUOTE_CHANGED,
                 "본 금액과 지금 금액이 다르다: 본 금액=$expectedRefund, 지금=${amounts.refundAmount}",
