@@ -34,11 +34,14 @@ function messageOf(error: unknown): string {
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
+  // 서버가 거절해도 친 이메일은 남긴다(`39-4` — React 19 는 액션 끝에 폼을 비운다). 비밀번호는 안 남긴다 — 서버도 `toString` 에서 빼는 값이다(`D9`).
+  const [email, setEmail] = useState("");
   const router = useRouter();
 
   // **제출 중인지를 여기서 안 든다**(`D16`). `SubmitButton` 이 `useFormStatus` 로 읽는다.
   async function submit(form: FormData) {
     setError(null);
+    setEmail(String(form.get("email") ?? ""));
 
     try {
       await api<LoginResponse>("/api/auth/login", {
@@ -64,7 +67,7 @@ export function LoginForm() {
 
   return (
     <form action={submit}>
-      <Field name="email" label="이메일" type="email" autoComplete="email" />
+      <Field name="email" label="이메일" type="email" autoComplete="email" defaultValue={email} />
       <Field name="password" label="비밀번호" type="password" autoComplete="current-password" />
 
       {/*

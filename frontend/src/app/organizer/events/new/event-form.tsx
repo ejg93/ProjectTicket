@@ -47,14 +47,21 @@ function messageOf(error: unknown): string {
   }
 }
 
+/** 제출한 값. 서버가 거절하면 이것으로 칸을 다시 채운다(`39-4`). 가격은 칸 글자 그대로 — 숫자로 바꾸면 빈 칸이 0 이 된다 */
+type Draft = { organizerId: string; title: string; grades: { code: string; price: string; sections: string[] }[] };
+
 /**
  * 공연·등급 등록(`45b`). 등급 줄은 늘릴 수 있고, 줄마다 코드·가격·구역을 받는다 — 구역은 홀 목록의 코드에서 고른다(`45a-1`).
  * 등급 없는 공연은 서버가 400 으로 막는다(회차를 못 연다). 성공하면 그 공연 화면으로 간다.
+ *
+ * **서버가 거절해도 친 값을 남긴다**(`39-4`). React 19 는 액션이 끝나면 `form.reset()` 을 부른다 — 오류를 잡고 끝나도 같다.
+ * 제출 때 값을 `draft` 에 들고 칸마다 `defaultValue`·`defaultChecked` 로 돌려준다. reset 이 그 값으로 되돌린다.
  */
 export function EventForm({ organizers, sections }: { organizers: Organizer[]; sections: string[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [grades, setGrades] = useState(1);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   async function submit(form: FormData) {
     setError(null);
@@ -63,6 +70,12 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
       price: Number(form.get(`grade_price_${i}`) ?? 0),
       sections: form.getAll(`grade_sections_${i}`).map(String),
     }));
+    // 구역 체크박스는 같은 이름이 여럿이라 `getAll` 이다 — `get` 은 첫 하나만 준다.
+    setDraft({
+      organizerId: String(form.get("organizer_id") ?? ""),
+      title: String(form.get("title") ?? ""),
+      grades: rows.map((row, i) => ({ code: row.code, price: String(form.get(`grade_price_${i}`) ?? ""), sections: row.sections })),
+    });
     try {
       const created = await api<{ event_id: number }>("/api/organizer/events", {
         method: "POST",
@@ -78,7 +91,8 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
     <form action={submit}>
       <p>
         <label htmlFor="organizer_id">기획사</label>
-        <select id="organizer_id" name="organizer_id" required>
+        {/* `<select>` 는 마운트 뒤의 `defaultValue` 변경을 옵션에 안 옮긴다(React 19) — 제출마다 `key` 로 다시 그려 그 값을 기본으로 만든다 */}
+        <select key={draft?.organizerId} id="organizer_id" name="organizer_id" required defaultValue={draft?.organizerId}>
           {organizers.map((o) => (
             <option key={o.organizer_id} value={o.organizer_id}>
               {o.name}
@@ -86,16 +100,21 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
           ))}
         </select>
       </p>
-      <Field name="title" label="공연 제목" maxLength={200} />
+      <Field name="title" label="공연 제목" maxLength={200} defaultValue={draft?.title} />
       {Array.from({ length: grades }, (_, i) => (
         <fieldset key={i}>
           <legend>등급 {i + 1}</legend>
-          <Field name={`grade_code_${i}`} label="등급 코드(예: VIP)" />
-          <Field name={`grade_price_${i}`} label="가격(원)" type="number" />
+          <Field name={`grade_code_${i}`} label="등급 코드(예: VIP)" defaultValue={draft?.grades[i]?.code} />
+          <Field name={`grade_price_${i}`} label="가격(원)" type="number" defaultValue={draft?.grades[i]?.price} />
           <p>구역</p>
           {sections.map((code) => (
             <label key={code}>
-              <input type="checkbox" name={`grade_sections_${i}`} value={code} /> {code}
+              <input
+                type="checkbox"
+                name={`grade_sections_${i}`}
+                value={code}
+                defaultChecked={draft?.grades[i]?.sections.includes(code) ?? false}
+              /> {code}
             </label>
           ))}
         </fieldset>

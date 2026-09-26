@@ -35,7 +35,7 @@ const SUBMIT_BUTTON = /\bSubmitButton\b/;
 const PENDING_STATE =
   /const\s*\[\s*(pending|sending|submitting|saving|posting)\s*,[^\]]*\]\s*=\s*(?:React\.)?useState\s*(?:<[^>]*>)?\s*\(/i;
 
-/** 2026-09-26 실측: 화면 `.tsx` 스물, `action=` 폼 넷(로그인·가입·선점·결제). 바닥은 그 절반과 그 수다 */
+/** 첫 실측(`39-2`): 화면 `.tsx` 스물, `action=` 폼 넷(로그인·가입·선점·결제). 바닥은 그 절반과 그 수다. `39-4` 때 `action=` 폼 파일은 아홉이다 */
 const MIN_SCREENS = 10;
 const MIN_ACTION_FORMS = 4;
 

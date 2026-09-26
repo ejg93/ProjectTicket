@@ -82,6 +82,27 @@ describe("공연 등록", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("2번째 등급의 코드를 확인해 주세요.");
   });
 
+  it("서버가 거절해도 친 값이 칸에 남는다(`39-4`)", async () => {
+    // React 19 는 액션이 끝나면 `form.reset()` 을 부른다 — 오류를 잡고 끝나도 같다. 값을 남기는 것은 draft → `defaultValue` 다.
+    respond({ type: "tag:projectticket.example,2026:validation-failed", detail: "요청 형식이 맞지 않는다" }, 400);
+    render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }, { organizer_id: 4, name: "둘째" }]} sections={["F1-A", "F1-B"]} />);
+
+    await userEvent.selectOptions(screen.getByLabelText("기획사"), "4");
+    await userEvent.type(screen.getByLabelText("공연 제목"), "겨울 콘서트");
+    await userEvent.type(screen.getByLabelText("등급 코드(예: VIP)"), "VIP");
+    await userEvent.type(screen.getByLabelText("가격(원)"), "154000");
+    await userEvent.click(screen.getByRole("checkbox", { name: "F1-B" }));
+    await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
+
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("기획사")).toHaveValue("4");
+    expect(screen.getByLabelText("공연 제목")).toHaveValue("겨울 콘서트");
+    expect(screen.getByLabelText("등급 코드(예: VIP)")).toHaveValue("VIP");
+    expect(screen.getByLabelText("가격(원)")).toHaveValue(154000);
+    expect(screen.getByRole("checkbox", { name: "F1-B" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "F1-A" })).not.toBeChecked();
+  });
+
   it("접근성 위반이 없다", async () => {
     const { container } = render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
     await expectNoAxeViolations(container);

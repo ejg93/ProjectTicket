@@ -13,6 +13,7 @@ export function Field({
   autoComplete,
   required = true,
   maxLength,
+  defaultValue,
 }: {
   name: string;
   label: string;
@@ -21,6 +22,8 @@ export function Field({
   required?: boolean;
   /** 서버 요청의 `@Size(max)` 와 같은 수를 **리터럴로** 적는다 — `ScreenLengthTest`(`G9`)가 글자로 읽는다 */
   maxLength?: number;
+  /** 서버가 거절한 뒤 다시 그릴 값(`39-4`). React 19 는 액션이 끝나면 폼을 비운다 — 폼이 친 값을 들고 있다가 여기로 돌려준다 */
+  defaultValue?: string;
 }) {
   return (
     <p>
@@ -32,6 +35,7 @@ export function Field({
         autoComplete={autoComplete}
         required={required}
         maxLength={maxLength}
+        defaultValue={defaultValue}
       />
     </p>
   );

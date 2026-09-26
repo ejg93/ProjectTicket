@@ -37,8 +37,13 @@ function messageOf(error: unknown): string {
   }
 }
 
+/** 제출한 값. 서버가 거절하면 이것으로 칸을 다시 채운다(`39-4`). 비밀번호 칸은 없다 */
+type Draft = { email: string; displayName: string; consents: Record<string, boolean> };
+
 export function SignupForm({ items }: { items: ConsentItem[] }) {
   const [error, setError] = useState<string | null>(null);
+  // 서버가 거절해도 친 값을 남긴다(`39-4` — React 19 는 액션 끝에 폼을 비운다). 비밀번호는 안 남긴다(`D9`).
+  const [draft, setDraft] = useState<Draft | null>(null);
   const router = useRouter();
 
   async function submit(form: FormData) {
@@ -49,6 +54,7 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
     const consents = Object.fromEntries(
       items.map((item) => [item.code, form.get(`consent-${item.code}`) === "on"]),
     );
+    setDraft({ email: String(form.get("email") ?? ""), displayName: String(form.get("display_name") ?? ""), consents });
 
     try {
       await api<SignupResponse>("/api/auth/signup", {
@@ -71,8 +77,8 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
 
   return (
     <form action={submit}>
-      <Field name="email" label="이메일" type="email" autoComplete="email" maxLength={254} />
-      <Field name="display_name" label="이름" autoComplete="name" maxLength={50} />
+      <Field name="email" label="이메일" type="email" autoComplete="email" maxLength={254} defaultValue={draft?.email} />
+      <Field name="display_name" label="이름" autoComplete="name" maxLength={50} defaultValue={draft?.displayName} />
       <Field name="password" label="비밀번호" type="password" autoComplete="new-password" maxLength={64} />
       <p className="muted">비밀번호는 15자 이상으로 정해 주세요.</p>
 
@@ -86,6 +92,7 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
                 name={`consent-${item.code}`}
                 type="checkbox"
                 required={item.required}
+                defaultChecked={draft?.consents[item.code] ?? false}
               />{" "}
               {item.title}
               {item.required ? " (필수)" : " (선택)"}

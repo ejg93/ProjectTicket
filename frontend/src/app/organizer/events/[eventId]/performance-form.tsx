@@ -29,16 +29,27 @@ function messageOf(error: unknown): string {
   }
 }
 
+/** 제출한 칸 글자 그대로(`datetime-local` 값은 오프셋을 붙이기 전). 서버가 거절하면 이것으로 칸을 다시 채운다 */
+type Draft = { hallId: string; startsAt: string; salesOpenAt: string };
+
 /**
  * 회차 등록(`45b`). 시각은 **KST 로 받아 오프셋을 붙여 보낸다**(`D7`) — `datetime-local` 은 시간대가 없어서 그대로 보내면 서버가 400 이다.
  * 판매 마감은 안 받는다 — 서버가 `관람 − 1시간` 으로 채운다(`V14`).
+ *
+ * 서버가 거절하면 친 값을 남기고(`39-4` — React 19 는 액션 끝에 폼을 비운다), 등록되면 비워 다음 회차를 받는다.
  */
 export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Hall[] }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   async function submit(form: FormData) {
     setError(null);
+    setDraft({
+      hallId: String(form.get("hall_id") ?? ""),
+      startsAt: String(form.get("starts_at") ?? ""),
+      salesOpenAt: String(form.get("sales_open_at") ?? ""),
+    });
     try {
       await api(`/api/organizer/events/${eventId}/performances`, {
         method: "POST",
@@ -48,6 +59,7 @@ export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Ha
           sales_open_at: kstIso(String(form.get("sales_open_at"))),
         },
       });
+      setDraft(null);
       router.refresh();
     } catch (thrown) {
       setError(messageOf(thrown));
@@ -58,7 +70,8 @@ export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Ha
     <form action={submit} aria-label="회차 등록">
       <p>
         <label htmlFor="hall_id">홀</label>
-        <select id="hall_id" name="hall_id" required>
+        {/* `<select>` 는 마운트 뒤의 `defaultValue` 변경을 옵션에 안 옮긴다(React 19) — `key` 로 다시 그린다 */}
+        <select key={draft?.hallId} id="hall_id" name="hall_id" required defaultValue={draft?.hallId}>
           {halls.map((h) => (
             <option key={h.hall_id} value={h.hall_id}>
               {h.venue_name} {h.name}
@@ -66,8 +79,8 @@ export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Ha
           ))}
         </select>
       </p>
-      <Field name="starts_at" label="관람 시각(한국 시간)" type="datetime-local" />
-      <Field name="sales_open_at" label="판매 시작(한국 시간)" type="datetime-local" />
+      <Field name="starts_at" label="관람 시각(한국 시간)" type="datetime-local" defaultValue={draft?.startsAt} />
+      <Field name="sales_open_at" label="판매 시작(한국 시간)" type="datetime-local" defaultValue={draft?.salesOpenAt} />
       {error ? (
         <p className="error" role="alert">
           {error}

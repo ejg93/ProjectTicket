@@ -136,7 +136,15 @@ CSRF 토큰이 브라우저 쿠키에 있고, 멱등키를 쥐고 재시도하�
 **`onSubmit={fn}` 폼은 반대다.** `useFormStatus` 는 `action` 이 건 제출만 알아서 거기에 `SubmitButton` 을 끼우면 한 번도 안 잠긴다. 그 꼴은 `useState` 로 드는 것이 맞다.
 지금 이 저장소의 폼은 전부 `action=` 이고 `onSubmit` 폼은 0개다 — 생기면 이 표가 갈린다.
 
-**React 는 액션이 끝나면 폼을 비운다.** 다시 낼 때 사용자는 같은 값을 다시 친다 — 멱등키를 「같은 입력이면 같은 키」로 쥐는 쪽(`CheckoutForm`)이 그것을 전제한다(`42`).
+**React 는 액션이 끝나면 폼을 비운다** — 액션이 오류를 잡고 정상 종료해도 같다. 액션 앞에서 `requestFormReset` 이 같은 전환에 들어가고 커밋이 `form.reset()` 을 부른다(React 19.3). 서버가 거절한 뒤 사용자가 전부 다시 치게 된다.
+
+| 값을 남길 폼 | 어떻게 |
+|---|---|
+| 로그인(이메일) · 가입(이메일·이름·동의) · 공연 등록 · 회차 등록 | 제출 첫 줄에서 값을 `draft` 상태에 들고 칸에 `defaultValue`·`defaultChecked` 로 돌려준다 — 입력칸의 기본값 갱신이 reset 보다 먼저 커밋돼 reset 이 그 값으로 되돌린다(`39-4`). 같은 이름이 여럿인 체크박스는 `form.getAll` |
+| `<select>` | `defaultValue` 만으로는 안 남는다 — React 19 가 마운트 뒤의 `defaultValue` 변경을 옵션에 안 옮긴다. `key={draft?.값}` 으로 다시 마운트한다 |
+| 비밀번호 · 카드 번호 | **안 남긴다** — 서버가 `toString` 에서도 빼는 값이다(`D9` · `D10`). 탈퇴·결제 폼은 그래서 비워지는 쪽이고, 멱등키를 「같은 입력이면 같은 키」로 쥐는 `CheckoutForm` 이 그것을 전제한다(`42`) |
+
+등록이 되면 다음 입력을 받는 폼(회차 등록)은 성공 때 `draft` 를 걷는다. 시험은 `organizer-forms.test.tsx` · `signup-form.test.tsx` 가 「거절 뒤에도 값이 칸에 있다」를 잰다.
 
 **`frontend/src/test/form-pending.test.ts` 가 잰다**(`39-2`) — `action=` 폼 파일의 pending `useState`, `onSubmit` 폼 파일의 `SubmitButton`. 린트는 「한 파일에 둘이 같이」를 못 적어서 시험이다.
 
