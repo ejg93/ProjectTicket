@@ -54,6 +54,7 @@ class MigrationTextTest {
             "consent_item" to "가입 동의 항목과 약관 원문. 가입 입구가 그 행을 읽는다(`V3`)",
             "refund_fee_tier" to "관람일 기준 환불 수수료 구간. 취소 입구가 그 행으로 율을 고른다(`V10`, ADR 0003)",
             "settlement_policy" to "기본 정산 수수료율. 정산이 그 행으로 계산한다(`V16`)",
+            "policy_document" to "개인정보처리방침(제30조). 처리방침 화면이 그 행을 읽는다 — 없으면 발의 링크가 404 다(`V21`)",
         )
 
         /**
