@@ -34,14 +34,14 @@ class SeatChangesTest : ConcurrencyTestBase() {
     @BeforeEach
     fun setUp() {
         fixture = EventFixture(jdbc)
-        val eventId = fixture.event(fixture.organizer("$PREFIX${System.nanoTime()}"))
-        val hallId = fixture.hall(venueName = "$PREFIX${System.nanoTime()}")
+        val eventId = fixture.event(fixture.organizer("${PREFIX}seat-changes"))
+        val hallId = fixture.hall(venueName = "${PREFIX}seat-changes-${System.nanoTime()}")
         fixture.seats(hallId, "F1-A", 4)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
         performanceId = fixture.performance(eventId, hallId)
         openService.open(performanceId, actorAccountId = null)
         seatIds = fixture.performanceSeatIds(performanceId)
-        buyer = fixture.account("$PREFIX${System.nanoTime()}@test.local")
+        buyer = fixture.account("${PREFIX}seat-changes-${System.nanoTime()}@test.local")
     }
 
     @Test
@@ -123,8 +123,4 @@ class SeatChangesTest : ConcurrencyTestBase() {
     private fun expire(reservationId: Long) =
         jdbc.sql("update reservation set held_until = now() - interval '1 minute' where reservation_id = :id")
             .param("id", reservationId).update()
-
-    private companion object {
-        const val PREFIX = "seat-changes-"
-    }
 }

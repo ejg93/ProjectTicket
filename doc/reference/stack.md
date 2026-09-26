@@ -278,6 +278,9 @@ Spring 은 그 표시를 테스트 클래스의 상속 계층에서 찾는데 �
 `.withReuse(true)` 가 코드에 있어도 기계마다 `~/.testcontainers.properties` 에 `testcontainers.reuse.enable=true` 가 있어야 한다. 안 켜져 있어도 실패하지 않고 경고 한 줄과 함께 새로 띄운다.
 CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사용 컨테이너를 지운다** — Flyway 체크섬이 안 맞아 전부 빨개진다.
 
+**재사용 컨테이너는 커밋 레인이 남긴 행을 실행 사이에 든다**(`G11`). `ConcurrencyTestBase` 는 바탕 `PREFIX` 가 붙은 행만 지우므로 접두 밖 행은 아무도 안 지운다.
+`SeatChangesTest` 가 제 `PREFIX` 로 바탕 것을 가려 실행마다 `held` 넷을 남겼고, 5분 뒤 전역 수를 세는 스윕 시험(`PaymentConfirmTest`)이 0→4 로 흔들렸다 — 재실행은 앞선 커밋 스윕이 넷을 걷어 초록이라 원인이 안 보인다. `TestConventionTest` 가 가림을 막는다.
+
 **시험 삼아 넣은 `V` 는 지워도 스키마에 남는다**(`G7b`). 파일을 지우면 Flyway 가 그 판을 「미래 판」으로 넘겨서 오류도 안 나고,
 재사용 컨테이너에 컬럼과 이력 행이 그대로 남아 다음 실행의 스키마 시험이 그것을 짚는다. 스키마를 바꾸는 탐침은
 `TESTCONTAINERS_REUSE_ENABLE=false` 로 새 컨테이너를 띄운다. 이미 남았으면 그 컨테이너에서 컬럼과 `flyway_schema_history` 행만 지운다.
