@@ -42,7 +42,7 @@
 | **`POST /api/performances/{id}/reservations`** | 좌석 선점 | 세션 + 관문 | 13 |
 | `GET /api/reservations/{id}` | 예매 하나 | 세션(본인) | 13 |
 | `POST /api/reservations/{id}/payments` | 결제 시작·결과 | 세션(본인) | 16 |
-| `POST /api/reservations/{id}/cancel` | 취소 | 세션(본인) | 17 |
+| `POST /api/reservations/{id}/cancel` | 취소. 본문 `{ "refund_amount" }` 에 **미리보기에서 본 환불액**을 싣는다 — 지금 계산과 다르면 409 `quote-changed`(지금 금액을 같이 준다), 아무것도 안 움직인다(`44a-1a`) | 세션(본인) | 17·44a-1a |
 | `GET /api/reservations/{id}/refund-preview` | 지금 취소하면 얼마인가 — 결제액·D-며칠·율·수수료·환불액. 취소할 수 없으면 `cancellable: false` 와 취소가 받을 `type` 슬러그(`reason`). **계산은 취소와 같은 함수다**(`RefundQuote`) | 세션(본인) | 44a |
 | `GET /api/reservations/{id}/tickets` | 발권된 티켓 | 세션(본인) | 18 |
 | `GET /api/organizer/organizers` · `GET /api/organizer/halls` | 공연을 올릴 내 기획사 · 회차를 올릴 홀(공용 — 공연장·구역 코드·구역별 좌석 수). 등록 폼이 고른다 | 세션(기획사) | 45a-1 |
@@ -145,6 +145,7 @@
 | **`invalid-transition`** | 409 | 지금 상태에서 못 하는 것 — 만료된 선점에 결제, 취소된 예매에 결제 | `from`, `action` | 16·17 |
 | **`hold-expired`** | 409 | `held_until` 이 지났다. `invalid-transition` 의 특수형 — 화면이 「다시 고르세요」로 가른다 | | 16 |
 | **`cancel-window-closed`** | 409 | 관람일 당일이라 취소 불가 | `starts_at` | 17 |
+| **`quote-changed`** | 409 | 취소 본문의 `refund_amount`(화면이 본 금액)가 지금 계산과 다르다 — 그사이 구간표가 개정됐거나 날이 넘어갔다. 아무것도 안 움직인다 | `refund_amount`(지금 금액) | 44a-1a |
 | **`admission-required`** | 429 | 활성 토큰이 없다. 대기열로 | `rank`, `eta_seconds` | 23 |
 | **`admission-mismatch`** | 403 | 토큰이 다른 계정·회차 것 | | 23 |
 | **`queue-closed`** | 410 | 회차가 닫혀 대기열이 없다 | | 21 |

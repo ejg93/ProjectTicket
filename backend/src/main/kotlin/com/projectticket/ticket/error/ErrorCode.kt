@@ -57,6 +57,8 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     INVALID_TRANSITION(HttpStatus.CONFLICT, "invalid-transition", "지금 상태에서 할 수 없다"),
     HOLD_EXPIRED(HttpStatus.CONFLICT, "hold-expired", "선점 시간이 지났다. 좌석을 다시 고른다"),
     CANCEL_WINDOW_CLOSED(HttpStatus.CONFLICT, "cancel-window-closed", "관람일 당일이라 취소할 수 없다"),
+    // 화면이 본 환불액과 지금 계산이 다르다(`44a-1a`, `D6` 고지). 그사이 구간표가 개정됐거나 날이 넘어갔다 — 화면이 미리보기를 다시 받는다.
+    QUOTE_CHANGED(HttpStatus.CONFLICT, "quote-changed", "본 금액과 지금 금액이 다르다"),
 
     // 좌석 읽기 모델(10a, `D20`). 변경 로그 밖을 물으면 410 — 화면이 그 코드로 전체를 다시 받는다.
     SEAT_CHANGES_EXPIRED(HttpStatus.GONE, "seat-changes-expired", "그 판 이후의 변경은 남아 있지 않다"),

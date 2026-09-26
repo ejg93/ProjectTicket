@@ -57,6 +57,23 @@ class RefundInvariantTest : ConcurrencyTestBase() {
 
         assertThatThrownBy { refunds.request(accountId, reservationId) }.hasMessageContaining("당일")
 
+        assertNothingMoved(reservationId)
+    }
+
+    /**
+     * 본 금액이 지금 계산과 다르면(`44a-1a`) 당일 취소처럼 아무것도 안 움직인다 — 같은 자리(조건부 UPDATE 뒤)에서 던진다.
+     * 구간표를 개정하는 대신 틀린 금액을 싣는다 — 커밋 레인에서 새 판을 넣으면 뒤 시험 전부가 그 판을 본다.
+     */
+    @Test
+    fun a_stale_amount_moves_nothing() {
+        val (reservationId, _) = reserved(startsInDays = 8)
+
+        assertThatThrownBy { refunds.request(accountId, reservationId, expectedRefund = 1) }.hasMessageContaining("본 금액")
+
+        assertNothingMoved(reservationId)
+    }
+
+    private fun assertNothingMoved(reservationId: Long) {
         assertThat(jdbc.sql("select status from reservation where reservation_id = :id").param("id", reservationId).query(String::class.java).single())
             .isEqualTo("reserved")
         assertThat(jdbc.sql("select count(*) from performance_seat where reservation_id = :id and status = 'reserved'").param("id", reservationId).query(Long::class.java).single())

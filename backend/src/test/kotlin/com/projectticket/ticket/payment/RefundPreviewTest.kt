@@ -10,6 +10,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -59,7 +60,11 @@ class RefundPreviewTest : PostgresTestBase() {
         assertThat(preview["cancellable"].asBoolean()).isTrue()
         assertThat(preview["payment_amount"].asInt()).isEqualTo(308_000)
 
-        mvc.post("/api/reservations/$reservationId/cancel") { with(user(buyer)); with(csrf()) }.andExpect { status { isOk() } }
+        mvc.post("/api/reservations/$reservationId/cancel") {
+            with(user(buyer)); with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refund_amount":${preview["refund_amount"].asInt()}}"""
+        }.andExpect { status { isOk() } }
 
         val refund = jdbc.sql(
             """

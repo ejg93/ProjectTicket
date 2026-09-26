@@ -11,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
@@ -31,6 +32,7 @@ class ReservationCancelTest : PostgresTestBase() {
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var openService: PerformanceOpenService
+    @Autowired lateinit var quote: RefundQuote
 
     private lateinit var fixture: EventFixture
     private lateinit var buyer: TicketUser
@@ -64,6 +66,36 @@ class ReservationCancelTest : PostgresTestBase() {
         assertThat(seatStatuses(reservationId)).containsOnly("available")
         assertThat(refundRow(reservationId)).isEqualTo(RefundRow("audience", 8, BigDecimal("0.10"), 30_800, 277_200, "done", true))
         assertThat(auditCount("reservation.cancelled", reservationId)).isOne()
+    }
+
+    @Test
+    fun the_amount_the_screen_saw_goes_through() {
+        cancel(reserved(startsInDays = 8), refundAmount = 277_200).andExpect {
+            status { isOk() }
+            jsonPath("$.refund_amount") { value(277_200) }
+        }
+    }
+
+    @Test
+    fun a_stale_amount_is_a_conflict_that_gives_the_current_one() {
+        val reservationId = reserved(startsInDays = 8)
+        val seen = checkNotNull(quote.preview(reservationId, buyer.id).refundAmount) { "8일 전이라 취소할 수 있다" }
+
+        // 그사이 구간표가 개정됐다 — 율 전부 +0.05. 시험 트랜잭션 안의 `now()` 는 한 값이라 이 판이 곧바로 효력을 갖는다.
+        jdbc.sql(
+            """
+            insert into refund_fee_tier (days_before_min, rate, effective_at)
+            values (10, 0.05, now()), (7, 0.15, now()), (3, 0.25, now()), (1, 0.35, now())
+            """,
+        ).update()
+
+        // 이 시험의 마지막 요청이다 — 롤백 바탕에서는 조건부 UPDATE 뒤의 예외가 rollback-only 표시만 남겨 뒤 요청이 `cancelled` 를 본다.
+        // 「아무것도 안 움직였다」는 `RefundInvariantTest` 가 커밋 레인에서 잰다.
+        cancel(reservationId, refundAmount = seen).andExpect {
+            status { isConflict() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:quote-changed") }
+            jsonPath("$.refund_amount") { value(261_800) }
+        }
     }
 
     @Test
@@ -172,8 +204,17 @@ class ReservationCancelTest : PostgresTestBase() {
         return reservationId
     }
 
-    private fun cancel(reservationId: Long, principal: TicketUser = buyer): ResultActionsDsl =
-        mvc.post("/api/reservations/$reservationId/cancel") { with(user(principal)); with(csrf()) }
+    /** 화면처럼 미리보기에서 본 금액을 싣는다(`44a-1a`). 취소할 수 없는 예매는 금액이 없어 0 — 대조 앞에서 거절된다 */
+    private fun cancel(
+        reservationId: Long,
+        principal: TicketUser = buyer,
+        refundAmount: Int = quote.preview(reservationId, buyer.id).refundAmount ?: 0,
+    ): ResultActionsDsl =
+        mvc.post("/api/reservations/$reservationId/cancel") {
+            with(user(principal)); with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refund_amount":$refundAmount}"""
+        }
 
     private fun principal(email: String): TicketUser =
         TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
