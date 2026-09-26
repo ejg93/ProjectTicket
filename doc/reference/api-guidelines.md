@@ -37,6 +37,7 @@
 | `GET /api/performances/{id}` | 회차 하나 + 공연 머리 + 등급 + `status`. 회차 등록 201 의 `Location` 이 이것을 가리킨다(11). **`draft` 는 그 기획사 사람에게만 답하고 남·비로그인에게는 404** — 아래 「기획사의 공연·회차 404」 | 공개(`draft` 제외) | 40c |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
 | `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |
+| `GET /api/refund-tiers` | 지금 효력 있는 취소 수수료 구간표 — `effective_at` 과 `tiers[{days_before_min, rate}]`(큰 것부터). 결제 전에 보여 준다(`D6`). 판을 고르는 조건은 취소 계산과 같다(`RefundQuote`) | 공개 | 42-1a |
 | `POST /api/queue/{performanceId}` · `GET` · `DELETE` | 대기열 진입·순번·이탈(`D12`) | 세션 | 21·24 |
 | **`POST /api/performances/{id}/reservations`** | 좌석 선점 | 세션 + 관문 | 13 |
 | `GET /api/reservations/{id}` | 예매 하나 | 세션(본인) | 13 |

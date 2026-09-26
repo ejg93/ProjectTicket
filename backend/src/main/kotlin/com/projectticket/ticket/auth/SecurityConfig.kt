@@ -239,6 +239,8 @@ class SecurityConfig {
             "/api/performances/*/seats",
             // 델타도 같은 그림이다(10a). 로그인 전에 좌석을 보고 나서 로그인한다.
             "/api/performances/*/seats/changes",
+            // 취소 수수료 구간표(`42-1a`). 결제 전에 보여 주는 공통 표다 — 예매 하나에 안 묶인다.
+            "/api/refund-tiers",
         )
 
         /** 로그인 없이 쓰는 경로 — 가입·로그인 둘. 로그아웃은 세션이 있어야 뜻이 있어 여기 없다 */
