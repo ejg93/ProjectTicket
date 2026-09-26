@@ -79,7 +79,7 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
     <form action={submit}>
       <Field name="email" label="이메일" type="email" autoComplete="email" maxLength={254} defaultValue={draft?.email} />
       <Field name="display_name" label="이름" autoComplete="name" maxLength={50} defaultValue={draft?.displayName} />
-      <Field name="password" label="비밀번호" type="password" autoComplete="new-password" maxLength={64} />
+      <Field name="password" label="비밀번호" type="password" autoComplete="new-password" maxLength={64} minLength={15} />
       <p className="muted">비밀번호는 15자 이상으로 정해 주세요.</p>
 
       <fieldset>

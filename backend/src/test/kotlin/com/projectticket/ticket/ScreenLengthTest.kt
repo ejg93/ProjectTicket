@@ -66,23 +66,54 @@ class ScreenLengthTest {
         }
     }
 
-    /** `<Field … name="x" … maxLength={N} … />` 에서 이름 → `maxLength` 글자(없으면 null). 주석 안의 칸은 뺀다 */
-    private fun fields(source: String): Map<String, String?> {
+    /**
+     * 하한도 같은 길이다(`G9-1`). `@Size(min)` 이 0 보다 큰 필드(지금은 `@Password` 의 15)마다 짝 폼에 같은 `minLength` 가 있어야 한다 —
+     * 없으면 화면이 14자를 받아 주고 서버가 400 으로 돌려보낸다. 상한과 같은 두 문장이다.
+     */
+    @Test
+    fun every_request_field_with_a_minimum_has_the_same_min_length_on_its_form() {
+        val minimums = PAIRS.flatMap { (form, request) -> sizedFields(request) { it.min }.filterValues { it > 0 }.map { Triple(form, request, it) } }
+        assertThat(minimums).describedAs("못 읽었다 — 짝 표의 DTO 에서 `@Size(min > 0)` 필드를 하나도 못 찾았다(`@Password` 가 15 다)").isNotEmpty()
+
+        minimums.forEach { (form, request, entry) ->
+            val (name, min) = entry
+            val onScreen = fields(Files.readString(app.resolve(form)), MIN_LENGTH)
+            assertThat(onScreen)
+                .describedAs("못 읽었다 — $form 에서 `name=\"$name\"` 인 `<Field … />` 를 못 찾았다(이름이나 꼴이 바뀌었다)")
+                .containsKey(name)
+            val raw = onScreen.getValue(name)
+            assertThat(raw)
+                .describedAs("갈렸다 — $form 의 `$name` 칸에 `minLength` 가 없다. 서버 ${request.simpleName} 는 ${min}자부터 받는다")
+                .isNotNull()
+            assertThat(raw)
+                .describedAs("못 읽었다 — $form 의 `$name` 칸 `minLength={$raw}` 가 리터럴 숫자가 아니다")
+                .matches("\\d+")
+            assertThat(raw?.toInt())
+                .describedAs("갈렸다 — $form 의 `$name` 칸은 `minLength={$raw}`, 서버 ${request.simpleName} 는 ${min}자부터 받는다")
+                .isEqualTo(min)
+        }
+    }
+
+    /** `<Field … name="x" … maxLength={N} … />` 에서 이름 → [attribute] 의 글자(없으면 null). 주석 안의 칸은 뺀다 */
+    private fun fields(source: String, attribute: Regex = MAX_LENGTH): Map<String, String?> {
         val code = LINE_COMMENT.replace(BLOCK_COMMENT.replace(source, ""), "")
         return FIELD.findAll(code).mapNotNull { match ->
             val attributes = match.groupValues[1]
-            NAME.find(attributes)?.groupValues?.get(1)?.let { it to MAX_LENGTH.find(attributes)?.groupValues?.get(1) }
+            NAME.find(attributes)?.groupValues?.get(1)?.let { it to attribute.find(attributes)?.groupValues?.get(1) }
         }.toMap()
     }
 
-    /** DTO 의 String 필드 중 `@Size(max)` 를 직접 또는 메타 애너테이션으로 든 것 — 이름은 snake_case(`D5` 본문 표기) */
-    private fun sizedFields(request: KClass<*>): Map<String, Int> =
+    /**
+     * DTO 의 String 필드 중 `@Size` 를 직접 또는 메타 애너테이션으로 든 것 → [bound] 가 고른 수(`max` 또는 `min`).
+     * 이름은 snake_case(`D5` 본문 표기). 상한이 없는(`Int.MAX_VALUE`) `@Size` 는 [bound] 가 `max` 일 때만 뺀다.
+     */
+    private fun sizedFields(request: KClass<*>, bound: (Size) -> Int = { it.max }): Map<String, Int> =
         request.java.declaredFields
             .filter { it.type == String::class.java }
             .mapNotNull { field ->
                 val size = field.getAnnotation(Size::class.java)
                     ?: field.annotations.firstNotNullOfOrNull { it.annotationClass.java.getAnnotation(Size::class.java) }
-                size?.takeIf { it.max < Int.MAX_VALUE }?.let { snake(field.name) to it.max }
+                size?.let(bound)?.takeIf { it < Int.MAX_VALUE }?.let { snake(field.name) to it }
             }
             .toMap()
 
@@ -110,5 +141,6 @@ class ScreenLengthTest {
         val FIELD = Regex("""<Field\b(.*?)/>""", RegexOption.DOT_MATCHES_ALL)
         val NAME = Regex("""\bname="([a-z_]+)"""")
         val MAX_LENGTH = Regex("""\bmaxLength=\{([^}]*)\}""")
+        val MIN_LENGTH = Regex("""\bminLength=\{([^}]*)\}""")
     }
 }
