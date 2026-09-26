@@ -65,23 +65,39 @@ class OrganizerEventValidationTest : PostgresTestBase() {
 
     @Test
     fun sales_opening_after_the_default_close_points_at_sales_open_at() {
-        val eventId = createEvent(grade("VIP", "F1-A")).andExpect { status { isCreated() } }.andReturn().response.let {
-            json.readTree(it.contentAsString)["event_id"].asLong()
-        }
         val startsAt = OffsetDateTime.now().plusDays(8)
 
         // 마감을 안 주면 관람 1시간 전이다(`V14` 트리거). 관람 30분 전에 여는 판매는 마감보다 늦다.
-        mvc.post("/api/organizer/events/$eventId/performances") {
+        createPerformance(startsAt, salesOpenAt = startsAt.minusMinutes(30)).andExpect(validationFailedAt("sales_open_at"))
+    }
+
+    @Test
+    fun sales_opening_after_the_show_points_at_sales_open_at() {
+        val startsAt = OffsetDateTime.now().plusDays(8)
+
+        // 이름 순으로 `performance_sales_before_start_check`(`V5`)가 창 제약보다 먼저 걸린다 — 그것도 400 이다(마무리 16차 독립 리뷰).
+        createPerformance(startsAt, salesOpenAt = startsAt.plusHours(1)).andExpect(validationFailedAt("sales_open_at"))
+    }
+
+    @Test
+    fun a_given_close_after_the_show_points_at_sales_close_at() {
+        val startsAt = OffsetDateTime.now().plusDays(8)
+
+        createPerformance(startsAt, salesOpenAt = OffsetDateTime.now().minusDays(1), salesCloseAt = startsAt.plusMinutes(10))
+            .andExpect(validationFailedAt("sales_close_at"))
+    }
+
+    private fun createPerformance(startsAt: OffsetDateTime, salesOpenAt: OffsetDateTime, salesCloseAt: OffsetDateTime? = null): ResultActionsDsl {
+        val eventId = createEvent(grade("VIP", "F1-A")).andExpect { status { isCreated() } }.andReturn().response.let {
+            json.readTree(it.contentAsString)["event_id"].asLong()
+        }
+        val body = mapOf("hall_id" to hallId, "starts_at" to startsAt.toString(), "sales_open_at" to salesOpenAt.toString()) +
+            listOfNotNull(salesCloseAt?.let { "sales_close_at" to it.toString() })
+        return mvc.post("/api/organizer/events/$eventId/performances") {
             with(user(organizer)); with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = json.writeValueAsString(
-                mapOf(
-                    "hall_id" to hallId,
-                    "starts_at" to startsAt.toString(),
-                    "sales_open_at" to startsAt.minusMinutes(30).toString(),
-                ),
-            )
-        }.andExpect(validationFailedAt("sales_open_at"))
+            content = json.writeValueAsString(body)
+        }
     }
 
     private fun validationFailedAt(field: String): MockMvcResultMatchersDsl.() -> Unit = {

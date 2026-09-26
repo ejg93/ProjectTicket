@@ -12,15 +12,19 @@ import type { Organizer } from "../../types";
 /** 등급 줄을 가리키는 칸(`grades[1].code`)을 줄 번호와 칸으로 가른다(`45d-a` 가 싣는 꼴) */
 const GRADE_FIELD = /^grades\[(\d+)\]\.(code|sections)$/;
 
-/** 틀린 칸이 등급 줄이면 그 줄을 짚는 문구. 아니면 null — 슬러그 문구로 떨어진다 */
+/**
+ * 틀린 칸이 등급 줄이면 그 줄을 짚는 문구. 아니면 null — 슬러그 문구로 떨어진다.
+ * **같은 칸 이름을 두 원인이 낸다** — 형식(Bean Validation: 코드 꼴·구역 없음)과 DB 제약(코드 중복·한 구역에 등급 둘, `45d-a`).
+ * 칸 이름만으로는 못 가르니 문구가 둘 다 말한다.
+ */
 function gradeMessageOf(error: ApiError): string | null {
   for (const { field } of error.errors) {
     const match = GRADE_FIELD.exec(field);
     if (!match) continue;
     const row = Number(match[1]) + 1;
     return match[2] === "code"
-      ? `${row}번째 등급의 코드가 앞 등급과 겹칩니다.`
-      : `${row}번째 등급의 구역이 앞 등급과 겹칩니다. 구역 하나에는 등급 하나만 붙습니다.`;
+      ? `${row}번째 등급의 코드를 확인해 주세요. 영문 대문자로 시작해야 하고, 앞 등급과 겹칠 수 없습니다.`
+      : `${row}번째 등급의 구역을 확인해 주세요. 하나 이상 골라야 하고, 앞 등급이 고른 구역은 고를 수 없습니다.`;
   }
   return null;
 }

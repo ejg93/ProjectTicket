@@ -85,6 +85,19 @@ describe("예매 취소", () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it("409 뒤 새 미리보기를 못 받으면 옛 금액을 걷고 그 실패를 말한다", async () => {
+    const changed = { type: "tag:projectticket.example,2026:quote-changed", status: 409, detail: "본 금액과 지금 금액이 다르다", refund_amount: 261800 };
+    answers([PREVIEW, 200], [changed, 409], [{ type: "about:blank", status: 502 }, 502]);
+    render(<CancelForm reservationId={9} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "취소" }));
+    await userEvent.click(await screen.findByRole("button", { name: "이 금액으로 취소" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("취소하지 못했습니다");
+    expect(screen.queryByRole("button", { name: "이 금액으로 취소" })).toBeNull();
+    expect(screen.queryByText("277,200원")).toBeNull();
+  });
+
   it("취소할 수 없으면 사유만 보이고 취소 버튼이 없다", async () => {
     answers([{ ...PREVIEW, cancellable: false, reason: "cancel-window-closed", fee_amount: null, refund_amount: null }, 200]);
     render(<CancelForm reservationId={9} />);

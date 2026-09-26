@@ -134,7 +134,7 @@
 | `consent-item-not-found` | 404 | 그런 코드의 동의 항목이 없다(약관·처리방침 화면) | | 39-1 |
 | `performance-not-found` | 404 | 회차 없음. 기획사 정산 조회는 남의 회차·정산서가 아직 없는 회차도 이 이름이다(`45c` — 둘을 가르면 남의 회차 존재가 샌다) | | 있다 |
 | `performance-not-openable` | 422 | 좌석 없는 홀, 등급 안 붙은 구역 | `detail` 에 구역 | 있다 |
-| `validation-failed` | 400 | Bean Validation | `errors[{field, message}]` | 있다 |
+| `validation-failed` | 400 | Bean Validation. 칸을 짚을 수 있는 DB 제약 위반도 이 이름이다 — 판매 창·등급 코드·구역(`45d-a`) | `errors[{field, message}]` | 있다 |
 | `malformed-request` · `method-not-allowed` · `unsupported-media-type` · `endpoint-not-found` · `internal` | 400·405·415·404·500 | 프레임워크 | | 있다 |
 | **`seat-taken`** | 409 | 고른 좌석 중 이미 잡힌 것이 있다 | `taken_seat_ids` | 13 |
 | **`seat-not-in-performance`** | 422 | 좌석 id 가 그 회차 것이 아니다 | `seat_ids` | 13 |
@@ -170,7 +170,7 @@
 
 `field` 는 요청 본문의 이름 그대로 snake_case 다. 요청에 쓴 이름과 오류에 나온 이름이 갈리면 화면이 못 찾는다.
 
-**DB 제약이 막은 것도 같은 꼴이다**(`45d-a`) — 판매 창은 `sales_open_at`, 등급 코드 중복은 `grades[i].code`, 한 구역에 등급 둘은 `grades[i].sections`. `i` 는 요청 배열의 0부터 센 자리다.
+**DB 제약이 막은 것도 같은 꼴이다**(`45d-a`) — 판매 창은 `sales_open_at`(준 마감이 관람 시각 이후면 `sales_close_at`), 등급 코드 중복은 `grades[i].code`, 한 구역에 등급 둘은 `grades[i].sections`. `i` 는 요청 배열의 0부터 센 자리다.
 
 ## 403 이냐 404 냐
 

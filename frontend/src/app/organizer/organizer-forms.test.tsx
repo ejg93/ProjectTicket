@@ -79,7 +79,7 @@ describe("공연 등록", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "F1-A" }));
     await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("2번째 등급의 코드가 앞 등급과 겹칩니다.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("2번째 등급의 코드를 확인해 주세요.");
   });
 
   it("접근성 위반이 없다", async () => {

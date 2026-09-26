@@ -51,19 +51,26 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  async function load() {
+  /** 미리보기를 받는다. 못 받으면 옛 미리보기를 걷는다 — 남겨 두면 옛 금액으로 다시 누를 수 있다 */
+  async function load(): Promise<boolean> {
     setError(null);
     try {
       setPreview(await api<Preview>(`/api/reservations/${reservationId}/refund-preview`));
+      return true;
     } catch (thrown) {
+      setPreview(null);
       setError(messageOf(slugOf(thrown)));
+      return false;
     }
   }
 
   async function cancel() {
     setError(null);
     // 폼은 취소할 수 있을 때만 그려서 금액이 있다. 없으면 보낼 금액이 없으니 미리보기부터 다시 받는다
-    if (preview?.refund_amount == null) return load();
+    if (preview?.refund_amount == null) {
+      await load();
+      return;
+    }
     try {
       // 멱등키를 안 싣는다 — 취소는 조건부 UPDATE 라 둘째 요청이 0행이다(`D4`)
       await api(`/api/reservations/${reservationId}/cancel`, {
@@ -74,8 +81,8 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
       router.refresh();
     } catch (thrown) {
       const slug = slugOf(thrown);
-      // 그사이 금액이 바뀌었다 — 새 금액을 보여 주고 다시 누르게 한다
-      if (slug === "quote-changed") await load();
+      // 그사이 금액이 바뀌었다 — 새 금액을 보여 주고 다시 누르게 한다. 새 금액을 못 받았으면 그 실패 문구가 남는다
+      if (slug === "quote-changed" && !(await load())) return;
       setError(messageOf(slug));
     }
   }

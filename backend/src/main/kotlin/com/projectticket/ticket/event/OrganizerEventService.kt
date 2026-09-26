@@ -87,10 +87,10 @@ class OrganizerEventService(
                 .single()
         } catch (e: DuplicateKeyException) {
             // `performance_hall_slot_key`(`V18`)가 막은 것이다. 형식은 맞는데 그 홀의 그 시각이 이미 찼으므로 409 다(`D5` 상태 코드 표) —
-            // `validation-failed` 는 Bean Validation 몫이고 그 계약이 `errors[{field, message}]` 라, 여기 쓰면 화면이 못 찾는 칸을 약속한다.
+            // `validation-failed` 는 틀린 칸을 `errors[{field, message}]` 로 짚는 계약이라, 짚을 칸이 없는 충돌에 쓰면 화면이 못 찾는 칸을 약속한다.
             throw TicketException(ErrorCode.PERFORMANCE_SLOT_TAKEN)
         } catch (e: DataIntegrityViolationException) {
-            throw salesWindowRejected(e)
+            throw salesWindowRejected(e, command)
         }
 
         auditLog.record(
@@ -128,21 +128,29 @@ class OrganizerEventService(
         }
 
     /**
-     * 판매 창 제약(`performance_sales_window_check`, `V14`)만 400 으로 바꾼다. 다른 제약 위반은 우리가 모르는 결함이라 그대로 올린다(500).
+     * 판매 창 제약 둘(`performance_sales_before_start_check` `V5` · `performance_sales_window_check` `V14`)만 400 으로 바꾼다.
+     * 다른 제약 위반은 우리가 모르는 결함이라 그대로 올린다(500).
      * 드라이버가 `runtimeOnly` 라 `PSQLException` 을 못 읽는다 — 제약 이름은 PG 문구(`violates check constraint "…"`)에서 찾는다.
+     *
+     * **둘 다 받는다** — PG 는 check 를 이름 순으로 보고 첫 위반에서 멈춘다. 판매 시작이 관람 시각 뒤면 `before_start` 가 먼저 걸린다.
+     * 칸은 값으로 가른다: 마감을 줬고 그것이 관람 시각 이후면 `sales_close_at`, 아니면 `sales_open_at`.
      */
-    private fun salesWindowRejected(e: DataIntegrityViolationException): RuntimeException =
-        if ((e.mostSpecificCause as? SQLException)?.message?.contains(SALES_WINDOW_CHECK) == true) {
-            fieldRejected("sales_open_at", "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다")
+    private fun salesWindowRejected(e: DataIntegrityViolationException, command: PerformanceCommand): RuntimeException {
+        val message = (e.mostSpecificCause as? SQLException)?.message.orEmpty()
+        if (SALES_CHECKS.none { it in message }) return e
+        val closeAt = command.salesCloseAt
+        return if (closeAt != null && closeAt >= command.startsAt) {
+            fieldRejected("sales_close_at", "판매 마감은 관람 시각보다 앞이어야 한다")
         } else {
-            e
+            fieldRejected("sales_open_at", "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다")
         }
+    }
 
     /** DB 제약이 막은 것도 Bean Validation 과 같은 꼴(`errors[{field, message}]`)로 낸다 — 화면이 같은 자리에서 칸을 찾는다(`D5`) */
     private fun fieldRejected(field: String, message: String) =
         TicketException(ErrorCode.VALIDATION_FAILED, message, mapOf("errors" to listOf(mapOf("field" to field, "message" to message))))
 
     private companion object {
-        const val SALES_WINDOW_CHECK = "performance_sales_window_check"
+        val SALES_CHECKS = listOf("performance_sales_before_start_check", "performance_sales_window_check")
     }
 }
