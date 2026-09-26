@@ -4,7 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Countdown } from "@/components/countdown";
-import { ApiError } from "@/lib/api";
+import { RefundTierTable, type RefundTiers } from "@/components/refund-tier-table";
+import { ApiError, apiPublic } from "@/lib/api";
 import { apiSession } from "@/lib/api-session";
 import { dateTime, money } from "@/lib/format";
 
@@ -67,6 +68,12 @@ export default async function ReservationPage({
       ? await apiSession<Ticket[]>(`/api/reservations/${reservationId}/tickets`)
       : [];
 
+  // 결제 전에 수수료 구간표를 보여 준다(`42-1b`, 약관 제3조). 못 불러와도 결제는 된다 — 그 칸만 「못 불러왔다」다.
+  const tiers =
+    reservation.status === "held"
+      ? await apiPublic<RefundTiers>("/api/refund-tiers").catch((): "failed" => "failed")
+      : null;
+
   return (
     <div>
       <h1>예매 확인</h1>
@@ -77,6 +84,7 @@ export default async function ReservationPage({
       {reservation.status === "held" ? (
         <>
           <Countdown deadline={reservation.held_until} label="남은 시간" />
+          {tiers ? <RefundTierTable table={tiers} /> : null}
           <CheckoutForm
             reservationId={reservation.reservation_id}
             amount={reservation.total_amount}

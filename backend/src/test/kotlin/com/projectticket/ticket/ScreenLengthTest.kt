@@ -99,7 +99,7 @@ class ScreenLengthTest {
         val UNSIZED: Map<String, String> = mapOf(
             "login/login-form.tsx" to "LoginRequest 는 @NotBlank 뿐",
             "me/withdraw/withdraw-form.tsx" to "WithdrawRequest 는 @NotBlank 뿐",
-            "me/reservations/cancel-form.tsx" to "본문 없음",
+            "me/reservations/cancel-form.tsx" to "CancelRequest 는 Int 뿐",
             "organizer/events/[eventId]/performance-form.tsx" to "CreatePerformanceRequest 에 String 이 없다",
             "performances/[performanceId]/hold-form.tsx" to "좌석 번호 목록",
             "reservations/[reservationId]/checkout-form.tsx" to "PayRequest.cardNumber 는 @CardNumber(자릿수)라 @Size 가 아니다",
