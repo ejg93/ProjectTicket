@@ -144,7 +144,7 @@ CSRF 토큰이 브라우저 쿠키에 있고, 멱등키를 쥐고 재시도하�
 | `<select>` | `defaultValue` 만으로는 안 남는다 — React 19 가 마운트 뒤의 `defaultValue` 변경을 옵션에 안 옮긴다. `key={draft?.값}` 으로 다시 마운트한다 |
 | 비밀번호 · 카드 번호 | **안 남긴다** — 서버가 `toString` 에서도 빼는 값이다(`D9` · `D10`). 탈퇴·결제 폼은 그래서 비워지는 쪽이고, 멱등키를 「같은 입력이면 같은 키」로 쥐는 `CheckoutForm` 이 그것을 전제한다(`42`) |
 
-등록이 되면 다음 입력을 받는 폼(회차 등록)은 성공 때 `draft` 를 걷는다. 시험은 `organizer-forms.test.tsx` · `signup-form.test.tsx` 가 「거절 뒤에도 값이 칸에 있다」를 잰다.
+등록이 되면 다음 입력을 받는 폼(회차 등록)은 성공 때 `draft` 를 걷는다. 시험은 `organizer-forms.test.tsx`(공연·회차) · `signup-form.test.tsx` · `login-form.test.tsx` 가 「거절 뒤에도 값이 칸에 있다」를 잰다. 줄을 빼는 폼은 `draft` 도 같이 자른다 — 안 자르면 다시 더한 줄이 뺀 값으로 되살아난다.
 
 **`frontend/src/test/form-pending.test.ts` 가 잰다**(`39-2`) — `action=` 폼 파일의 pending `useState`, `onSubmit` 폼 파일의 `SubmitButton`. 린트는 「한 파일에 둘이 같이」를 못 적어서 시험이다.
 

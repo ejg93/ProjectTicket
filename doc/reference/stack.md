@@ -281,6 +281,8 @@ CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사
 **재사용 컨테이너는 커밋 레인이 남긴 행을 실행 사이에 든다**(`G11`). `ConcurrencyTestBase` 는 바탕 `PREFIX` 가 붙은 행만 지우므로 접두 밖 행은 아무도 안 지운다.
 `SeatChangesTest` 가 제 `PREFIX` 로 바탕 것을 가려 실행마다 `held` 넷을 남겼고, 5분 뒤 전역 수를 세는 스윕 시험(`PaymentConfirmTest`)이 0→4 로 흔들렸다 — 재실행은 앞선 커밋 스윕이 넷을 걷어 초록이라 원인이 안 보인다. `TestConventionTest` 가 가림을 막는다.
 
+**역할은 DB 가 아니라 클러스터에 산다**(마무리 17차). `V20` 의 `create role ticket_app` 은 같은 Postgres 안의 둘째 DB 에서 「already exists」(42710)로 선다 — `ticket-db` 에 `ticket_check` 를 만들어 빈 DB 기동을 재면 `V20` 에서 멈춘다. 빈 기동은 버리는 컨테이너(새 클러스터)로 잰다(`/verify`). Testcontainers·CI 는 매번 새 클러스터라 안 걸린다.
+
 **시험 삼아 넣은 `V` 는 지워도 스키마에 남는다**(`G7b`). 파일을 지우면 Flyway 가 그 판을 「미래 판」으로 넘겨서 오류도 안 나고,
 재사용 컨테이너에 컬럼과 이력 행이 그대로 남아 다음 실행의 스키마 시험이 그것을 짚는다. 스키마를 바꾸는 탐침은
 `TESTCONTAINERS_REUSE_ENABLE=false` 로 새 컨테이너를 띄운다. 이미 남았으면 그 컨테이너에서 컬럼과 `flyway_schema_history` 행만 지운다.

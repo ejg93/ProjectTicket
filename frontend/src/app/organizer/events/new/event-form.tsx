@@ -63,6 +63,12 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
   const [grades, setGrades] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
 
+  /** 뺀 줄의 값을 `draft` 에서도 걷는다 — 안 걷으면 다시 「등급 추가」한 줄이 뺀 줄의 값으로 되살아난다(마무리 17차) */
+  function removeLastGrade() {
+    setGrades((n) => n - 1);
+    setDraft((d) => (d ? { ...d, grades: d.grades.slice(0, grades - 1) } : d));
+  }
+
   async function submit(form: FormData) {
     setError(null);
     const rows = Array.from({ length: grades }, (_, i) => ({
@@ -127,7 +133,7 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
         {grades > 1 ? (
           <>
             {" "}
-            <button type="button" onClick={() => setGrades((n) => n - 1)}>
+            <button type="button" onClick={removeLastGrade}>
               마지막 등급 빼기
             </button>
           </>

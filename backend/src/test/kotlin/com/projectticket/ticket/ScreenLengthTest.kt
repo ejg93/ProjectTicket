@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Test
  * 방향은 서버 → 화면이다. **DTO 의 `@Size(max)` 있는 String 필드마다** 짝 폼에 같은 `maxLength` 가 있어야 한다 —
  * 화면에만 상한이 있으면 서버가 더 받을 뿐 해가 없다. `*-form.tsx` 는 전부 [PAIRS] 나 [UNSIZED] 에 있어야 한다 —
  * 새 폼이 생기면 어느 쪽인지 적을 때까지 선다. `maxLength` 는 **리터럴 숫자만** 읽는다.
+ * 하한(`G9-1`)은 [PAIRS] 안의 DTO 만 본다 — `@Size(min)` 만 있고 `max` 가 없는 DTO 의 폼은 [UNSIZED] 로 가서 하한 시험이 못 본다.
+ * 지금 그런 DTO 는 없다. 생기면 그 폼을 [PAIRS] 에 넣는다(마무리 17차 독립 리뷰).
  *
  * 문장이 둘이다 — 「못 읽었다」(칸·꼴을 못 찾음)와 「갈렸다」(찾았는데 수가 다름). 섞으면 정규식 고장이 드리프트로 보인다(`quality-gates.md`).
  *

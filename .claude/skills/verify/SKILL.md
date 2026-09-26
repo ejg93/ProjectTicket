@@ -32,7 +32,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 `scripts/docker-up.sh` 가 
 | 스키마·서비스만 볼 때 | 아무 때 | `./gradlew integrationTest` | 실패 0. 컨테이너 레인 |
 | **좌석·예매를 건드렸으면** | 번들 끝 | `./gradlew integrationTest --tests '*Concurrency*'` | 실패 0. 이 레인이 빠지면 동시성 결함이 push 까지 숨는다 |
 | **수치를 남길 때**(락 비교·부하) | 그 청크 | `./gradlew measure` | `build` 밖이다(`D8`). 표를 `doc/notes/` 에 기계 사양과 같이 적고 ADR 이 읽는다. 늘 다시 돈다 — 건너뛰면 지난 숫자를 이번 것으로 읽는다 |
-| **새 `V*` 가 있었으면** | 번들 끝 | 빈 DB 로 `POSTGRES_DB=ticket_check ./gradlew bootRun --args='--spring.profiles.active=local'` 후 `curl localhost:8080/api/health` | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
+| **새 `V*` 가 있었으면** | 번들 끝 | **빈 클러스터**로 — `docker run -d --rm --name ticket-check-db -e POSTGRES_USER=ticket -e POSTGRES_PASSWORD=… -e POSTGRES_DB=ticket_check -p 5499:5432 postgres:17-alpine` 뒤 `.env` 를 읽고 `POSTGRES_DB=ticket_check POSTGRES_PORT=5499 ./gradlew bootRun --args='--spring.profiles.active=local'`, `curl localhost:8080/api/health`. 끝나면 앱 프로세스(`TicketApplication`)와 컨테이너를 끈다. `ticket-db` 안에 둘째 DB 를 만들면 `V20` 의 `create role` 이 「이미 있다」로 선다 — 역할은 클러스터 단위다(`stack.md`) | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
 | 화면을 건드렸으면 | 청크 | `npx tsc --noEmit && npm run lint && npm test`(= `verify.sh`) | 초록. lint 는 `--cache` 라 둘째부터 바뀐 파일만 |
 | 화면을 건드렸으면 | 번들 끝 | `cd frontend && npm run build && npm run lint && npm test`(= `verify.sh --full`) | 초록 |
 | 예매·대기열 화면을 건드렸으면 | 번들 끝 — **`46b` 뒤에만.** `verify.sh --full` 이 Playwright 와 `e2e` 스크립트가 있을 때만 돈다 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과. Playwright 는 있는데 백엔드가 안 떠 있으면 빨갛다 |

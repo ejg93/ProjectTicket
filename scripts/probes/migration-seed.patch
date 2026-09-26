@@ -1,11 +1,11 @@
 # 게이트: MigrationTextTest 시드 금지
 # 명령: cd backend && ./gradlew test --tests '*MigrationTextTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*MigrationTextTest.xml 2>/dev/null; exit $r
 # 문구: 마이그레이션에 시드를 넣었다
-diff --git a/backend/src/main/resources/db/migration/V21__probe_insert.sql b/backend/src/main/resources/db/migration/V21__probe_insert.sql
+diff --git a/backend/src/main/resources/db/migration/V900__probe_insert.sql b/backend/src/main/resources/db/migration/V900__probe_insert.sql
 new file mode 100644
 index 0000000..a1b9f35
 --- /dev/null
-+++ b/backend/src/main/resources/db/migration/V21__probe_insert.sql
++++ b/backend/src/main/resources/db/migration/V900__probe_insert.sql
 @@ -0,0 +1,2 @@
 +-- probe
 +insert into account (email) values ('probe@example.com');

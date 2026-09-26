@@ -25,7 +25,7 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     // 계정 관리(5b). 탈퇴한 계정도 **없는 것**이다 — 관리자에게도 마찬가지다(`D5` 「403 이냐 404 냐」).
     ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "account-not-found", "그런 계정이 없다"),
 
-    // 동의. 형식은 맞는데 값이 규칙에 안 맞는 자리라 422 다(`D5`).
+    // 동의. 입력칸 하나로 못 푸는 규칙 위반이라 422 다 — 빠진 필수 동의는 요청에 칸이 없고, 모르는 항목은 화면이 낡은 목록을 보낸 것이다(`D5` 「400 과 422 의 경계」).
     UNKNOWN_CONSENT_ITEM(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-consent-item", "모르는 동의 항목이다"),
     REQUIRED_CONSENT_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "required-consent-missing", "필수 동의 항목이다"),
 
@@ -80,9 +80,9 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT, "idempotency-in-progress", "같은 요청이 처리 중이다"),
     IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "idempotency-key-reused", "같은 멱등키로 다른 요청이 왔다"),
 
-    // 요청 형식과 칸을 짚는 위반. `validation-failed` 는 칸 하나를 짚을 수 있는 위반 전부다 — 형식이든 규칙이든(`45d-c`, `D5` 「400 과 422 의 경계」).
+    // 요청 형식과 입력칸 위반. `validation-failed` 는 입력칸 하나를 고치면 되는 위반 전부다 — 형식이든 규칙이든(`45d-c`, `D5` 「400 과 422 의 경계」).
     // 나머지는 프레임워크가 정한 상태 코드를 우리 type 으로 옮길 때 쓴다 — 하나로 뭉치면 405·415·깨진 JSON 이 같은 type 으로 나가서 상태 코드보다 type 이 더 뭉친다.
-    VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "요청 형식이 맞지 않는다"),
+    VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "입력한 값이 맞지 않는다"),
     MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "malformed-request", "요청을 읽지 못했다"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "method-not-allowed", "이 경로에서 쓸 수 없는 메서드다"),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "unsupported-media-type", "받을 수 없는 본문 형식이다"),
