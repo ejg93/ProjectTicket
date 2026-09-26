@@ -11,7 +11,9 @@ import com.projectticket.ticket.outbox.OutboxRelay
 import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.RefundQuote
 import com.projectticket.ticket.payment.RefundTransitionService
+import com.projectticket.ticket.payment.expectedRefundOf
 import com.projectticket.ticket.reservation.SeatHoldService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -37,6 +39,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var openService: PerformanceOpenService
 
     private lateinit var fixture: EventFixture
@@ -89,7 +92,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     @Test
     fun cancellation_mail_carries_the_refund_numbers() {
         val reservationId = reserved(startsInDays = 8)
-        refunds.request(accountId, reservationId)
+        refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId))
 
         deliver()
 

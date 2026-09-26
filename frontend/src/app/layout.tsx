@@ -35,7 +35,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <footer>
           <nav aria-label="약관">
-            <Link href="/terms">이용약관</Link> <Link href="/privacy">개인정보 수집·이용 안내</Link>
+            <Link href="/terms">이용약관</Link> <Link href="/privacy">개인정보 수집·이용 안내</Link>{" "}
+            <Link href="/privacy-policy">개인정보처리방침</Link>
           </nav>
         </footer>
       </body>

@@ -23,6 +23,7 @@ class RefundInvariantTest : ConcurrencyTestBase() {
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var quote: RefundQuote
 
     private lateinit var fixture: EventFixture
     private var accountId: Long = 0
@@ -55,7 +56,7 @@ class RefundInvariantTest : ConcurrencyTestBase() {
     fun same_day_cancel_moves_nothing() {
         val (reservationId, _) = reserved(startsInDays = 0)
 
-        assertThatThrownBy { refunds.request(accountId, reservationId) }.hasMessageContaining("당일")
+        assertThatThrownBy { refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId)) }.hasMessageContaining("당일")
 
         assertNothingMoved(reservationId)
     }

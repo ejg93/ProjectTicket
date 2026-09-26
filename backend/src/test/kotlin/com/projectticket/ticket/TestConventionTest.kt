@@ -55,6 +55,22 @@ class TestConventionTest {
             .isEmpty()
     }
 
+    /**
+     * 커밋 레인 자식이 `PREFIX` 를 다시 선언하면 그 클래스 안에서 바탕 것이 가려진다 — 정리(`purgePrefixedRows`)는 바탕 접두만 지워
+     * 그 행이 재사용 컨테이너에 남고, 전역 수를 세는 스윕 시험이 다음 실행에서 흔들린다(`G11` — `SeatChangesTest` 가 `held` 넷을 남겼다).
+     * `const val` 도 `val` 도 바깥 클래스의 정적 필드로 나온다 — 필드 이름으로 본다.
+     */
+    @Test
+    fun a_commit_lane_test_keeps_the_base_prefix() {
+        val children = topLevel.filter { it.isAssignableTo(ConcurrencyTestBase::class.java) && it.name != ConcurrencyTestBase::class.java.name }
+        assertThat(children).describedAs("ConcurrencyTestBase 자식을 못 읽었다 — ImportOption 이나 패키지가 바뀌었다").isNotEmpty()
+
+        val shadowing = children.filter { c -> c.family().any { member -> member.fields.any { it.name == PREFIX_FIELD } } }.map { it.simpleName }
+        assertThat(shadowing)
+            .describedAs("바탕 접두를 가렸다 — 정리가 그 행을 못 지운다. 제 꼬리는 \"\${PREFIX}이름-\" 으로 바탕 접두 뒤에 붙인다(G11)")
+            .isEmpty()
+    }
+
     @Test
     fun the_lane_table_matches_the_build_file() {
         val root = Path.of("..").toAbsolutePath().normalize()
@@ -104,6 +120,9 @@ class TestConventionTest {
         const val MIN_TEST_CLASSES = 30
 
         val BASES = listOf(PostgresTestBase::class.java, ConcurrencyTestBase::class.java)
+
+        /** `ConcurrencyTestBase.PREFIX` 의 이름. 자식이 같은 이름을 선언하면 가린다 */
+        const val PREFIX_FIELD = "PREFIX"
 
         val TEST_ANNOTATIONS = setOf(
             "org.junit.jupiter.api.Test",

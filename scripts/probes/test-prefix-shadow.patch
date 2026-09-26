@@ -1,0 +1,16 @@
+# 게이트: TestConventionTest 바탕 접두 가림(`G11`)
+# 명령: cd backend && ./gradlew test --tests '*TestConventionTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*TestConventionTest.xml 2>/dev/null; exit $r
+# 문구: 바탕 접두를 가렸다
+diff --git a/backend/src/test/kotlin/com/projectticket/ticket/payment/RefundInvariantTest.kt b/backend/src/test/kotlin/com/projectticket/ticket/payment/RefundInvariantTest.kt
+index 6eeffa6..940f9b4 100644
+--- a/backend/src/test/kotlin/com/projectticket/ticket/payment/RefundInvariantTest.kt
++++ b/backend/src/test/kotlin/com/projectticket/ticket/payment/RefundInvariantTest.kt
+@@ -98,4 +98,8 @@ class RefundInvariantTest : ConcurrencyTestBase() {
+             }
+         }.hasStackTraceContaining("환불 등식이 안 맞는다")
+     }
++
++    private companion object {
++        const val PREFIX = "probe-"
++    }
+ }

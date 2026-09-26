@@ -241,6 +241,8 @@ class SecurityConfig {
             "/api/performances/*/seats/changes",
             // 취소 수수료 구간표(`42-1a`). 결제 전에 보여 주는 공통 표다 — 예매 하나에 안 묶인다.
             "/api/refund-tiers",
+            // 개인정보처리방침(`39-3a`, 제30조 제2항). 누구나 쉽게 확인할 수 있어야 한다.
+            "/api/policies/*",
         )
 
         /** 로그인 없이 쓰는 경로 — 가입·로그인 둘. 로그아웃은 세션이 있어야 뜻이 있어 여기 없다 */

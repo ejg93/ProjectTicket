@@ -5,7 +5,9 @@ import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.RefundQuote
 import com.projectticket.ticket.payment.RefundTransitionService
+import com.projectticket.ticket.payment.expectedRefundOf
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -25,6 +27,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService
     @Autowired lateinit var refunds: RefundTransitionService
+    @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var sweeper: HoldSweeper
     @Autowired lateinit var openService: PerformanceOpenService
     @Autowired lateinit var transactionManager: PlatformTransactionManager
@@ -79,7 +82,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
         assertThat(pointerSet(reservationId)).describedAs("reserved").isEqualTo(expected)
 
-        refunds.request(accountId, reservationId)
+        refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId))
         assertThat(pointerSet(reservationId)).describedAs("cancelled — 포인터는 풀린다").isEmpty()
         assertThat(recordSet(reservationId)).describedAs("cancelled — 기록은 남는다").isEqualTo(expected)
     }

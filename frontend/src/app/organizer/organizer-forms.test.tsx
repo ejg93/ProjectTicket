@@ -82,6 +82,48 @@ describe("공연 등록", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("2번째 등급의 코드를 확인해 주세요.");
   });
 
+  it("서버가 거절해도 친 값이 칸에 남는다(`39-4`)", async () => {
+    // React 19 는 액션이 끝나면 `form.reset()` 을 부른다 — 오류를 잡고 끝나도 같다. 값을 남기는 것은 draft → `defaultValue` 다.
+    respond({ type: "tag:projectticket.example,2026:validation-failed", detail: "요청 형식이 맞지 않는다" }, 400);
+    render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }, { organizer_id: 4, name: "둘째" }]} sections={["F1-A", "F1-B"]} />);
+
+    await userEvent.selectOptions(screen.getByLabelText("기획사"), "4");
+    await userEvent.type(screen.getByLabelText("공연 제목"), "겨울 콘서트");
+    await userEvent.type(screen.getByLabelText("등급 코드(예: VIP)"), "VIP");
+    await userEvent.type(screen.getByLabelText("가격(원)"), "154000");
+    await userEvent.click(screen.getByRole("checkbox", { name: "F1-B" }));
+    await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
+
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("기획사")).toHaveValue("4");
+    expect(screen.getByLabelText("공연 제목")).toHaveValue("겨울 콘서트");
+    expect(screen.getByLabelText("등급 코드(예: VIP)")).toHaveValue("VIP");
+    expect(screen.getByLabelText("가격(원)")).toHaveValue(154000);
+    expect(screen.getByRole("checkbox", { name: "F1-B" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "F1-A" })).not.toBeChecked();
+  });
+
+  it("거절 뒤 뺀 등급 줄을 다시 더하면 빈 줄이다(마무리 17차)", async () => {
+    respond({ type: "tag:projectticket.example,2026:validation-failed", detail: "입력한 값이 맞지 않는다" }, 400);
+    render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
+
+    await userEvent.type(screen.getByLabelText("공연 제목"), "겨울 콘서트");
+    await userEvent.click(screen.getByRole("button", { name: "등급 추가" }));
+    const [, secondCode] = screen.getAllByLabelText("등급 코드(예: VIP)");
+    await userEvent.type(screen.getAllByLabelText("등급 코드(예: VIP)")[0], "VIP");
+    await userEvent.type(secondCode, "R");
+    for (const price of screen.getAllByLabelText("가격(원)")) await userEvent.type(price, "1000");
+    for (const box of screen.getAllByRole("checkbox", { name: "F1-A" })) await userEvent.click(box);
+    await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
+    await screen.findByRole("alert");
+
+    await userEvent.click(screen.getByRole("button", { name: "마지막 등급 빼기" }));
+    await userEvent.click(screen.getByRole("button", { name: "등급 추가" }));
+
+    expect(screen.getAllByLabelText("등급 코드(예: VIP)")[1]).toHaveValue("");
+    expect(screen.getAllByLabelText("등급 코드(예: VIP)")[0]).toHaveValue("VIP");
+  });
+
   it("접근성 위반이 없다", async () => {
     const { container } = render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
     await expectNoAxeViolations(container);
@@ -128,6 +170,41 @@ describe("회차 등록", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  const HALLS = [
+    { hall_id: 9, name: "1관", venue_name: "홀", sections: [] },
+    { hall_id: 10, name: "2관", venue_name: "홀", sections: [] },
+  ];
+
+  async function fillPerformance() {
+    await userEvent.selectOptions(screen.getByLabelText("홀"), "10");
+    await userEvent.type(screen.getByLabelText("관람 시각(한국 시간)"), "2026-10-01T19:30");
+    await userEvent.type(screen.getByLabelText("판매 시작(한국 시간)"), "2026-09-20T10:00");
+    await userEvent.click(screen.getByRole("button", { name: "회차 등록" }));
+  }
+
+  it("서버가 거절해도 친 값이 남는다(`39-4`)", async () => {
+    respond({ type: "tag:projectticket.example,2026:performance-slot-taken", detail: "그 시각에 회차가 있다" }, 409);
+    render(<PerformanceForm eventId={42} halls={HALLS} />);
+
+    await fillPerformance();
+
+    await screen.findByRole("alert");
+    expect(screen.getByLabelText("홀")).toHaveValue("10");
+    expect(screen.getByLabelText("관람 시각(한국 시간)")).toHaveValue("2026-10-01T19:30");
+    expect(screen.getByLabelText("판매 시작(한국 시간)")).toHaveValue("2026-09-20T10:00");
+  });
+
+  it("등록되면 비워 다음 회차를 받는다", async () => {
+    respond({ performance_id: 7 });
+    render(<PerformanceForm eventId={42} halls={HALLS} />);
+
+    await fillPerformance();
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByLabelText("관람 시각(한국 시간)")).toHaveValue(""));
+    expect(screen.getByLabelText("홀")).toHaveValue("9");
   });
 });
 

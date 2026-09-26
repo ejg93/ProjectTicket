@@ -55,14 +55,14 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
     /** 커밋된 예매 하나. 소비자가 표를 다시 읽으므로(`D11`) 진짜 행이 있어야 한다 */
     private fun reservedSeat(): Reserved {
         val fixture = EventFixture(jdbc)
-        val eventId = fixture.event(fixture.organizer("$PREFIX${System.nanoTime()}"))
-        val hallId = fixture.hall(venueName = "$PREFIX${System.nanoTime()}")
+        val eventId = fixture.event(fixture.organizer("${PREFIX}consumer-idem"))
+        val hallId = fixture.hall(venueName = "${PREFIX}consumer-idem-${System.nanoTime()}")
         fixture.seats(hallId, "F1-A", 2)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
         val performanceId = fixture.performance(eventId, hallId)
         openService.open(performanceId, actorAccountId = null)
 
-        val accountId = fixture.account("$PREFIX${System.nanoTime()}@test.local")
+        val accountId = fixture.account("${PREFIX}consumer-idem-${System.nanoTime()}@test.local")
         val seatId = fixture.performanceSeatIds(performanceId).first()
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, listOf(seatId)))
         val paying = payments.startPaying(accountId, reservationId)
@@ -96,8 +96,6 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
             .param("id", eventId).query(Long::class.java).single()
 
     private companion object {
-        const val PREFIX = "consumer-idem-"
-
         /** 둘째 메시지가 처리될 시간을 준 뒤에 센다. 안 주면 「아직 안 왔다」를 「안 만들었다」로 읽는다 */
         const val SETTLE_MS = 3_000L
     }
