@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 좌석 현황 조회(`D20`). 로그인 없이 본다(`SecurityConfig.PUBLIC_PATHS`).
+ * 좌석 현황 조회(`D20`). 로그인 없이 본다(`SecurityConfig.PUBLIC_GET_PATHS`).
  *
  * `ETag` 는 버전이고 `Cache-Control: no-cache` 는 「써도 되지만 매번 재검증하라」다(`D5` 「헤더」).
  * 재검증은 손으로 한다 — `WebRequest.checkNotModified` 가 응답에 헤더를 직접 쓰는데 `ResponseEntity` 가 또 쓰면 `ETag` 가 둘이 된다.

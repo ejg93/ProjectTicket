@@ -9,6 +9,7 @@ import java.util.function.Supplier
 import org.springframework.boot.web.server.autoconfigure.ServerProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.InsufficientAuthenticationException
@@ -76,7 +77,8 @@ class SecurityConfig {
         http
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers(*PUBLIC_PATHS.toTypedArray()).permitAll()
+                    .requestMatchers(HttpMethod.GET, *PUBLIC_GET_PATHS.toTypedArray()).permitAll()
+                    .requestMatchers(HttpMethod.POST, *PUBLIC_POST_PATHS.toTypedArray()).permitAll()
                     // 경로 접두로 역할을 가른다(`D5`). **필터라 컨트롤러 밖이다** — 기획사 입구가 늘어도 빠뜨릴 자리가 없다.
                     .requestMatchers(ORGANIZER_PREFIX).hasAuthority(AccountRole.ORGANIZER.authority)
                     .requestMatchers(ADMIN_PREFIX).hasAuthority(AccountRole.ADMIN.authority)
@@ -208,21 +210,22 @@ class SecurityConfig {
         SpringSessionBackedSessionRegistry(sessions)
 
     companion object {
-        /** 로그인 없이 되는 경로. 공연 목록·좌석 현황 조회는 그 청크(10)가 여기에 더한다 */
         /** 기획사 전용 접두. 여기서 막힌 403 은 `organizer-forbidden` 이다(`ProblemAccessDeniedHandler`) */
         const val ORGANIZER_PREFIX = "/api/organizer/**"
 
         /** 관리자 전용 접두(5b). 역할을 컨트롤러가 다시 안 센다 — 입구가 늘어도 빠뜨릴 자리가 없다 */
         const val ADMIN_PREFIX = "/api/admin/**"
 
-        val PUBLIC_PATHS = listOf(
+        /**
+         * 로그인 없이 읽는 경로. **메서드까지 가른다**(`S1`) — 경로만 열면 같은 경로의 DELETE·PUT 도 인증 없이 인가를 지난다.
+         * 여기 없는 메서드는 익명이면 401 이다.
+         */
+        val PUBLIC_GET_PATHS = listOf(
             "/api/health",
             "/actuator/health",
             "/actuator/health/**",
             // 수집기가 읽는다(30). 로컬 compose 는 인증이 없어서 열어 두고, 밖에 나갈 때는 망으로 가른다(`D9`).
             "/actuator/prometheus",
-            "/api/auth/signup",
-            "/api/auth/login",
             // 가입 화면이 무엇에 동의를 받아야 하는지 알아야 한다. 로그인 전에 보는 것이라 공개다.
             "/api/consent-items",
             // 약관·처리방침 본문(`39-1`). 발에서 누구나 닿아야 한다.
@@ -236,6 +239,12 @@ class SecurityConfig {
             "/api/performances/*/seats",
             // 델타도 같은 그림이다(10a). 로그인 전에 좌석을 보고 나서 로그인한다.
             "/api/performances/*/seats/changes",
+        )
+
+        /** 로그인 없이 쓰는 경로 — 가입·로그인 둘. 로그아웃은 세션이 있어야 뜻이 있어 여기 없다 */
+        val PUBLIC_POST_PATHS = listOf(
+            "/api/auth/signup",
+            "/api/auth/login",
         )
     }
 }

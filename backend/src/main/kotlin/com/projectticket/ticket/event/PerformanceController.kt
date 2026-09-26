@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 회차 하나(`D5`, `40c`). 로그인 없이 본다(`SecurityConfig.PUBLIC_PATHS`) — 좌석도처럼 보고 나서 로그인한다.
+ * 회차 하나(`D5`, `40c`). 로그인 없이 본다(`SecurityConfig.PUBLIC_GET_PATHS`) — 좌석도처럼 보고 나서 로그인한다.
  *
  * **`draft` 는 그 기획사 사람만 본다.** 회차 등록 201 의 `Location` 이 이 주소라 등록한 쪽에는 답해야 하고(RFC 9110),
  * 남에게는 **없는 회차**다 — 번호가 순번이라 훑으면 미공개 공연이 드러난다(`D5` 「기획사의 공연·회차 404」, 마무리 13차 독립 리뷰).
