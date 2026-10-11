@@ -100,7 +100,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 |---|---|---|---|
 | `ci.yml` | `backend` | 필수 | 빌드·테스트 두 레인·detekt |
 | `ci.yml` | `frontend` | 필수 | `next build`·lint·test. `frontend/` 가 있을 때만 돈다 — 그 전에는 `steps.has` 가 건너뛰어도 잡은 초록이다 |
-| `ci.yml` | `audit` | 아니다 | `npm audit --audit-level=high`. 빨가면 배지로 보이고 dependabot 이 고친다 — 필수로 걸면 남의 권고 하나에 머지가 선다(`B0-5`, 사용자 결정 (가)) |
+| `ci.yml` | `audit` | 아니다 | `npm audit --audit-level=high`. 필수로 걸면 남의 권고 하나에 머지가 선다(`B0-5`, 사용자 결정 (가)). **빨개도 아무도 안 본다** — 머지 뒤 `main` 실행을 읽는 자리가 없고, Dependabot PR 은 버전표 때문에 혼자 빨갛다(`stack.md`). 2026-10-11 `main` 이 Next critical 로 빨간 채였다(점검 9차 → `I9-1`·`I9-5`) |
 | `ci.yml` | `e2e` | 아니다 | 가입→선점→(관문)→결제 한 바퀴를 Playwright 로(`46b`). 백엔드는 잡 안의 jar + compose 셋. 사용자 결정 (가) — 흔들림을 재기 전이라 필수로 안 건다. 열 번 연속 초록이면 `G12` 가 올린다 |
 | `ci.yml` | `secrets` | 필수 | gitleaks |
 | `ci.yml` | `docs` | 필수 | `doc-lint.sh` |

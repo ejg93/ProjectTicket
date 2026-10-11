@@ -186,7 +186,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 
 **자원 단위로 판다.** 관객·기획사 같은 사람 단위로 안 판다 — 같은 자원을 두 사람이 다루면 코드가 두 벌이 된다.
 
-지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `reservation` · `settlement`.
+지금 있는 것: `account` · `audit` · `auth` · `consent` · `demo` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `queue` · `reservation` · `settlement` · `web`. 뿌리에 스케줄러 둘(`SchedulerLock`·`SchedulingConfig`) — 모든 스케줄러가 부른다. `demo` 는 `local` 프로필의 시드(12), `web` 은 목록 규약(`Paging`, `D5`)이다.
 
 **의존 방향은 `payment → reservation → event → settlement`, 그리고 전부 `outbox`·`idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있고 회차 종료가 `reservation` 에 있는 이유다 — 부르는 쪽이 아래로 간다.
 넷 사이의 방향은 `ArchitectureTest.resourcePackagesDependDownward` 가 막는다(`G7a`).

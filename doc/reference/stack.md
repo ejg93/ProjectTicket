@@ -411,6 +411,11 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 
 의존 그래프가 기본 가지 기준이라 작업 가지에 올려도 경보가 그대로다. `main` 에 머지돼야 `fixed` 로 닫힌다. 오탐은 사람이 `inaccurate` 로 닫는다.
 
+### 버전표에 행이 있는 의존성의 Dependabot PR 은 혼자서는 빨갛다
+
+`StackVersionConsistencyTest` 가 이 표와 빌드 파일을 대조하는데 Dependabot 은 이 표를 안 고친다 — Next·ArchUnit·Gradle 을 올린 PR(#34·#30)이 `backend` 잡에서 그 시험으로 섰다(점검 9차). **설계대로다.** 판을 올리는 것은 작업 가지의 청크가 표와 같이 하고, 그 PR 은 닫는다.
+`npm audit` 의 전이 의존성은 Dependabot 그룹 PR 이 안 고친다 — 직접 의존만 올린다. 잠금 파일은 `npm audit fix` 가 고친다. **고친 판이 없는 권고**(`braces *`)는 둘 다 못 고친다.
+
 ### Redis 는 테스트 롤백이 안 되돌린다
 
 `PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.
@@ -483,13 +488,9 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ## 아직 안 정한 것
 
-| 대상 | 언제 |
-|---|---|
-| Redisson(스케줄러 락·좌석 락) | 33, ADR 0003. Lettuce 는 `20a` 가 스타터로 들였다 |
-| 품질 게이트 도구(detekt·CodeQL·SpotBugs) | `P10`(46·47). ProjectShop 의 SpotBugs·find-sec-bugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봤다 — 그 판단은 그때 다시 |
-| Kafka | 28, ADR 0007 |
+지금 없다. 있던 셋은 정해졌다(점검 9차 `I9`) — Redisson 은 **안 쓴다**(33, `SchedulerLock` 이 Lettuce 위의 `SET NX`), 품질 게이트는 detekt·CodeQL 이고 SpotBugs 는 안 들였다(`P10`·`47`, `quality-gates.md`), Kafka 는 위 버전표에 있다(28).
 
-정해지면 위 버전표에 줄을 더한다.
+새로 미정인 것이 생기면 여기 행을 세우고, 정해지면 위 버전표로 옮긴다.
 
 ## 버전을 올릴 때
 
