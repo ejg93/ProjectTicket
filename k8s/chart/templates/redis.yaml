@@ -1,9 +1,11 @@
-# Redis(`36`). compose `redis` 를 옮겼다. 날아가도 사고가 아닌 것만 둔다(대기열·세션·좌석 판) — 볼륨을 안 단다.
+# Redis(`36`). 날아가도 사고가 아닌 것만 둔다(대기열·세션·좌석 판) — 볼륨을 안 단다.
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
-  namespace: ticket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ticket.labels" . | nindent 4 }}
 spec:
   selector:
     app: redis
@@ -14,7 +16,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-  namespace: ticket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ticket.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -27,7 +31,7 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7-alpine
+          image: {{ .Values.redis.image }}
           args: ["redis-server", "--appendonly", "yes"]
           ports:
             - containerPort: 6379

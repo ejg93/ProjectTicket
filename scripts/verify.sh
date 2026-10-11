@@ -117,6 +117,13 @@ if changed tools; then
     node -e 'JSON.parse(require("fs").readFileSync(".claude/settings.json","utf8"))' || { echo "settings.json 이 JSON 이 아니다"; ok=0; }
     bash scripts/doc-lint.sh >/dev/null || ok=0
     bash scripts/hooks-test.sh || ok=0
+    # 차트(`37`): lint 와 렌더 ↔ 커밋된 스냅샷. helm 이 없는 기계면 그 둘만 건너뛴다 — CI `backend` 잡이 같은 것을 돈다.
+    if command -v helm >/dev/null; then
+      helm lint --strict --quiet k8s/chart >/dev/null || { echo "helm lint 가 빨갛다 — helm lint --strict k8s/chart"; ok=0; }
+      helm template ticket k8s/chart -n ticket | diff -q - k8s/chart/snapshot.yaml >/dev/null         || { echo "차트 렌더가 스냅샷과 다르다 — bash scripts/helm-snapshot.sh 를 돌리고 커밋한다"; ok=0; }
+    else
+      echo "== helm 이 없다 — 차트 lint·스냅샷 비교를 건너뛴다(CI backend 잡이 돈다)"
+    fi
   fi
 fi
 [ "$ran" -eq 0 ] && echo "돌릴 것이 없다 — 지문이 origin/main 과 같거나 도장이 이미 있다"

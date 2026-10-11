@@ -42,6 +42,18 @@ jobs:
         run: ./gradlew build
         working-directory: backend
 
+      # 차트(`37`). 필수 잡 안에 둔다 — 렌더가 커밋된 스냅샷과 어긋나면 머지가 선다(`K8sManifestTest` 가 그 스냅샷을 읽는다).
+      # 판을 로컬과 같게 박는다 — 러너에 깔린 helm 은 판이 달라 렌더 글자가 갈릴 수 있다.
+      - if: steps.has.outputs.ok == 'true'
+        uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+
+      - if: steps.has.outputs.ok == 'true'
+        run: |
+          helm lint --strict k8s/chart
+          helm template ticket k8s/chart -n ticket | diff - k8s/chart/snapshot.yaml             || { echo "차트 렌더가 스냅샷과 다르다 — bash scripts/helm-snapshot.sh 를 돌리고 커밋한다"; exit 1; }
+
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 15

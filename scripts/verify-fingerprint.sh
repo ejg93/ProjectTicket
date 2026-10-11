@@ -33,4 +33,4 @@ lane frontend frontend/src frontend/package.json frontend/package-lock.json fron
               frontend/e2e frontend/playwright.config.ts \
               doc/reference/api-guidelines.md doc/reference/screen-rules.md
 # 검증 도구 자체(`B0-2`). 이 레인이 없으면 verify.sh·훅을 고쳐도 도장이 안 바뀌어 아무 검사도 안 돈다.
-lane tools    scripts .claude/settings.json
+lane tools    scripts .claude/settings.json k8s/chart

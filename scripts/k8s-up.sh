@@ -15,11 +15,10 @@ docker build -t "$IMAGE" backend
 kind load docker-image "$IMAGE" --name "$CLUSTER"
 
 existed=$(kubectl -n ticket get deployment app -o name 2>/dev/null || true)
-kubectl apply -f k8s/base/namespace.yaml
-kubectl apply -f k8s/base
+# 차트(`37`)가 다섯을 들고 준비될 때까지 기다린다. 값이 그대로면 아무것도 안 바뀐다.
+helm upgrade --install ticket k8s/chart -n ticket --create-namespace --wait --timeout 5m
 # 같은 태그로 다시 구웠으면 파드가 옛 이미지를 쥐고 있다 — 새로 띄운다. 처음이면 막 뜨는 파드를 죽이지 않게 건너뛴다.
-[ -n "$existed" ] && kubectl -n ticket rollout restart deployment/app >/dev/null
-
-for target in statefulset/db deployment/redis statefulset/kafka deployment/app; do
-  kubectl -n ticket rollout status "$target" --timeout=300s
-done
+if [ -n "$existed" ]; then
+  kubectl -n ticket rollout restart deployment/app >/dev/null
+  kubectl -n ticket rollout status deployment/app --timeout=300s
+fi

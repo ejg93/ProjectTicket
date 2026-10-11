@@ -1,0 +1,8 @@
+# 로컬 kind 배포 차트(`37`). `36` 의 매니페스트 다섯을 값으로 묶었다 — base 는 지웠다(둘을 두면 갈린다).
+# 렌더 결과를 `snapshot.yaml` 로 커밋한다. 템플릿이나 값을 고치면 `bash scripts/helm-snapshot.sh` 를 돌리고 같이 커밋한다.
+apiVersion: v2
+name: ticket
+description: 공연 예매 시스템 — 앱과 Postgres·Redis·Kafka
+type: application
+version: 0.1.0
+appVersion: "local"

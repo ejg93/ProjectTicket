@@ -30,6 +30,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Next | 16.3.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
 | React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
 | kind | 0.33.0 | `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
+| Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
 | kubectl | 1.36.1 | Docker Desktop 이 준다. 매니페스트는 `k8s/base` |
 | Playwright | 1.63.0 | `frontend/package.json`(`^1.63.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |

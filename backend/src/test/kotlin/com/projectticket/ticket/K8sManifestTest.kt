@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test
 
 /**
  * k8s 매니페스트가 **무중단의 전제를 지키나**(`36`). `ComposeContractTest` 와 같은 자리 — 파일을 글자로 읽어 클러스터가 필요 없다.
+ * 차트(`37`)의 템플릿이 아니라 **값이 박힌 렌더 결과**(`k8s/chart/snapshot.yaml`)를 읽는다 — 템플릿에는 `{{ .Values… }}` 만 있다.
+ * 스냅샷이 렌더와 같은지는 `verify.sh` tools 레인과 CI `backend` 잡이 본다.
  *
  * | 무엇 | 틀리면 |
  * |---|---|
@@ -19,15 +21,18 @@ class K8sManifestTest {
 
     private val root: Path = Path.of("..").toAbsolutePath().normalize()
 
-    /** 주석은 걷어낸다 — 설명 줄의 단어가 검사에 걸리면 안 된다 */
-    private val app = Files.readString(root.resolve("k8s/base/app.yaml"))
-        .lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+    /** 스냅샷에서 앱 Deployment 문서 하나. 주석은 걷어낸다 — 설명 줄의 단어가 검사에 걸리면 안 된다 */
+    private val app = Files.readString(root.resolve("k8s/chart/snapshot.yaml"))
+        .split(Regex("""(?m)^---$"""))
+        .map { doc -> doc.lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n") }
+        .firstOrNull { it.contains("kind: Deployment") && it.contains(Regex("""(?m)^ {2}name: app$""")) }
+        .orEmpty()
     private val up = Files.readString(root.resolve("scripts/k8s-up.sh"))
 
     @Test
     fun the_app_deployment_keeps_the_zero_downtime_premises() {
         // 아래 단언이 다 「값이 있다」라 못 읽으면 빨강이지만, Deployment 를 다른 파일로 옮기면 그 사실을 먼저 말한다(`G3`).
-        assertThat(app).describedAs("k8s/base/app.yaml 에서 Deployment 를 못 읽었다 — 옮겼으면 이 검사도 옮긴다").contains("kind: Deployment")
+        assertThat(app).describedAs("k8s/chart/snapshot.yaml 에서 앱 Deployment 를 못 읽었다 — 이름을 바꿨거나 스냅샷을 안 만들었다").contains("kind: Deployment")
 
         assertThat(app).contains("path: /actuator/health/readiness")
         assertThat(app).contains("replicas: 3")
