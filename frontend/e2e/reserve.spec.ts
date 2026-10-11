@@ -49,8 +49,13 @@ test("가입한 관객이 좌석 하나를 잡고 결제까지 마친다", async
 async function holdOneSeat(page: Page) {
   const open = page.getByRole("checkbox", { name: /선택 가능/ });
   await open.first().waitFor();
-  const count = await open.count();
-  await open.nth(Math.floor(Math.random() * count)).check();
+  const seat = open.nth(Math.floor(Math.random() * (await open.count())));
+  // 하이드레이션 전에 누른 체크는 React 상태에 안 들어가고 하이드레이션이 풀어 버린다(막 뜬 서버의 첫 판에서 「0석 선택」으로 실측).
+  // 상태 줄이 「1석 선택」을 말할 때까지 다시 고른다.
+  await expect(async () => {
+    await seat.check();
+    await expect(page.getByRole("status").filter({ hasText: "석 선택" })).toHaveText(/^1석 선택/, { timeout: 1_000 });
+  }).toPass();
   await page.getByRole("button", { name: "선택한 좌석 예매" }).click();
   await expect(page).toHaveURL(/\/(reservations|queue)\/\d+/);
 }

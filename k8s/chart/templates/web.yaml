@@ -1,6 +1,6 @@
 # 화면(`36a`). Next standalone 이미지. 서버 컴포넌트는 `BACKEND_ORIGIN` 으로 앱에 직접, 브라우저의 `/api` 는
 # 빌드 때 굳은 rewrites 로 같은 곳에 간다 — 둘 다 앱 Service(`app:8080`)다(`D16` 「서버·클라이언트 경계」).
-# 밖에서는 NodePort 30300 → kind 가 호스트 3000 으로 연다(`k8s/kind.yaml`).
+# 밖에서는 NodePort 30300 → kind 가 호스트 3300 으로 연다(`k8s/kind.yaml`).
 apiVersion: v1
 kind: Service
 metadata:

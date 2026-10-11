@@ -34,7 +34,7 @@ web:
   replicas: 2
   image: ticket-web
   tag: local
-  # 호스트 3000 ← kind `extraPortMappings` ← 이 NodePort(`k8s/kind.yaml`).
+  # 호스트 3300 ← kind `extraPortMappings` ← 이 NodePort(`k8s/kind.yaml`).
   nodePort: 30300
   resources:
     requests:

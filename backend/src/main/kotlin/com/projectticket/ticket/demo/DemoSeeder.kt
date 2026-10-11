@@ -167,7 +167,7 @@ class DemoSeeder(
 
         private val EVENT_TITLES = listOf("겨울 콘서트", "봄 뮤지컬")
 
-        /** 권고 락 열쇠. 이 시드 말고는 권고 락을 안 쓴다 — 아무 수나 겹치지 않으면 된다 */
+        /** 권고 락 열쇠. 앱 코드에서 권고 락은 이 시드뿐이다 — Flyway 도 권고 락을 쓰지만 열쇠가 다르다(`LOCK_MAGIC_NUM` 기반) */
         private const val SEED_LOCK_KEY = 20_260_912L
     }
 }

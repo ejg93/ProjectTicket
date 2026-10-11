@@ -18,9 +18,9 @@ for _ in $(seq 1 20); do
 done
 [ "$app_ok" = 1 ] || { echo "앱이 답하지 않는다 — kubectl -n ticket get pods 와 logs 를 본다" >&2; exit 1; }
 
-# 화면(`36a`) — NodePort 를 kind 가 호스트 3000 으로 연다. `/events` 는 서버 컴포넌트가 앱을 직접 부른다.
+# 화면(`36a`) — NodePort 를 kind 가 호스트 3300 으로 연다. `/events` 는 서버 컴포넌트가 앱을 직접 부른다.
 for path in /login /events; do
-  code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:3000$path")
+  code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:3300$path")
   echo "web $path $code"
   [ "$code" = 200 ] || { echo "화면이 $path 에 200 을 안 준다 — kubectl -n ticket logs deploy/web" >&2; exit 1; }
 done
