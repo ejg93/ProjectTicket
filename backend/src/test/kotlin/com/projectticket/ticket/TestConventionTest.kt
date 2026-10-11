@@ -59,13 +59,16 @@ class TestConventionTest {
      * 커밋 레인 자식이 `PREFIX` 를 다시 선언하면 그 클래스 안에서 바탕 것이 가려진다 — 정리(`purgePrefixedRows`)는 바탕 접두만 지워
      * 그 행이 재사용 컨테이너에 남고, 전역 수를 세는 스윕 시험이 다음 실행에서 흔들린다(`G11` — `SeatChangesTest` 가 `held` 넷을 남겼다).
      * `const val` 도 `val` 도 바깥 클래스의 정적 필드로 나온다 — 필드 이름으로 본다.
+     * getter 만 둔 `val PREFIX get() = …` 은 필드가 없고 메서드 `getPREFIX` 만 나온다 — 그것도 가림이다(`G11-1`).
      */
     @Test
     fun a_commit_lane_test_keeps_the_base_prefix() {
         val children = topLevel.filter { it.isAssignableTo(ConcurrencyTestBase::class.java) && it.name != ConcurrencyTestBase::class.java.name }
         assertThat(children).describedAs("ConcurrencyTestBase 자식을 못 읽었다 — ImportOption 이나 패키지가 바뀌었다").isNotEmpty()
 
-        val shadowing = children.filter { c -> c.family().any { member -> member.fields.any { it.name == PREFIX_FIELD } } }.map { it.simpleName }
+        val shadowing = children.filter { c ->
+            c.family().any { member -> member.fields.any { it.name == PREFIX_FIELD } || member.methods.any { it.name == PREFIX_GETTER } }
+        }.map { it.simpleName }
         assertThat(shadowing)
             .describedAs("바탕 접두를 가렸다 — 정리가 그 행을 못 지운다. 제 꼬리는 \"\${PREFIX}이름-\" 으로 바탕 접두 뒤에 붙인다(G11)")
             .isEmpty()
@@ -123,6 +126,7 @@ class TestConventionTest {
 
         /** `ConcurrencyTestBase.PREFIX` 의 이름. 자식이 같은 이름을 선언하면 가린다 */
         const val PREFIX_FIELD = "PREFIX"
+        const val PREFIX_GETTER = "getPREFIX"
 
         val TEST_ANNOTATIONS = setOf(
             "org.junit.jupiter.api.Test",

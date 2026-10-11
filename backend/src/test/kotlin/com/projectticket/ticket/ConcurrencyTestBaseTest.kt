@@ -1,10 +1,11 @@
 package com.projectticket.ticket
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 
 /**
- * 바탕 자체를 잰다 — 스레드마다 자기 트랜잭션으로 **커밋**되는가, 정리가 접두 행만 지우는가.
+ * 바탕 자체를 잰다 — 스레드마다 자기 트랜잭션으로 **커밋**되는가, 정리가 접두 행만 지우는가, 접두로 못 찾는 파기 흉내를 뒤 대조가 잡는가.
  *
  * 이것이 통과해야 위에 올리는 동시성 테스트(13·14·16)의 실패가 바탕이 아니라 코드를 가리킨다.
  */
@@ -31,6 +32,21 @@ class ConcurrencyTestBaseTest : ConcurrencyTestBase() {
             .describedAs("남의 행을 지우면 그쪽 테스트가 조용히 깨진다")
             .isOne()
         jdbc.sql("delete from account where account_id = :id").param("id", bystander).update()
+    }
+
+    @Test
+    fun a_leaked_purge_lookalike_fails_the_after_guard() {
+        val leaked = insertAccount("${PREFIX}ghost@test.local")
+        try {
+            // 파기 흉내 — 이메일이 비면 접두 정리가 못 찾는다. 뒤 대조가 이것을 빨강으로 내야 한다(`G11-1`).
+            jdbc.sql("update account set email = null, deleted_at = now() where account_id = :id").param("id", leaked).update()
+
+            assertThatThrownBy { purgeAfter() }
+                .isInstanceOf(AssertionError::class.java)
+                .hasMessageContaining("파기 흉내 계정 1")
+        } finally {
+            jdbc.sql("delete from account where account_id = :id").param("id", leaked).update()
+        }
     }
 
     private fun insertAccount(email: String): Long =

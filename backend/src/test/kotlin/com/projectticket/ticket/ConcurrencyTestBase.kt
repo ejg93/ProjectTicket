@@ -3,6 +3,7 @@ package com.projectticket.ticket
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.fail
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -48,8 +49,6 @@ abstract class ConcurrencyTestBase {
      * 순서는 `restrict` 외래키를 거슬러 올라간다 — 좌석의 포인터를 먼저 풀어야 예매가 지워지고, 예매가 계정·회차를 `restrict` 로 잡아서
      * 예매가 그다음, 회차가 공연·홀을 `restrict` 로 잡아서 회차가 그다음이다. 나머지는 `cascade` 라 부모만 지운다.
      */
-    @BeforeEach
-    @AfterEach
     fun purgePrefixedRows() {
         TransactionTemplate(txManager).executeWithoutResult {
             val performances = """
@@ -89,6 +88,33 @@ abstract class ConcurrencyTestBase {
             jdbc.sql("delete from account where email like :prefix").param("prefix", "$PREFIX%").update()
         }
     }
+
+    /** 이 시험이 들어오기 전의 파기 흉내 계정 수. [purgeAfter] 가 이것과 대조한다. */
+    private var ghostsBefore = 0L
+
+    @BeforeEach
+    fun purgeBefore() {
+        purgePrefixedRows()
+        ghostsBefore = countGhosts()
+    }
+
+    /**
+     * 정리 뒤 **파기 흉내 계정이 늘었으면 빨강이다**(`G11-1`). 파기는 이메일을 비우므로(`V2`) 그 계정은 접두로 못 찾고,
+     * 그 계정의 `notification` 도 같이 남아 전역을 훑는 스윕 시험을 다음 실행에서 흔든다.
+     * 접두 없는 행을 전역으로 지워 덮지 않는다 — 남의 행을 지우게 된다(`purge_removes_only_prefixed_rows`).
+     * 그래서 이메일을 비운 시험이 **제 `account_id` 로** 지우고, 여기서는 그것을 잊었는지만 본다.
+     */
+    @AfterEach
+    fun purgeAfter() {
+        purgePrefixedRows()
+        val leaked = countGhosts() - ghostsBefore
+        if (leaked > 0) {
+            fail("파기 흉내 계정 $leaked 을 남겼다 — 그 시험이 제 account_id 로 notification·account 를 지운다(G11-1)")
+        }
+    }
+
+    private fun countGhosts(): Long =
+        jdbc.sql("select count(*) from account where email is null and deleted_at is not null").query(Long::class.java).single()
 
     /**
      * 스레드 `count` 를 **출발선에 모아 두고 한 번에 놓는다.** 스레드를 만드는 시간이 선점 하나보다 길어서

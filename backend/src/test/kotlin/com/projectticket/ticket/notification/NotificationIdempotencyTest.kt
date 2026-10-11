@@ -51,7 +51,8 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     fun setUp() {
         // **남이 커밋해 둔 알림을 치운다.** 28 뒤로 커밋 레인 테스트의 Kafka 소비자가 진짜 행을 남기고,
         // 컨테이너를 재사용하면 지난 실행 것까지 쌓인다 — 스윕은 전체를 훑으므로 그것들이 이 테스트의 수를 흔든다.
-        // 이 트랜잭션 안의 삭제라 끝나면 되돌아간다(`stack.md` — 롤백 레인).
+        // 커밋 레인이라 이 삭제는 **전역으로 커밋된다** — 남의 행을 치우는 것이 목적이다. 이 클래스 뒤에 남는 것은
+        // 바탕의 접두 정리가, 접두로 못 찾는 파기 계정은 그것을 만든 시험이 제 id 로 지운다(`G11-1`).
         jdbc.sql("delete from notification").update()
 
         fixture = EventFixture(jdbc)
@@ -129,16 +130,22 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     @Test
     fun a_withdrawn_account_is_skipped_not_failed() {
         val leaving = fixture.account("${PREFIX}leaving@test.local")
-        insertPending(leaving)
-        // 파기는 컬럼을 비운다(`V2`). 다시 해도 같으니 재시도가 아니다.
-        jdbc.sql("update account set email = null, password_hash = null, display_name = null, deleted_at = now() where account_id = :id")
-            .param("id", leaving).update()
+        try {
+            insertPending(leaving)
+            // 파기는 컬럼을 비운다(`V2`). 다시 해도 같으니 재시도가 아니다.
+            jdbc.sql("update account set email = null, password_hash = null, display_name = null, deleted_at = now() where account_id = :id")
+                .param("id", leaving).update()
 
-        sweeper.sweep()
+            sweeper.sweep()
 
-        val row = jdbc.sql("select status, failure_reason from notification where account_id = :id")
-            .param("id", leaving).query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }.single()
-        assertThat(row).isEqualTo("skipped" to "withdrawn_account")
+            val row = jdbc.sql("select status, failure_reason from notification where account_id = :id")
+                .param("id", leaving).query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }.single()
+            assertThat(row).isEqualTo("skipped" to "withdrawn_account")
+        } finally {
+            // 이메일이 비어 바탕의 접두 정리가 못 찾는다 — 제 id 로 지운다(`ConcurrencyTestBase.purgeAfter`).
+            jdbc.sql("delete from notification where account_id = :id").param("id", leaving).update()
+            jdbc.sql("delete from account where account_id = :id").param("id", leaving).update()
+        }
     }
 
     @Test
