@@ -458,7 +458,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | `npm run dev` | 죽여도 3000 을 쥔 node 가 남고 낡은 서버가 답한다. HMR 이 새 코드를 도는 것처럼 보이게 한다 |
 | `vitest-axe` | 정식 판이 없고 vitest 최신과 안 붙는다. `axe-core` 를 직접 쓴다 |
 | 브라우저로 밟기 | Puppeteer 가 사용자 홈(`C:\Users\EJG\node_modules\puppeteer`)에 있다. 저장소에 안 넣는다. 경로는 `file://` URL 로 준다 — POSIX 경로를 그대로 넘기면 Node 가 `C:\c\Users\…` 로 읽는다 |
-| `rewrites()` | **`next build` 때 굳는다.** `next.config.ts` 가 읽은 `BACKEND_ORIGIN` 이 `routes-manifest.json` 에 박혀서 시작할 때 주는 env 로는 안 바뀐다 — 다른 주소를 보게 하려면 그 값을 주고 **다시 빌드**한다(`39` 실측: 8080 이 박힌 채로 8081 을 줘서 프록시가 500 이었다) |
+| `rewrites()` | **`next build` 때 굳는다.** `next.config.ts` 가 읽은 `BACKEND_ORIGIN` 이 `routes-manifest.json` 에 박혀서 시작할 때 주는 env 로는 안 바뀐다 — 다른 주소를 보게 하려면 그 값을 주고 **다시 빌드**한다(`39` 실측: 8080 이 박힌 채로 8081 을 줘서 프록시가 500 이었다). k8s 화면 이미지는 그래서 `frontend/Dockerfile` 의 `ARG BACKEND_ORIGIN` 으로 굽는다 — `k8s-up.sh` 가 `http://app:8080` 을 준다(`36a`, `K8sManifestTest`) |
 | 비밀번호 블록리스트 | 가입을 손으로 밟을 때 `password` 가 든 문자열은 15자를 넘겨도 막힌다(`PasswordBlocklist`). 400 이 `validation-failed` 로 나온다 |
 | Puppeteer 진입점 | `lib/puppeteer/puppeteer.js` 다. `lib/esm/...` 은 없다 |
 | 접근성 헛것 | 이름 없는 `<input>` 은 `page.accessibility.snapshot()` 으로 브라우저에게 묻고, `<nextjs-portal>`(개발 오버레이)은 걷어낸다 — 판정을 뒤집기 전에 재는 도구부터 의심한다 |

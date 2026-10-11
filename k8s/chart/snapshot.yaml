@@ -130,6 +130,28 @@ spec:
     - port: 6379
 
 ---
+# Source: ticket/templates/web.yaml
+# 화면(`36a`). Next standalone 이미지. 서버 컴포넌트는 `BACKEND_ORIGIN` 으로 앱에 직접, 브라우저의 `/api` 는
+# 빌드 때 굳은 rewrites 로 같은 곳에 간다 — 둘 다 앱 Service(`app:8080`)다(`D16` 「서버·클라이언트 경계」).
+# 밖에서는 NodePort 30300 → kind 가 호스트 3000 으로 연다(`k8s/kind.yaml`).
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  type: NodePort
+  selector:
+    app: web
+  ports:
+    - port: 3000
+      nodePort: 30300
+
+---
 # Source: ticket/templates/app.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -237,6 +259,50 @@ spec:
             exec:
               command: ["redis-cli", "ping"]
             periodSeconds: 5
+
+---
+# Source: ticket/templates/web.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: ticket-web:local
+          imagePullPolicy: Never
+          env:
+            # 서버 컴포넌트가 실행 때 읽는다(`lib/api.ts`). rewrites 는 이 값이 아니라 빌드 인자로 굳은 값을 쓴다.
+            - name: BACKEND_ORIGIN
+              value: http://app:8080
+          ports:
+            - containerPort: 3000
+          # 로그인 화면은 백엔드를 안 부른다 — 앱이 롤링 중이어도 화면 대가 엔드포인트에서 빠지지 않는다.
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: 3000
+            periodSeconds: 5
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
 
 ---
 # Source: ticket/templates/hpa.yaml

@@ -29,6 +29,20 @@ app:
     SPRING_PROFILES_ACTIVE: local
   postgresPassword: ticket
 
+# 화면(`36a`). `scripts/k8s-up.sh` 가 `BACKEND_ORIGIN=http://app:8080` 으로 굽는다 — `/api` 프록시 목적지가 빌드 때 굳는다.
+web:
+  replicas: 2
+  image: ticket-web
+  tag: local
+  # 호스트 3000 ← kind `extraPortMappings` ← 이 NodePort(`k8s/kind.yaml`).
+  nodePort: 30300
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
 postgres:
   image: postgres:17-alpine
   storage: 1Gi

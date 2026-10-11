@@ -66,6 +66,20 @@ class K8sManifestTest {
         assertThat(app).describedAs("매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $built")
     }
 
+    @Test
+    fun the_web_image_bakes_the_backend_origin_at_build_time() {
+        val web = docOf("Deployment", "web")
+        assertThat(web).describedAs("k8s/chart/snapshot.yaml 에서 화면 Deployment 를 못 읽었다(36a)").contains("kind: Deployment")
+        // 로그인 화면은 백엔드를 안 부른다 — 앱이 롤링 중이어도 화면 대가 엔드포인트에서 안 빠진다.
+        assertThat(web).contains("path: /login")
+
+        // `rewrites()` 의 목적지는 `next build` 때 굳는다(`stack.md`). 실행 env 로는 `/api` 프록시가 안 바뀌므로 빌드 인자여야 한다.
+        assertThat(Files.readString(root.resolve("frontend/Dockerfile")))
+            .describedAs("frontend/Dockerfile 이 BACKEND_ORIGIN 을 빌드 인자로 안 받는다 — 프록시가 localhost:8080 으로 굳는다")
+            .contains("ARG BACKEND_ORIGIN")
+        assertThat(up).describedAs("k8s-up.sh 가 화면을 앱 Service 주소로 안 굽는다").contains("--build-arg BACKEND_ORIGIN=http://app:8080")
+    }
+
     private fun docOf(kind: String, name: String): String =
         docs.firstOrNull { it.contains("kind: $kind") && it.contains(Regex("""(?m)^ {2}name: $name$""")) }.orEmpty()
 
