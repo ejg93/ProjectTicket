@@ -22,8 +22,8 @@ import java.time.OffsetDateTime
  * 좌석 복제(9)·정책 박제(27)·등급 매핑(11)이 한 번씩 돈다.
  *
  * 대신 **멱등을 스스로 든다.** Flyway 가 공짜로 주던 「한 번만」이 없어서, 표식 기획사가 이미 있으면 통째로 건너뛴다.
- * 그 검사는 삽입과 같은 트랜잭션이라 **순차 실행에서만 성립한다** — 둘이 같이 뜨면 둘 다 「없다」를 본다.
- * 데모가 두 벌 들어가지는 않는다(`organizer.code` 가 유일이라 진 쪽 기동이 실패한다). `local` 한 대짜리라 여기까지만 든다.
+ * 검사 앞에 **트랜잭션 단위 권고 락**을 잡는다 — k8s 가 `local` 로 셋을 한꺼번에 띄우면(`36`) 셋이 다 「없다」를 보고
+ * 진 둘이 `organizer.code` 유일 제약에 부딪쳐 기동이 죽었다(재시작 뒤엔 수렴했다). 락을 기다린 대는 커밋된 시드를 보고 건너뛴다.
  *
  * 공연장·홀·좌석은 SQL 로 넣는다 — 그것을 만드는 입구가 아직 없다(관리자 몫). 2천 석을 `generate_series` 한 문장으로 넣는 이유는
  * 행마다 왕복하면 2천 번이고 그 사이 트랜잭션이 열려 있어서다(`PerformanceOpenService.copySeats` 와 같은 판단).
@@ -41,6 +41,7 @@ class DemoSeeder(
 
     @Transactional
     override fun run(args: ApplicationArguments) {
+        jdbc.sql("select 1 from (select pg_advisory_xact_lock(:key)) as locked").param("key", SEED_LOCK_KEY).query(Int::class.java).single()
         if (alreadySeeded()) {
             log.info("데모 데이터 — 이미 있다")
             return
@@ -165,5 +166,8 @@ class DemoSeeder(
         )
 
         private val EVENT_TITLES = listOf("겨울 콘서트", "봄 뮤지컬")
+
+        /** 권고 락 열쇠. 이 시드 말고는 권고 락을 안 쓴다 — 아무 수나 겹치지 않으면 된다 */
+        private const val SEED_LOCK_KEY = 20_260_912L
     }
 }

@@ -46,6 +46,16 @@ JAVA_HOME="C:/Program Files/Java/jdk-25" ./gradlew bootRun
 curl localhost:8080/api/health
 ```
 
+## k8s 로 띄우기
+
+로컬 kind 클러스터에 앱 셋과 Postgres·Redis·Kafka 를 올린다(`36`). kind 0.33.0 과 kubectl 이 있어야 한다.
+
+```bash
+bash scripts/k8s-up.sh      # 클러스터·이미지·적용. 다시 불러도 된다
+bash scripts/k8s-smoke.sh   # port-forward 로 /api/health
+bash scripts/k8s-down.sh    # 지운다
+```
+
 ## 요구 사항
 
 - Docker Desktop
