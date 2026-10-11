@@ -141,8 +141,12 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     helm.sh/chart: ticket-0.1.0
 spec:
-  # HPA 가 켜지면 대수는 그것이 든다 — 여기 박으면 `helm upgrade` 마다 HPA 가 늘린 대수를 되돌린다.
-  replicas: 3
+  # 한 대씩 새로 띄우고 준비되면 옛 대를 내린다 — 받는 대수가 줄지 않는다(`38`).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: app
@@ -191,6 +195,10 @@ spec:
               port: 8080
             periodSeconds: 10
             failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           resources:
             limits:
               memory: 768Mi
@@ -229,6 +237,33 @@ spec:
             exec:
               command: ["redis-cli", "ping"]
             periodSeconds: 5
+
+---
+# Source: ticket/templates/hpa.yaml
+# 앱 대수를 CPU 로 고른다(`38`). 하한 3 은 `replicas` 의 자리다 — 롤링 중에도 셋 밑으로 안 내려간다.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app
+  minReplicas: 3
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
 
 ---
 # Source: ticket/templates/kafka.yaml

@@ -50,6 +50,12 @@ spec:
   # HPA 가 켜지면 대수는 그것이 든다 — 여기 박으면 `helm upgrade` 마다 HPA 가 늘린 대수를 되돌린다.
   replicas: {{ .Values.app.replicas }}
   {{- end }}
+  # 한 대씩 새로 띄우고 준비되면 옛 대를 내린다 — 받는 대수가 줄지 않는다(`38`).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: app
@@ -98,5 +104,11 @@ spec:
               port: 8080
             periodSeconds: 10
             failureThreshold: 3
+          {{- if gt (int .Values.app.preStopSeconds) 0 }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ .Values.app.preStopSeconds }}"]
+          {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}

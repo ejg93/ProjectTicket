@@ -14,6 +14,9 @@ kubectl config use-context "kind-$CLUSTER" >/dev/null
 docker build -t "$IMAGE" backend
 kind load docker-image "$IMAGE" --name "$CLUSTER"
 
+# HPA(`38`)가 읽는 CPU 지표. 없으면 HPA 가 `<unknown>` 이다.
+kubectl apply -f k8s/metrics-server.yaml >/dev/null
+
 existed=$(kubectl -n ticket get deployment app -o name 2>/dev/null || true)
 # 차트(`37`)가 다섯을 들고 준비될 때까지 기다린다. 값이 그대로면 아무것도 안 바뀐다.
 helm upgrade --install ticket k8s/chart -n ticket --create-namespace --wait --timeout 5m

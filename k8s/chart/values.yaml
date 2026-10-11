@@ -4,8 +4,12 @@ app:
   image: ticket-app
   # `scripts/k8s-up.sh` 가 이 태그로 굽고 `kind load` 한다 — 레지스트리에서 안 받는다.
   tag: local
-  # 앱의 graceful 종료 상한(20초)보다 길어야 한다(`K8sManifestTest`).
+  # 앱의 graceful 종료 상한(20초)보다 길어야 한다(`K8sManifestTest`). preStop 대기가 이 안에서 먼저 쓴다.
   terminationGracePeriodSeconds: 30
+  # 종료 신호 앞에 기다리는 초(`38`). 엔드포인트에서 빠진 것이 kube-proxy 에 퍼지기 전에 SIGTERM 이 오면
+  # 이미 닫힌 대로 요청이 간다 — readiness·graceful 이 있어도 남는 틈이다. 0 이면 preStop 을 안 단다(측정 판 2).
+  # 5 의 근거는 `doc/notes/rollout.md` 의 세 판이다.
+  preStopSeconds: 5
   # HPA 는 requests 대비 사용률로 잰다(`38`).
   resources:
     requests:
@@ -35,6 +39,10 @@ redis:
 kafka:
   image: apache/kafka:4.3.1
 
-# `38` 이 켠다.
+# CPU 사용률(requests 대비)로 대수를 고른다(`38`). 켜면 Deployment 의 `replicas` 를 안 쓴다 — 대수는 HPA 가 든다.
+# metrics-server 가 있어야 돈다(`k8s/metrics-server.yaml`, `k8s-up.sh` 가 적용).
 hpa:
-  enabled: false
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 6
+  cpuPercent: 70
