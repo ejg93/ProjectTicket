@@ -33,11 +33,14 @@ export const options = {
       gracefulRampDown: "10s",
     },
   },
-  // 여기서 막히면 그 자체가 결과다 — 숫자를 남기는 것이 목적이라 실패로 끝내지 않는다.
+  // **실패는 5xx 와 연결 오류뿐이다**(`38`). 409(남이 먼저 잡음)·429(관문)는 정상 흐름이라 아래 콜백이 4xx 를 성공으로 센다 —
+  // 기본값이면 4xx 까지 실패로 세서 「오류율 0」을 못 쓴다. 31·35 의 표는 옛 정의(0.5 문턱)로 이미 적혔다.
   thresholds: {
-    http_req_failed: ["rate<0.5"],
+    http_req_failed: ["rate==0"],
   },
 };
+
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
 
 /** 멱등키는 **UUIDv4 여야 한다**(13 의 `IdempotencyKeys`). 아무 문자열이나 보내면 400 이다 */
 function uuid() {

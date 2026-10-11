@@ -9,6 +9,12 @@ const BACKEND = process.env.BACKEND_ORIGIN ?? "http://localhost:8080";
 
 const nextConfig: NextConfig = {
   /**
+   * 실행에 필요한 것만 `.next/standalone` 에 모은다(`36a`). 컨테이너 이미지가 `node_modules` 통째를 안 싣는다.
+   * `next start` 는 그대로 돈다 — e2e(`46b`)는 그것을 쓴다.
+   */
+  output: "standalone",
+
+  /**
    * 이 폴더가 프로젝트 뿌리다.
    *
    * 안 적으면 Turbopack 이 상위 폴더까지 훑다가 저장소 밖의 `package-lock.json` 을 집어 경고를 낸다.

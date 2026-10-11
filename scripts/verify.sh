@@ -41,6 +41,16 @@ stamped() {
 }
 # 안 떠 있으면 켜고 기다린다(`docker-up.sh`, 밤샘 플랜) — 사용자가 없는 밤에 「켜고 다시 돌린다」로 서지 않게.
 docker_up() { bash scripts/docker-up.sh; }
+# vitest 는 초록이면 끝 네 줄, 빨가면 실패 줄을 20줄까지 — 끝 네 줄에는 무엇이 빨간지가 없다(`G11-1`).
+# 실패 줄 모양이 vitest 판과 안 맞으면 끝 40줄로 물러난다.
+vitest_run() {
+  local out rc=0
+  out=$(mktemp)
+  (cd frontend && npm test) >"$out" 2>&1 || rc=1
+  if [ $rc = 0 ]; then tail -4 "$out"; else grep -E '^ +(FAIL|×|✗) |^[A-Za-z]*Error: ' "$out" | head -20 | grep . || tail -40 "$out"; fi
+  rm -f "$out"
+  return $rc
+}
 
 ran=0; ok=1; lv_backend=; lv_frontend=; lv_tools=
 if changed backend && [ -d backend ]; then
@@ -78,7 +88,7 @@ if changed frontend && [ -d frontend ]; then
     ran=1; lv_frontend=$level
     if [ "$level" = full ]; then
       echo "== frontend 지문이 origin/main 과 다르다 → next build · lint · test"
-      (cd frontend && npm run build >/dev/null && npm run lint && npm test 2>&1 | tail -4) || ok=0
+      { (cd frontend && npm run build >/dev/null && npm run lint) && vitest_run; } || ok=0
       # e2e 는 실물이 있을 때만 — Playwright 와 `e2e` 스크립트(`46b`). 있으면 백엔드가 떠 있어야 한다.
       if [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json; then
         if curl -sf localhost:8080/api/health >/dev/null; then
@@ -92,7 +102,7 @@ if changed frontend && [ -d frontend ]; then
       fi
     else
       echo "== frontend 지문이 origin/main 과 다르다 → tsc --noEmit · lint · test"
-      (cd frontend && npx tsc --noEmit && npm run lint && npm test 2>&1 | tail -4) || ok=0
+      { (cd frontend && npx tsc --noEmit && npm run lint) && vitest_run; } || ok=0
     fi
   fi
 fi
@@ -107,6 +117,13 @@ if changed tools; then
     node -e 'JSON.parse(require("fs").readFileSync(".claude/settings.json","utf8"))' || { echo "settings.json 이 JSON 이 아니다"; ok=0; }
     bash scripts/doc-lint.sh >/dev/null || ok=0
     bash scripts/hooks-test.sh || ok=0
+    # 차트(`37`): lint 와 렌더 ↔ 커밋된 스냅샷. helm 이 없는 기계면 그 둘만 건너뛴다 — CI `backend` 잡이 같은 것을 돈다.
+    if command -v helm >/dev/null; then
+      helm lint --strict --quiet k8s/chart >/dev/null || { echo "helm lint 가 빨갛다 — helm lint --strict k8s/chart"; ok=0; }
+      helm template ticket k8s/chart -n ticket | diff -q - k8s/chart/snapshot.yaml >/dev/null         || { echo "차트 렌더가 스냅샷과 다르다 — bash scripts/helm-snapshot.sh 를 돌리고 커밋한다"; ok=0; }
+    else
+      echo "== helm 이 없다 — 차트 lint·스냅샷 비교를 건너뛴다(CI backend 잡이 돈다)"
+    fi
   fi
 fi
 [ "$ran" -eq 0 ] && echo "돌릴 것이 없다 — 지문이 origin/main 과 같거나 도장이 이미 있다"

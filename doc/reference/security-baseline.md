@@ -111,11 +111,14 @@
 | principal | `TicketUser` 가 인증 뒤 해시를 지운다(`CredentialsContainer`). `equals` 는 id 로만 | 해시가 세션 내내 메모리에 남으면 안 된다. `data class` 면 못 지운다 |
 | 요청 객체 `toString` | `SignupRequest`·`LoginRequest` 가 재정의 | `data class` 기본 `toString` 이 평문 비밀번호를 찍는다 |
 | 오류 본문 | `detail` 에 개인정보·SQL·스택 없음. `trace_id` 는 오류에만 | `D10` |
-| 프록시 뒤 IP | **아직 없다.** `forward-headers-strategy` 미설정 | nginx 가 서는 33 이 `native` 로 켜고 신뢰 대역을 루프백으로 좁힌다. 안 켜면 `acted_ip` 가 프록시 IP 가 된다 |
+| 프록시 뒤 IP | `forward-headers-strategy: native`(33). 신뢰 대역은 톰캣 기본값(사설망·루프백) — `application.yml` | 안 켜면 `acted_ip`·감사의 IP 가 프록시 IP 가 되고 로그인 실패 카운터가 한 IP 로 뭉친다 |
 
 ## 감사
 
 무엇을 남기나는 ADR 0003 — 돈·권한·상태가 바뀌는 것. 실패한 시도는 `ATTEMPT` 로 롤백을 넘어 남는다(`D10`).
+
+접속 IP 를 남기는 자리는 셋이다 — 동의(`account_consent.acted_ip`), 로그인 성공·실패(`AuthController`), 탈퇴 실패(`WithdrawalService`)의 `audit_log.detail.ip`.
+감사 행은 3년 뒤 파기된다(`AccountPurgeBatch.AUDIT_RETENTION_YEARS`). 수집 동의 고지는 판 2(`V22`, 39-3c)부터 셋을 다 적는다 — 판 1 은 동의 시점만 적었다.
 
 **권한이 트리거 앞에 선다**(`4a`, `V20`). 앱은 붙자마자 `ticket_app` 역할을 입고(`connection-init-sql`),
 그 역할에는 `audit_log` 의 `update`·`delete`·`truncate` 가 없다 — 문장이 트리거까지 못 간다.

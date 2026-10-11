@@ -1,0 +1,448 @@
+---
+# Source: ticket/templates/app.yaml
+# **로컬 전용이다.** 평문을 `values.yaml` 에 둔다 — 실제 배포면 이 Secret 은 저장소 밖에서 만든다(`security-baseline.md` 「비밀」).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "ticket"
+
+---
+# Source: ticket/templates/app.yaml
+# 앱(`36`). compose `app` + nginx 의 자리를 Deployment 와 Service 하나가 받는다 —
+# nginx 의 `upstream` 이 하던 대수 나누기를 Service 엔드포인트가 한다(`35` 가 넘긴 것).
+# 이미지는 `scripts/k8s-up.sh` 가 굽고 `kind load` 로 노드에 넣는다 — 레지스트리에서 안 받는다(`imagePullPolicy: Never`).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+data:
+  DB_HOST: "db"
+  KAFKA_BOOTSTRAP: "kafka:9092"
+  POSTGRES_DB: "ticket"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "ticket"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  SPRING_PROFILES_ACTIVE: "local"
+
+---
+# Source: ticket/templates/postgres.yaml
+# Postgres(`36`). compose `db` 를 옮겼다 — 같은 이미지, 같은 기동 인자(`pg_stat_statements`), 같은 init SQL.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+data:
+  # `docker/postgres/init/01-stat.sql` 과 같다. 볼륨이 비었을 때 한 번만 돈다.
+  01-stat.sql: |
+    create extension if not exists pg_stat_statements;
+
+---
+# Source: ticket/templates/app.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  selector:
+    app: app
+  ports:
+    - port: 8080
+
+---
+# Source: ticket/templates/kafka.yaml
+# Kafka(`36`, 사용자 결정 (가) — Kafka 도 올린다). compose `kafka` 의 KRaft 한 대를 옮겼다.
+# 바깥 리스너(9094)는 뺐다 — 클러스터 안에서만 `kafka:9092` 로 본다.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: broker
+      port: 9092
+    - name: controller
+      port: 9093
+
+---
+# Source: ticket/templates/postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  selector:
+    app: db
+  ports:
+    - port: 5432
+
+---
+# Source: ticket/templates/redis.yaml
+# Redis(`36`). 날아가도 사고가 아닌 것만 둔다(대기열·세션·좌석 판) — 볼륨을 안 단다.
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+
+---
+# Source: ticket/templates/web.yaml
+# 화면(`36a`). Next standalone 이미지. 서버 컴포넌트는 `BACKEND_ORIGIN` 으로 앱에 직접, 브라우저의 `/api` 는
+# 빌드 때 굳은 rewrites 로 같은 곳에 간다 — 둘 다 앱 Service(`app:8080`)다(`D16` 「서버·클라이언트 경계」).
+# 밖에서는 NodePort 30300 → kind 가 호스트 3300 으로 연다(`k8s/kind.yaml`).
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  type: NodePort
+  selector:
+    app: web
+  ports:
+    - port: 3000
+      nodePort: 30300
+
+---
+# Source: ticket/templates/app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  # 한 대씩 새로 띄우고 준비되면 옛 대를 내린다 — 받는 대수가 줄지 않는다(`38`).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      # 앱의 graceful 종료 상한(`timeout-per-shutdown-phase: 20s`)보다 길어야 진행 중인 요청을 마치고 내려간다.
+      terminationGracePeriodSeconds: 30
+      # compose 의 `depends_on: condition: service_healthy` 자리. k8s 는 순서를 안 지켜서 앱이 DB 보다 먼저 뜨면
+      # Flyway 가 「Connection refused」로 기동을 죽이고 재시작을 서너 번 돈다 — DB 가 받을 때까지 여기서 기다린다.
+      initContainers:
+        - name: wait-db
+          image: postgres:17-alpine
+          command: ["sh", "-c", "until pg_isready -h db -p 5432 -U ticket; do sleep 2; done"]
+      containers:
+        - name: app
+          image: ticket-app:local
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: app
+            - secretRef:
+                name: app
+          ports:
+            - containerPort: 8080
+          # 준비됐나(db·redis)와 살아 있나를 가른다(35a). DB 가 끊긴 대는 엔드포인트에서 빠지되 재시작되지 않는다.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 3
+          # 셋이 한꺼번에 뜨면 Flyway 락을 기다리는 대가 생긴다 — 기동 동안은 liveness 를 미룬다(최대 150초).
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            limits:
+              memory: 768Mi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+
+---
+# Source: ticket/templates/redis.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            periodSeconds: 5
+
+---
+# Source: ticket/templates/web.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: ticket-web:local
+          imagePullPolicy: Never
+          env:
+            # 서버 컴포넌트가 실행 때 읽는다(`lib/api.ts`). rewrites 는 이 값이 아니라 빌드 인자로 굳은 값을 쓴다.
+            - name: BACKEND_ORIGIN
+              value: http://app:8080
+          ports:
+            - containerPort: 3000
+          # 로그인 화면은 백엔드를 안 부른다 — 앱이 롤링 중이어도 화면 대가 엔드포인트에서 빠지지 않는다.
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: 3000
+            periodSeconds: 5
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+
+---
+# Source: ticket/templates/hpa.yaml
+# 앱 대수를 CPU 로 고른다(`38`). 하한 3 은 `replicas` 의 자리다 — 롤링 중에도 셋 밑으로 안 내려간다.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app
+  minReplicas: 3
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+# Source: ticket/templates/kafka.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      # 파드에 `KAFKA_PORT` 같은 서비스 환경 변수가 주입되면 이미지가 그것을 설정으로 읽으려 든다 — 끈다.
+      enableServiceLinks: false
+      containers:
+        - name: kafka
+          image: apache/kafka:4.3.1
+          env:
+            - { name: KAFKA_NODE_ID, value: "1" }
+            - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }
+            - { name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093" }
+            - { name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093" }
+            - { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092" }
+            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT" }
+            - { name: KAFKA_CONTROLLER_LISTENER_NAMES, value: "CONTROLLER" }
+            - { name: KAFKA_INTER_BROKER_LISTENER_NAME, value: "PLAINTEXT" }
+            - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1" }
+            - { name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS, value: "0" }
+          ports:
+            - containerPort: 9092
+            - containerPort: 9093
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+
+---
+# Source: ticket/templates/postgres.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: ticket
+  labels:
+    app.kubernetes.io/part-of: ticket
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: ticket-0.1.0
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          args: ["-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+          env:
+            - name: POSTGRES_DB
+              value: ticket
+            - name: POSTGRES_USER
+              value: ticket
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app
+                  key: POSTGRES_PASSWORD
+            - name: TZ
+              value: Asia/Seoul
+            # PVC 루트에 `lost+found` 가 있으면 initdb 가 「비어 있지 않다」로 선다 — 한 칸 아래를 쓴다.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "ticket", "-d", "ticket"]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init
+          configMap:
+            name: db-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

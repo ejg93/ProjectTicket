@@ -26,9 +26,11 @@ lane() {
 # `doc/reference/` 다섯과 `.github/workflows/ci.yml` 도 같은 이유다 — `ErrorContractTest`·`MetricNamesTest`·`EventCatalogTest`·`StackVersionConsistencyTest`·`StateMachineDocTest` 가 글자로 읽는다(점검 2차·3차).
 # `testing-strategy.md` 는 `TestConventionTest`(G7d), frontend 의 `api-guidelines.md` 는 `error-types.test.ts`(G7c)가 읽는다(마무리 12차).
 # `seat-map.tsx` 는 `SeatLimitConsistencyTest`(41-1)가 읽는다 — frontend 파일인데 backend 레인에도 둔다. frontend 의 `screen-rules.md` 는 `screen-map.test.ts`(39-1). `frontend/src/app` 은 `ScreenLengthTest`(G9)가 폼의 `maxLength` 를 읽는다 — `ls-tree` 가 글롭을 못 받아 폴더째 둔다.
-lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md .github/workflows/ci.yml .github/workflows/codeql.yml .github/workflows/claude-review.yml doc/reference/quality-gates.md doc/reference/state-machines.md doc/reference/testing-strategy.md frontend/src/components/seat-map.tsx frontend/src/app
+# `k8s` 와 `scripts/k8s-up.sh`·`frontend/Dockerfile` 은 `K8sManifestTest`(36·36a)가 읽는다 — 스크립트는 tools 레인에도 있다.
+lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md .github/workflows/ci.yml .github/workflows/codeql.yml .github/workflows/claude-review.yml doc/reference/quality-gates.md doc/reference/state-machines.md doc/reference/testing-strategy.md frontend/src/components/seat-map.tsx frontend/src/app k8s scripts/k8s-up.sh frontend/Dockerfile
 lane frontend frontend/src frontend/package.json frontend/package-lock.json frontend/tsconfig.json \
               frontend/next.config.ts frontend/eslint.config.mjs frontend/vitest.config.mts frontend/vitest.setup.ts \
+              frontend/e2e frontend/playwright.config.ts \
               doc/reference/api-guidelines.md doc/reference/screen-rules.md
 # 검증 도구 자체(`B0-2`). 이 레인이 없으면 verify.sh·훅을 고쳐도 도장이 안 바뀌어 아무 검사도 안 돈다.
-lane tools    scripts .claude/settings.json
+lane tools    scripts .claude/settings.json k8s/chart

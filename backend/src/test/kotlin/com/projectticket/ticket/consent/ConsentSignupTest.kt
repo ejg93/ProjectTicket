@@ -58,6 +58,24 @@ class ConsentSignupTest : PostgresTestBase() {
     }
 
     @Test
+    fun the_collect_notice_names_every_place_that_keeps_an_ip() {
+        // 감사가 로그인·탈퇴 요청의 IP 를 3년 남긴다(`D9` 「감사」). 판 1 은 동의 시점만 적었다 — 판 2 가 고친다(`V22`, 제15조 제2항).
+        mvc.get("/api/consent-items/privacy_collect").andExpect {
+            status { isOk() }
+            jsonPath("$.version") { value(2) }
+            jsonPath("$.collected_items") { value(org.hamcrest.Matchers.containsString("로그인")) }
+            jsonPath("$.collected_items") { value(org.hamcrest.Matchers.containsString("탈퇴")) }
+            jsonPath("$.retention_period") { value(org.hamcrest.Matchers.containsString("3년")) }
+        }
+
+        signUp(mapOf("terms_of_service" to true, "privacy_collect" to true)).andExpect { status { isCreated() } }
+        assertThat(
+            jdbc.sql("select item_version from current_consent where item_code = 'privacy_collect'")
+                .query(Int::class.java).single(),
+        ).describedAs("새 가입은 지금 판에 동의한다").isEqualTo(2)
+    }
+
+    @Test
     fun signup_without_required_consent_is_rejected() {
         signUp(mapOf("terms_of_service" to true)).andExpect {
             status { isUnprocessableEntity() }

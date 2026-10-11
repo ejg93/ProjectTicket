@@ -1,0 +1,24 @@
+{{- if .Values.hpa.enabled }}
+# 앱 대수를 CPU 로 고른다(`38`). 하한 3 은 `replicas` 의 자리다 — 롤링 중에도 셋 밑으로 안 내려간다.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ticket.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.cpuPercent }}
+{{- end }}

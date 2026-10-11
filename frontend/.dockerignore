@@ -1,0 +1,7 @@
+# 빌드 맥락에서 뺀다 — 로컬 산출물이 이미지에 섞이면 `npm ci` 로 받은 것과 갈린다.
+node_modules
+.next
+test-results
+playwright-report
+coverage
+tsconfig.tsbuildinfo

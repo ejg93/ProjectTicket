@@ -8,6 +8,7 @@
 | 이름 | 무엇 | 어디서 |
 |---|---|---|
 | `http_req_duration` | 전체 응답 시간 | k6 기본 |
+| `http_req_failed` | **5xx 와 연결 오류만**(`38`). 409·429 는 정상 흐름이라 안 센다 — 문턱 `rate==0` | k6 기본 + 응답 콜백 |
 | `hold_latency_ms` | 선점 요청 하나 | 스크립트 |
 | `admission_wait_ms` | 줄에 서서 토큰을 받기까지 | 스크립트 |
 | `seats_won` · `seats_taken` | 좌석을 잡았나 남이 먼저 잡았나 | 스크립트 |

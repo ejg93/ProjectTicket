@@ -1,0 +1,87 @@
+# Postgres(`36`). compose `db` 를 옮겼다 — 같은 이미지, 같은 기동 인자(`pg_stat_statements`), 같은 init SQL.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ticket.labels" . | nindent 4 }}
+data:
+  # `docker/postgres/init/01-stat.sql` 과 같다. 볼륨이 비었을 때 한 번만 돈다.
+  01-stat.sql: |
+    create extension if not exists pg_stat_statements;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ticket.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: db
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ticket.labels" . | nindent 4 }}
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          args: ["-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.app.env.POSTGRES_DB }}
+            - name: POSTGRES_USER
+              value: {{ .Values.app.env.POSTGRES_USER }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app
+                  key: POSTGRES_PASSWORD
+            - name: TZ
+              value: Asia/Seoul
+            # PVC 루트에 `lost+found` 가 있으면 initdb 가 「비어 있지 않다」로 선다 — 한 칸 아래를 쓴다.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.app.env.POSTGRES_USER }}", "-d", "{{ .Values.app.env.POSTGRES_DB }}"]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init
+          configMap:
+            name: db-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}

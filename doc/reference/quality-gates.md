@@ -41,6 +41,8 @@
 | `QualityGateDocTest` | 4 테스트 | 〃 | 이 문서의 「CI 잡과 필수 검사」 표와 `.github/workflows/` 의 잡이 갈리는 것(`P10`). 잡을 더하고 표를 안 고치면 어느 잡이 머지를 막는지 아무도 모른다 | `P10` 2026-09-19 — `secrets` 행을 빼니 빨갛고 되돌리니 초록 |
 | `TestConventionTest` | 4 테스트 | 〃 | 레인·태그·바탕의 약속이 갈리는 것(`G7d`, `D8`) — 바탕 없이 DB·`MockMvc` 를 쓰는 테스트(빠른 레인에서 컨테이너 없이 돈다), 사유 없이 손으로 단 `@Tag("db")`, 「레인」 표와 `build.gradle.kts` 의 태스크·태그, 커밋 레인 자식이 바탕 `PREFIX` 를 가리는 것(`G11` — 정리가 그 행을 못 지워 재사용 컨테이너에 남는다) | `G7d` 2026-09-25 — 셋 각자 위반을 넣으니 셋 다 빨강. 탐침 `test-without-base`·`test-hand-tag`·`test-lane-name`. `G11` 2026-09-26 — 자식에 `PREFIX` 를 다시 선언하니 빨강. 탐침 `test-prefix-shadow` |
 | `ComposeContractTest` | 4 테스트 | 〃 | nginx 가 대수를 안 나누는 것과 healthcheck 가 이미지에 없는 도구를 쓰는 것(마무리 6차). **둘 다 기동은 되고 오류도 안 냈다** | 마무리 6차 2026-09-18 — 결함 둘을 되살리니 셋이 다 빨갰다. `G3` 2026-09-25 — `proxy_pass` 줄을 지우니 초록(공허 통과)이던 것이 「못 읽었다」로 선다 |
+| `K8sManifestTest` | 4 테스트 | `gradlew test`(빠른 레인) | 차트 렌더(`k8s/chart/snapshot.yaml`)가 무중단의 전제를 잃는 것(`36`·`38`·`36a`) — readiness 경로 · 대수 셋(HPA 하한) · grace ≥ 25 · `maxUnavailable: 0` · `preStop` · `imagePullPolicy: Never` 와 `k8s-up.sh` 태그 · 화면 `ARG BACKEND_ORIGIN`. 템플릿이 아니라 값이 박힌 렌더를 읽는다 | `36` 2026-10-11 — grace 를 10 으로 바꾸니 빨강 |
+| helm lint · 스냅샷 diff | 4 테스트 | `verify.sh` tools 레인 · CI `backend` 잡(helm 4.3.0 고정) | 템플릿·값을 고치고 `snapshot.yaml` 을 안 다시 쓴 것(`37`) — 그러면 `K8sManifestTest` 가 낡은 렌더를 본다. `helm lint --strict` 가 차트 구조를 본다 | 마무리 18차 2026-10-11 — `web.replicas` 를 3 으로 바꾸고 스냅샷을 안 다시 쓰니 diff 가 갈렸다, 되돌리니 같다 |
 | `MetricNamesTest` | 4 테스트 | 〃 | `D10` 의 지표 이름 표와 `TicketMetrics` 가 갈리는 것(`30`). 갈리면 대시보드 패널만 조용히 빈다 | `G3` 2026-09-25 — 표 머리를 바꾸니 빨갛긴 했는데 「갈렸다」 문구에 `[]` 였다. 이제 「못 읽었다」로 가른다 |
 | `StackVersionConsistencyTest` | 4 테스트 | 〃 | `stack.md` 버전 표가 `build.gradle.kts`·compose·`frontend/package.json` 과 갈리는 것 | `G3` 2026-09-25 — Grafana 버전 칸을 비우니 `image: grafana/grafana:` 가 그대로 들어 있어 초록이던 것이 「못 읽었다」로 선다 |
 | `EventTopicTest` | 4 테스트 | 〃 | 토픽 상수와 `EventTopics.of` 가 갈리는 것(마무리 6차). `@KafkaListener` 의 `topics` 가 상수여야 해서 두 벌이 생긴다 | `G2` 2026-09-25 — 상수 `PERFORMANCE` 를 `ticket.performances` 로 바꾸니 빨강. 탐침 `event-topic` |
@@ -68,8 +70,8 @@
 
 **「부순 날」이 빈 줄은 아직 증거가 없는 것이다**(아래 「게이트는 부순 증거가 있어야 닫힌다」). 걸려 있는 것과 도는 것은 다르다.
 
-**여기 없는 것**: SpotBugs·E2E. SpotBugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봐서 안 들였다(`stack.md`) — 그 자리는 detekt 와
-CodeQL 이 나눠 든다. E2E 는 `46b` 가 세운다.
+**여기 없는 것**: SpotBugs. SpotBugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봐서 안 들였다(`stack.md`) — 그 자리는 detekt 와
+CodeQL 이 나눠 든다. E2E 는 아래 「CI 잡과 필수 검사」의 `e2e` 잡이다(`46b`, 필수 아님).
 
 **`컴파일`·`나머지 테스트` 두 줄은 일부러 부술 이유가 없다.** 그 둘은 **매일 실패 사례를 낸다** —
 오타를 치면 컴파일이 막고, 코드를 잘못 고치면 테스트가 빨개진다.
@@ -99,6 +101,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | `ci.yml` | `backend` | 필수 | 빌드·테스트 두 레인·detekt |
 | `ci.yml` | `frontend` | 필수 | `next build`·lint·test. `frontend/` 가 있을 때만 돈다 — 그 전에는 `steps.has` 가 건너뛰어도 잡은 초록이다 |
 | `ci.yml` | `audit` | 아니다 | `npm audit --audit-level=high`. 빨가면 배지로 보이고 dependabot 이 고친다 — 필수로 걸면 남의 권고 하나에 머지가 선다(`B0-5`, 사용자 결정 (가)) |
+| `ci.yml` | `e2e` | 아니다 | 가입→선점→(관문)→결제 한 바퀴를 Playwright 로(`46b`). 백엔드는 잡 안의 jar + compose 셋. 사용자 결정 (가) — 흔들림을 재기 전이라 필수로 안 건다. 열 번 연속 초록이면 `G12` 가 올린다 |
 | `ci.yml` | `secrets` | 필수 | gitleaks |
 | `ci.yml` | `docs` | 필수 | `doc-lint.sh` |
 | `codeql.yml` | `analyze` | **필수 — 언어 셋 다**(`P10`) | 문맥 이름이 `analyze (java-kotlin, manual)`·`analyze (javascript-typescript, none)`·`analyze (actions, none)` 이다. **push 에서만 돌지만 보호는 이름으로 맞추고 이벤트를 안 가려서** 그 실행이 자리를 채운다 — `46a` 가 그렇게 적었고 `P10` 뒤 첫 PR 이 실측이다 |

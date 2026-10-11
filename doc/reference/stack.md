@@ -29,6 +29,10 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
 | Next | 16.3.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
 | React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
+| kind | 0.33.0 | `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
+| Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
+| kubectl | 1.36.1 | Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
+| Playwright | 1.63.0 | `frontend/package.json`(`^1.63.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
 **버전을 물으면 이 표가 아니라 위 파일들을 본다.** 표가 낡을 수 있다 — `StackVersionConsistencyTest` 가 이 표와 파일을 대조해서 낡으면 빨개진다.
@@ -454,7 +458,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | `npm run dev` | 죽여도 3000 을 쥔 node 가 남고 낡은 서버가 답한다. HMR 이 새 코드를 도는 것처럼 보이게 한다 |
 | `vitest-axe` | 정식 판이 없고 vitest 최신과 안 붙는다. `axe-core` 를 직접 쓴다 |
 | 브라우저로 밟기 | Puppeteer 가 사용자 홈(`C:\Users\EJG\node_modules\puppeteer`)에 있다. 저장소에 안 넣는다. 경로는 `file://` URL 로 준다 — POSIX 경로를 그대로 넘기면 Node 가 `C:\c\Users\…` 로 읽는다 |
-| `rewrites()` | **`next build` 때 굳는다.** `next.config.ts` 가 읽은 `BACKEND_ORIGIN` 이 `routes-manifest.json` 에 박혀서 시작할 때 주는 env 로는 안 바뀐다 — 다른 주소를 보게 하려면 그 값을 주고 **다시 빌드**한다(`39` 실측: 8080 이 박힌 채로 8081 을 줘서 프록시가 500 이었다) |
+| `rewrites()` | **`next build` 때 굳는다.** `next.config.ts` 가 읽은 `BACKEND_ORIGIN` 이 `routes-manifest.json` 에 박혀서 시작할 때 주는 env 로는 안 바뀐다 — 다른 주소를 보게 하려면 그 값을 주고 **다시 빌드**한다(`39` 실측: 8080 이 박힌 채로 8081 을 줘서 프록시가 500 이었다). k8s 화면 이미지는 그래서 `frontend/Dockerfile` 의 `ARG BACKEND_ORIGIN` 으로 굽는다 — `k8s-up.sh` 가 `http://app:8080` 을 준다(`36a`, `K8sManifestTest`) |
 | 비밀번호 블록리스트 | 가입을 손으로 밟을 때 `password` 가 든 문자열은 15자를 넘겨도 막힌다(`PasswordBlocklist`). 400 이 `validation-failed` 로 나온다 |
 | Puppeteer 진입점 | `lib/puppeteer/puppeteer.js` 다. `lib/esm/...` 은 없다 |
 | 접근성 헛것 | 이름 없는 `<input>` 은 `page.accessibility.snapshot()` 으로 브라우저에게 묻고, `<nextjs-portal>`(개발 오버레이)은 걷어낸다 — 판정을 뒤집기 전에 재는 도구부터 의심한다 |

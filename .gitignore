@@ -1,5 +1,8 @@
 node_modules/
 .next/
+# Playwright 산출물(`46b`)
+test-results/
+playwright-report/
 out/
 dist/
 build/
