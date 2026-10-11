@@ -67,6 +67,65 @@ jobs:
         run: npm run build && npm run lint && npm test
         working-directory: frontend
 
+  # 예매 한 바퀴를 실제 브라우저로(`46b`). **필수 검사가 아니다** — 사용자 결정 (가), 열 번 연속 초록이면 `G12` 가 올린다.
+  # 백엔드는 잡 안에서 jar 로 띄운다(`local` 프로필 — 데모 시드). 데모 시드는 health 가 뜬 뒤 몇 초 안에 끝나는데
+  # 그 사이 npm·브라우저·next build 가 몇 분이라 기다림을 따로 안 둔다.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: has
+        run: test -f frontend/playwright.config.ts && echo ok=true >> "$GITHUB_OUTPUT" || echo ok=false >> "$GITHUB_OUTPUT"
+
+      - if: steps.has.outputs.ok == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - if: steps.has.outputs.ok == 'true'
+        uses: gradle/actions/setup-gradle@v6
+
+      - if: steps.has.outputs.ok == 'true'
+        run: ./gradlew bootJar
+        working-directory: backend
+
+      # compose 의 포트·비밀번호 기본값이 앱 기본값과 같다(5432·6379·9094, `ticket`) — `.env` 없이 붙는다.
+      - if: steps.has.outputs.ok == 'true'
+        run: docker compose up -d --wait db redis kafka
+
+      - if: steps.has.outputs.ok == 'true'
+        run: |
+          jar=$(find build/libs -name '*.jar' ! -name '*-plain.jar' | head -1)
+          nohup java -jar "$jar" --spring.profiles.active=local > ../backend.log 2>&1 &
+          curl -sf --retry 30 --retry-delay 3 --retry-all-errors localhost:8080/api/health
+        working-directory: backend
+
+      - if: steps.has.outputs.ok == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - if: steps.has.outputs.ok == 'true'
+        run: npm ci && npx playwright install --with-deps chromium && npm run build
+        working-directory: frontend
+
+      - if: steps.has.outputs.ok == 'true'
+        run: npm run e2e
+        working-directory: frontend
+
+      - if: failure() && steps.has.outputs.ok == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report
+            backend.log
+
   # 화면 의존성의 알려진 취약점. **필수 검사가 아니다**(`B0-5`, 사용자 결정) — 전이 의존성에 새 권고가 뜨면
   # 우리 커밋과 무관하게 빨개져서, `frontend` 잡 안에 두면 머지가 선다. 여기서는 배지로 보이고 dependabot 이 고침을 맡는다.
   audit:

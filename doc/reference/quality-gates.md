@@ -68,8 +68,8 @@
 
 **「부순 날」이 빈 줄은 아직 증거가 없는 것이다**(아래 「게이트는 부순 증거가 있어야 닫힌다」). 걸려 있는 것과 도는 것은 다르다.
 
-**여기 없는 것**: SpotBugs·E2E. SpotBugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봐서 안 들였다(`stack.md`) — 그 자리는 detekt 와
-CodeQL 이 나눠 든다. E2E 는 `46b` 가 세운다.
+**여기 없는 것**: SpotBugs. SpotBugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봐서 안 들였다(`stack.md`) — 그 자리는 detekt 와
+CodeQL 이 나눠 든다. E2E 는 아래 「CI 잡과 필수 검사」의 `e2e` 잡이다(`46b`, 필수 아님).
 
 **`컴파일`·`나머지 테스트` 두 줄은 일부러 부술 이유가 없다.** 그 둘은 **매일 실패 사례를 낸다** —
 오타를 치면 컴파일이 막고, 코드를 잘못 고치면 테스트가 빨개진다.
@@ -99,6 +99,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | `ci.yml` | `backend` | 필수 | 빌드·테스트 두 레인·detekt |
 | `ci.yml` | `frontend` | 필수 | `next build`·lint·test. `frontend/` 가 있을 때만 돈다 — 그 전에는 `steps.has` 가 건너뛰어도 잡은 초록이다 |
 | `ci.yml` | `audit` | 아니다 | `npm audit --audit-level=high`. 빨가면 배지로 보이고 dependabot 이 고친다 — 필수로 걸면 남의 권고 하나에 머지가 선다(`B0-5`, 사용자 결정 (가)) |
+| `ci.yml` | `e2e` | 아니다 | 가입→선점→(관문)→결제 한 바퀴를 Playwright 로(`46b`). 백엔드는 잡 안의 jar + compose 셋. 사용자 결정 (가) — 흔들림을 재기 전이라 필수로 안 건다. 열 번 연속 초록이면 `G12` 가 올린다 |
 | `ci.yml` | `secrets` | 필수 | gitleaks |
 | `ci.yml` | `docs` | 필수 | `doc-lint.sh` |
 | `codeql.yml` | `analyze` | **필수 — 언어 셋 다**(`P10`) | 문맥 이름이 `analyze (java-kotlin, manual)`·`analyze (javascript-typescript, none)`·`analyze (actions, none)` 이다. **push 에서만 돌지만 보호는 이름으로 맞추고 이벤트를 안 가려서** 그 실행이 자리를 채운다 — `46a` 가 그렇게 적었고 `P10` 뒤 첫 PR 이 실측이다 |

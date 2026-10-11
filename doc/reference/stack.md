@@ -29,6 +29,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
 | Next | 16.3.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
 | React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
+| Playwright | 1.63.0 | `frontend/package.json`(`^1.63.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
 **버전을 물으면 이 표가 아니라 위 파일들을 본다.** 표가 낡을 수 있다 — `StackVersionConsistencyTest` 가 이 표와 파일을 대조해서 낡으면 빨개진다.

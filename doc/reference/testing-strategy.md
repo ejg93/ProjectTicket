@@ -14,7 +14,7 @@
 | **동시성** | **같은 좌석을 둘이 못 잡는다** | 컨테이너 DB, 커밋 | `ConcurrencyTestBase` — **롤백 없음**(12f) | 12f 부터 |
 | HTTP | 쿠키 왕복, 필터 순서, 실제 상태 코드 | 컨테이너 DB + 서블릿 | 바탕이 없다 — `SharedSessionTest` 가 앱 둘을 직접 띄운다 | 33 부터 |
 | 화면 | 오류 `type` 에 따른 분기, 상태에 따른 표시 | jsdom | Vitest + Testing Library | 39 부터 |
-| E2E | 프록시·세션 쿠키·CSRF 가 실제로 오가나 | 브라우저 + 서버 둘 | Playwright | 42 부터 |
+| E2E | 프록시·세션 쿠키·CSRF 가 실제로 오가나 | 브라우저 + 서버 둘 | Playwright — `frontend/e2e/`, CI `e2e` 잡 | `46b` 부터 |
 
 **MockMvc 로 충분한 자리와 아닌 자리를 가른다.** MockMvc 는 보안 필터 체인을 다 지나므로 401·403·CSRF·관문(23)까지 잰다.
 못 재는 것은 **서블릿 컨테이너가 하는 일** — 쿠키의 `Secure`·`SameSite` 실제 동작, 프록시 헤더, 오류 페이지 디스패치다. 그때만 HTTP 층을 연다.
