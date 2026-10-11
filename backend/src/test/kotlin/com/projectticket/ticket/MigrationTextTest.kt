@@ -51,7 +51,7 @@ class MigrationTextTest {
          * 늘리려면 그 표가 「운영에서도 같은 값으로 있어야 한다」는 근거를 값에 적는다.
          */
         val RULEBOOK_TABLES = mapOf(
-            "consent_item" to "가입 동의 항목과 약관 원문. 가입 입구가 그 행을 읽는다(`V3`)",
+            "consent_item" to "가입 동의 항목과 약관 원문. 가입 입구가 그 행을 읽는다(`V3`, 수집 동의 판 2 `V22`)",
             "refund_fee_tier" to "관람일 기준 환불 수수료 구간. 취소 입구가 그 행으로 율을 고른다(`V10`, ADR 0003)",
             "settlement_policy" to "기본 정산 수수료율. 정산이 그 행으로 계산한다(`V16`)",
             "policy_document" to "개인정보처리방침(제30조). 처리방침 화면이 그 행을 읽는다 — 없으면 발의 링크가 404 다(`V21`)",
