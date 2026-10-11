@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Countdown } from "@/components/countdown";
+import { expectNoAxeViolations } from "@/test/axe";
 
 import { CheckoutForm } from "./checkout-form";
 
@@ -67,13 +68,14 @@ describe("결제", () => {
   it("거절을 오류가 아니라 결과로 그린다", async () => {
     document.cookie = "XSRF-TOKEN=t";
     mockFetch(declined);
-    render(<CheckoutForm reservationId={7} amount={154000} />);
+    const { container } = render(<CheckoutForm reservationId={7} amount={154000} />);
 
     await userEvent.type(screen.getByLabelText("카드번호"), "4111111111111111");
     await userEvent.click(screen.getByRole("button"));
 
     // 서버가 201 로 준 것이라 「서버가 고장났다」가 아니라 「카드사가 거절했다」다.
     expect(await screen.findByRole("alert")).toHaveTextContent(/거절했습니다/);
+    await expectNoAxeViolations(container);
   });
 
   it("같은 카드로 다시 누르면 같은 멱등키를 보낸다", async () => {
@@ -120,9 +122,10 @@ describe("결제", () => {
 
 describe("카운트다운", () => {
   it("남은 시간을 분초로 그린다", async () => {
-    render(<Countdown deadline={new Date(Date.now() + 90_000).toISOString()} label="남은 시간" />);
+    const { container } = render(<Countdown deadline={new Date(Date.now() + 90_000).toISOString()} label="남은 시간" />);
 
     expect(await screen.findByRole("timer")).toHaveTextContent(/01:(29|30)/);
+    await expectNoAxeViolations(container);
   });
 
   it("0 이면 다시 고르라고 말한다", async () => {

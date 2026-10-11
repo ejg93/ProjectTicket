@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { SeatMapData } from "@/components/seat-map";
+import { expectNoAxeViolations } from "@/test/axe";
 
 import { HoldForm } from "./hold-form";
 
@@ -112,17 +113,19 @@ describe("선점", () => {
   });
 
   it("남이 먼저 잡은 좌석은 새로 고치라고 말한다", async () => {
+    // container 로 잰다 — body 에 걸면 랜드마크(main) 가 없다는 region 규칙이 조각 시험을 다 빨갛게 한다. main 은 layout 몫이다
     document.cookie = "XSRF-TOKEN=t";
     mockFetch(
       { type: "tag:projectticket.example,2026:seat-taken", detail: "이미 잡힌 좌석이 있다" },
       409,
     );
-    render(<HoldForm data={seatMap()} performanceId="5" />);
+    const { container } = render(<HoldForm data={seatMap()} performanceId="5" />);
 
     await userEvent.click(screen.getByRole("checkbox", { name: /1번, 선택 가능/ }));
     await submit();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/좌석 현황을 새로 고쳐/);
+    await expectNoAxeViolations(container);
   });
 
   it("대기열을 지나온 탭이면 입장 토큰을 헤더로 싣는다(`43`)", async () => {

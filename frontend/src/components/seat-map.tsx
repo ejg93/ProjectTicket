@@ -85,7 +85,7 @@ export function SeatMap({
 
       {data.sections.map((section) => (
         <section key={section.code} aria-labelledby={`section-${section.code}`}>
-          <h3 id={`section-${section.code}`}>{section.name}</h3>
+          <h2 id={`section-${section.code}`}>{section.name}</h2>
           {section.rows.map((row) => (
             <div key={row.label} className="seat-row">
               <span aria-hidden="true">{row.label}</span>

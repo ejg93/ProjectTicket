@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { expectNoAxeViolations } from "@/test/axe";
+
 import { LoginForm } from "./login-form";
 
 /**
@@ -32,13 +34,14 @@ describe("로그인", () => {
         }),
       ),
     );
-    render(<LoginForm />);
+    const { container } = render(<LoginForm />);
 
     await userEvent.type(screen.getByLabelText("이메일"), "fan@example.com");
     await userEvent.type(screen.getByLabelText("비밀번호"), "wrong password here");
     await userEvent.click(screen.getByRole("button", { name: "로그인" }));
 
     await screen.findByRole("alert");
+    await expectNoAxeViolations(container);
     expect(screen.getByLabelText("이메일")).toHaveValue("fan@example.com");
     expect(screen.getByLabelText("비밀번호")).toHaveValue("");
   });
