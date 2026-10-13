@@ -25,8 +25,11 @@ const R = 20; // 입장 속도(명/초) — `AdmissionService` 5초마다 100
 const BATCH = 100; // 첫 배치는 이론값(순번 ÷ R)이 틱(5초)보다 작아 비율에서 뺀다
 
 const entered = new Counter("entered");
+const enterFailed = new Counter("enter_failed");
 const left = new Counter("left");
+const releaseFailed = new Counter("release_failed");
 const dropped = new Counter("dropped");
+const pollRound = new Trend("poll_round_ms", true);
 const queueRank = new Trend("queue_rank");
 const pollLatency = new Trend("poll_latency_ms", true);
 const admissionWait = new Trend("admission_wait_ms", true);
@@ -74,7 +77,9 @@ function finish(a, body) {
   if (a.rank > BATCH) waitOverExpected.add(waited / 1000 / (a.rank / R));
   const res = http.del(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
   check(res, { "반납 204": (r) => r.status === 204 });
-  left.add(1);
+  // 반납이 안 됐으면 자리를 쥔 채다 — 셈을 따로 둔다. `left + release_failed + dropped = entered` 가 VU 상태 관리가 안 샜다는 뜻이다
+  if (res.status === 204) left.add(1);
+  else releaseFailed.add(1);
   a.done = true;
 }
 
@@ -82,6 +87,7 @@ function enter(a) {
   const res = http.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
   check(res, { "대기열 진입 200": (r) => r.status === 200 });
   if (res.status !== 200) {
+    enterFailed.add(1);
     a.done = true;
     return;
   }
@@ -114,7 +120,10 @@ export default function () {
     mine = mine_();
     mine.forEach(enter);
   } else {
-    mine.filter((a) => !a.done).forEach(poll);
+    const waiting = mine.filter((a) => !a.done);
+    waiting.forEach(poll);
+    // 바퀴 하나의 길이 — 계정 하나가 다음에 묻기까지의 간격이다. 2초를 넘으면 하트비트(90초)까지의 여유가 그만큼 준다
+    if (waiting.length > 0) pollRound.add(Date.now() - round);
   }
   // 한 바퀴가 2초보다 빠르면 남은 시간을 쉰다. 느리면 바로 다음 바퀴 — 그 간격 자체가 결과다(`poll_latency_ms`).
   const rest = POLL_MS - (Date.now() - round);

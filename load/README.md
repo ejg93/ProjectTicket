@@ -78,7 +78,8 @@ docker exec ticket-redis sh -c "redis-cli --scan --pattern 'admit:*' | xargs -r 
 `setup()` 반환값은 VU 마다 복사돼 1만 × 500 이 Docker VM 메모리를 넘긴다. 세션은 무활동 30분에 끝나니 바로 이어서 돌린다.
 
 ```bash
-# 1. 세션 1만 → load/results/sessions.json (무시 목록). 3분쯤
+# 1. 세션 1만 → load/results/sessions.json (무시 목록이라 새로 받은 저장소에는 폴더가 없다). 3분쯤
+mkdir -p load/results
 MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -v "$(pwd -W)/load:/load" \
   -e ACCOUNTS=10000 grafana/k6:2.2.0 run /load/prelogin.js
 
@@ -89,7 +90,7 @@ MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -
   -e ACCOUNTS=10000 -e VUS=500 -e RAMP=60s -e HOLD=600s grafana/k6:2.2.0 run /load/queue-surge.js
 ```
 
-요약에서 읽을 것: `entered`·`left`·`dropped`(합이 계정 수라야 한다) · `wait_over_expected`(대기 ÷ (순번 ÷ 20) — `D13` 은 ≤ 2) ·
+요약에서 읽을 것: `entered`(= 계정 수) · `left` + `release_failed` + `dropped`(= `entered` 라야 한다) · `poll_round_ms`(바퀴 간격, 2초 언저리라야 한다) · `wait_over_expected`(대기 ÷ (순번 ÷ 20) — `D13` 은 ≤ 2) ·
 `poll_latency_ms` · `http_req_failed`. 대수별 입장은 아래 「대수가 실제로 갈렸나」처럼 앱마다 `queue_admitted_total` 을 읽는다 —
 **Prometheus 는 `app:8080` 하나를 긁어 셋 중 아무 대나 본다.**
 

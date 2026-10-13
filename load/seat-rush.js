@@ -146,6 +146,8 @@ export default function (data) {
   let csrf;
   if (data.sessions) {
     const s = data.sessions[index - 1];
+    // 미리 로그인에 실패한 계정은 건너뛴다 — 세션 없이 보내면 401 이 측정에 섞인다
+    if (!s || !s.session) return;
     jar = new http.CookieJar();
     jar.set(`${BASE}/`, "TICKETSESSION", s.session);
     jar.set(`${BASE}/`, "XSRF-TOKEN", s.xsrf);

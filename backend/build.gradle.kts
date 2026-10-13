@@ -201,6 +201,9 @@ tasks.test {
 		rootProject.file("../frontend/Dockerfile"),
 		// `StackVersionConsistencyTest` 가 Next·React·Playwright 판을 글자로 읽는다(`I9-3`).
 		rootProject.file("../frontend/package.json"),
+		// `StackVersionConsistencyTest` 가 k6 이미지 판을 글자로 읽는다(마무리 20차).
+		rootProject.file("../load/README.md"),
+		rootProject.file("../scripts/k8s-rollout-test.sh"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
