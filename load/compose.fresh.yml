@@ -1,0 +1,17 @@
+# 부하 시험용 빈 DB·Redis(35b). 재사용 `ticket-db` 는 데모 회차가 「첫 기동 + 14일」에 닫혀서 줄을 못 선다(`stack.md`) —
+# 대기열 POST 가 410 `queue-closed` 고 `prepare.sql` 이 열린 회차를 못 찾는다.
+#
+# **볼륨만 갈아 끼운다.** 원래 볼륨(`db-data`·`redis-data`)은 그대로 남는다 — 이 파일 없이 `docker compose up -d` 하면 돌아온다.
+# 새로 비우려면 `docker compose -f docker-compose.yml -f load/compose.fresh.yml down` 뒤
+# `docker volume rm projectticket_db-load-data projectticket_redis-load-data`. `down -v` 는 원래 볼륨까지 지운다 — 안 쓴다.
+services:
+  db:
+    volumes:
+      - db-load-data:/var/lib/postgresql/data
+  redis:
+    volumes:
+      - redis-load-data:/data
+
+volumes:
+  db-load-data:
+  redis-load-data:

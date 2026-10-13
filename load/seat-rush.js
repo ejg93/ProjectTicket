@@ -4,6 +4,10 @@
 // 관문(23)이 선점 앞에 서 있으므로 줄을 안 서면 429 다 — 그래서 이 스크립트가 줄부터 선다.
 //
 // 돌리는 법과 읽는 법은 `load/README.md`.
+//
+// `PRELOGIN=1` 이면 `setup()` 이 계정 `ACCOUNTS` 개를 미리 로그인하고 반복은 로그인을 건너뛴다 — 순수 예매 경로(35b).
+// 미리 로그인 도우미는 `load/lib/session.js` 와 같은 것을 **이 파일 안에 든다** — `scripts/k8s-rollout-test.sh` 가
+// 이 파일 하나만 configmap 으로 싣기 때문이다. 기본(`PRELOGIN` 없음)은 반복마다 로그인한다.
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Counter, Trend } from "k6/metrics";
@@ -12,6 +16,7 @@ const BASE = __ENV.BASE_URL || "http://nginx:80";
 const PERFORMANCE_ID = __ENV.PERFORMANCE_ID || "1";
 const ACCOUNTS = Number(__ENV.ACCOUNTS || 300);
 const PASSWORD = __ENV.PASSWORD || "demo-password-1234";
+const PRELOGIN = __ENV.PRELOGIN === "1";
 
 // 무엇이 몇 번 일어났나. k6 기본 지표(응답 시간·오류율) 위에 **업무 결과**를 더한다.
 const seatsWon = new Counter("seats_won");
@@ -33,10 +38,14 @@ export const options = {
       gracefulRampDown: "10s",
     },
   },
+  setupTimeout: "15m",
+  // 측정 요청은 `phase:run`, 미리 로그인은 `phase:prelogin` — 아래 문턱이 요약에 `run` 만 따로 낸다.
+  tags: { phase: "run" },
   // **실패는 5xx 와 연결 오류뿐이다**(`38`). 409(남이 먼저 잡음)·429(관문)는 정상 흐름이라 아래 콜백이 4xx 를 성공으로 센다 —
   // 기본값이면 4xx 까지 실패로 세서 「오류율 0」을 못 쓴다. 31·35 의 표는 옛 정의(0.5 문턱)로 이미 적혔다.
   thresholds: {
     http_req_failed: ["rate==0"],
+    "http_req_duration{phase:run}": ["p(95)>=0"],
   },
 };
 
@@ -74,6 +83,33 @@ function logIn(jar, index) {
   return csrfToken(jar);
 }
 
+/** `load/lib/session.js` 와 같다 — 위 머리말 */
+function preloginAll(count) {
+  const tags = { phase: "prelogin" };
+  const out = [];
+  const started = Date.now();
+  for (let i = 1; i <= count; i++) {
+    const jar = new http.CookieJar();
+    http.get(`${BASE}/api/health`, { jar, tags });
+    const xsrf = jar.cookiesForURL(`${BASE}/`)["XSRF-TOKEN"];
+    const res = http.post(
+      `${BASE}/api/auth/login`,
+      JSON.stringify({ email: `load${i}@test.local`, password: PASSWORD }),
+      { jar, tags, headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": xsrf ? xsrf[0] : "" } },
+    );
+    check(res, { "미리 로그인 200": (r) => r.status === 200 }, tags);
+    http.get(`${BASE}/api/health`, { jar, tags });
+    const cookies = jar.cookiesForURL(`${BASE}/`);
+    out.push({ session: cookies.TICKETSESSION ? cookies.TICKETSESSION[0] : null, xsrf: cookies["XSRF-TOKEN"] ? cookies["XSRF-TOKEN"][0] : null });
+  }
+  console.log(`미리 로그인 끝 — ${count}개, ${Math.round((Date.now() - started) / 1000)}초`);
+  return out;
+}
+
+export function setup() {
+  return PRELOGIN ? { sessions: preloginAll(ACCOUNTS) } : { sessions: null };
+}
+
 /** 줄에 서고 토큰이 나올 때까지 2초마다 묻는다(ADR 0003 — 폴링이 하트비트를 겸한다) */
 function waitForAdmission(jar, csrf) {
   const started = Date.now();
@@ -100,10 +136,20 @@ function waitForAdmission(jar, csrf) {
   return null;
 }
 
-export default function () {
+export default function (data) {
   const index = ((__VU - 1) % ACCOUNTS) + 1;
-  const jar = http.cookieJar();
-  const csrf = logIn(jar, index);
+  let jar;
+  let csrf;
+  if (data.sessions) {
+    const s = data.sessions[index - 1];
+    jar = new http.CookieJar();
+    jar.set(`${BASE}/`, "TICKETSESSION", s.session);
+    jar.set(`${BASE}/`, "XSRF-TOKEN", s.xsrf);
+    csrf = s.xsrf;
+  } else {
+    jar = http.cookieJar();
+    csrf = logIn(jar, index);
+  }
   const token = waitForAdmission(jar, csrf);
   if (!token) return;
 
