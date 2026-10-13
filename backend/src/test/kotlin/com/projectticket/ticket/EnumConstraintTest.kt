@@ -3,10 +3,12 @@ package com.projectticket.ticket
 import com.projectticket.ticket.auth.AccountRole
 import com.projectticket.ticket.auth.AccountStatus
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.PerformanceStatus
 import com.projectticket.ticket.notification.NotificationStatus
 import com.projectticket.ticket.outbox.AggregateType
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.payment.PaymentStatus
+import com.projectticket.ticket.payment.RefundStatus
 import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.reservation.ReservationStatus
 import com.projectticket.ticket.settlement.SettlementLineKind
@@ -92,12 +94,14 @@ class EnumConstraintTest {
         val MIRRORED: Map<String, List<String>> = mapOf(
             "account_role_check" to AccountRole.entries.map { it.code },
             "account_status_check" to AccountStatus.entries.map { it.code },
+            "performance_status_check" to PerformanceStatus.entries.map { it.code },
             "performance_seat_status_check" to PerformanceSeatStatus.entries.map { it.code },
             "notification_status_check" to NotificationStatus.entries.map { it.code },
             "outbox_aggregate_type_check" to AggregateType.entries.map { it.code },
             "outbox_type_check" to EventType.entries.map { it.code },
             "payment_status_check" to PaymentStatus.entries.map { it.code },
             "reservation_status_check" to ReservationStatus.entries.map { it.code },
+            "refund_status_check" to RefundStatus.entries.map { it.code },
             "reservation_cancelled_by_check" to CancelledBy.entries.map { it.code },
             "settlement_line_kind_check" to SettlementLineKind.entries.map { it.code },
             "settlement_status_check" to SettlementStatus.entries.map { it.code },
@@ -118,15 +122,12 @@ class EnumConstraintTest {
          * 여기 적힌 것은 이 테스트가 못 지킨다 — 갈려도 안 걸린다. 앱이 분기하기 시작하면 열거형을 만들고 위로 옮긴다.
          */
         val WITHOUT_ENUM: Set<String> = setOf(
-            // 회차 상태는 SQL 안에서만 산다(전이 트리거·조건부 UPDATE). Kotlin 쪽은 문자열을 안 비교한다.
-            "performance_status_check",
             // 기획사 상태도 같다 — 지금은 조회 필터에만 쓴다.
             "organizer_status_check",
             // 동의 출처는 감사용 꼬리표다. 분기하지 않는다.
             "account_consent_source_check",
-            // 환불 사유·상태는 `D6` 의 표가 출처고 앱은 삽입만 한다.
+            // 환불 사유는 `D6` 의 표가 출처고 앱은 삽입만 한다.
             "refund_reason_check",
-            "refund_status_check",
         )
     }
 }

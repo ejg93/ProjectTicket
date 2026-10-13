@@ -25,7 +25,7 @@ class PerformanceOpenService(
     fun open(performanceId: Long, actorAccountId: Long?): Int {
         val performance = load(performanceId)
 
-        if (performance.status != "draft") {
+        if (performance.status != PerformanceStatus.DRAFT.code) {
             throw TicketException(ErrorCode.PERFORMANCE_NOT_OPENABLE, "이미 연 회차다: $performanceId")
         }
 
@@ -50,7 +50,8 @@ class PerformanceOpenService(
 
         // **정책을 오픈 때 박제한다**(`D21`). 가격을 박제한 것과 같은 논리다 — 요율을 고쳐도 이미 열린 회차의 정산이 안 흔들린다.
         val policy = policies.currentFor(organizerOf(performance.eventId))
-        jdbc.sql("update performance set status = 'open', settlement_policy_id = :policy where performance_id = :id")
+        jdbc.sql("update performance set status = :open, settlement_policy_id = :policy where performance_id = :id")
+            .param("open", PerformanceStatus.OPEN.code)
             .param("policy", policy.settlementPolicyId)
             .param("id", performanceId)
             .update()

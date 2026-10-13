@@ -203,6 +203,7 @@ commit                 ← 앞의 예약분이 null 로 터진다
 유일 인덱스 위반을 예외로 받으면 그 트랜잭션은 `25P02` 라 다음 문장이 못 돈다. 「이미 있으면 그 행을 읽어 답한다」는 흐름은 예외가 아니라 **`on conflict … do nothing` 의 0행**으로 받는다 —
 `SeatHoldService.insertReservation`(`duplicate-hold` 에 기존 예매 id), `TicketService.issueOne`(번호 재추첨), `IdempotencyService.claim`.
 `on conflict` 의 `where` 는 부분 인덱스의 조건과 **글자까지 같은 리터럴**이어야 한다 — 바인딩하면 플래너가 인덱스를 못 맞춘다.
+**부분 인덱스를 타려는 질의도 같다.** `where status = 'held'` 인덱스 위에서 `status = $1` 의 `explain (generic_plan)` 은 Seq Scan, 리터럴·custom plan 은 Index Scan 이다(Postgres 17.10, 번들 7 설계 실측). JDBC 는 같은 문장을 다섯 번 넘게 돌리면 서버 쪽 준비 문장으로 넘어가고, 그 뒤 generic plan 으로 갈지는 `plan_cache_mode = auto` 의 비용 비교라 **리터럴만이 확정이다.** 그 자리 목록은 `SqlTextTest.INDEXED_LITERALS`.
 
 ### 부분 유일 인덱스가 앱 검증을 경합에서 지킨다
 

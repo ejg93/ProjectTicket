@@ -62,7 +62,7 @@ class SettlementStore(private val jdbc: JdbcClient) {
 
     /**
      * 집계할 것을 고른다. `for update skip locked` 로 **한 회에 같은 행을 둘이 안 집는다** — 다만 이 트랜잭션이 끝나면 락이 풀리므로,
-     * 두 번 집계되는 것을 실제로 막는 것은 [settle] 의 조건부 UPDATE(`and status = 'scheduled'`)다.
+     * 두 번 집계되는 것을 실제로 막는 것은 [settle] 의 조건부 UPDATE(`and status = :scheduled`)다.
      */
     @Transactional
     fun takeDue(batchSize: Int): List<Due> =
@@ -97,10 +97,11 @@ class SettlementStore(private val jdbc: JdbcClient) {
         val moved = jdbc.sql(
             """
             update settlement set status = :pending, amount = :amount, settled_at = now()
-             where settlement_id = :id and status = 'scheduled'
+             where settlement_id = :id and status = :scheduled
             """,
         )
             .param("pending", SettlementStatus.PENDING.code)
+            .param("scheduled", SettlementStatus.SCHEDULED.code)
             .param("amount", amount)
             .param("id", due.settlementId)
             .update()
@@ -114,7 +115,10 @@ class SettlementStore(private val jdbc: JdbcClient) {
         return amount
     }
 
-    /** 판매된 것 — `reserved` 예매의 좌석 가격 합(`D21`). 취소·만료된 예매는 안 든다 */
+    /**
+     * 판매된 것 — `reserved` 예매의 좌석 가격 합(`D21`). 취소·만료된 예매는 안 든다.
+     * 상태를 **리터럴로 둔다** — 정산은 맨 아래 층이라 `ReservationStatus` 를 못 본다(`ArchitectureTest`). 값이 열거형 `code` 인지는 `SqlTextTest` 가 본다(`I9-4`).
+     */
     private fun saleOf(performanceId: Long): Int =
         jdbc.sql(
             """

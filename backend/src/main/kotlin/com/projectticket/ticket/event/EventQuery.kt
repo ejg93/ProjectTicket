@@ -27,9 +27,9 @@ class EventQuery(private val jdbc: JdbcClient) {
         val total = jdbc.sql(
             """
             select count(*) from event e
-             where exists (select 1 from performance p where p.event_id = e.event_id and p.status = 'open')
+             where exists (select 1 from performance p where p.event_id = e.event_id and p.status = :open)
             """,
-        ).query(Int::class.java).single()
+        ).param("open", PerformanceStatus.OPEN.code).query(Int::class.java).single()
 
         // `order by` 에 박히는 것은 우리가 쓴 조각이다 — 요청의 글자는 [OrderBy] 의 허용 목록을 지나며 버려진다.
         val items = jdbc.sql(
@@ -42,12 +42,12 @@ class EventQuery(private val jdbc: JdbcClient) {
                    (select min(g.price) from seat_grade g where g.event_id = e.event_id) as min_price
               from event e
               join organizer o on o.organizer_id = e.organizer_id
-              join performance p on p.event_id = e.event_id and p.status = 'open'
+              join performance p on p.event_id = e.event_id and p.status = :open
              group by e.event_id, e.title, o.name, e.created_at
              order by ${order.sql}, e.event_id
              limit :size offset :offset
             """,
-        ).param("size", paging.size).param("offset", paging.offset).query(EventSummary::class.java).list().filterNotNull()
+        ).param("open", PerformanceStatus.OPEN.code).param("size", paging.size).param("offset", paging.offset).query(EventSummary::class.java).list().filterNotNull()
 
         return EventPage(items, paging.page, paging.size, total)
     }
@@ -81,10 +81,10 @@ class EventQuery(private val jdbc: JdbcClient) {
               from performance p
               join hall h on h.hall_id = p.hall_id
               join venue v on v.venue_id = h.venue_id
-             where p.event_id = :id and p.status = 'open'
+             where p.event_id = :id and p.status = :open
              order by p.starts_at
             """,
-        ).param("id", eventId).query(PerformanceLine::class.java).list().filterNotNull()
+        ).param("id", eventId).param("open", PerformanceStatus.OPEN.code).query(PerformanceLine::class.java).list().filterNotNull()
 
         return EventDetail(event.eventId, event.title, event.organizerName, grades, performances)
     }

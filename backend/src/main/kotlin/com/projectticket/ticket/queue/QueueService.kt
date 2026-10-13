@@ -2,6 +2,7 @@ package com.projectticket.ticket.queue
 
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
+import com.projectticket.ticket.event.PerformanceStatus
 import java.time.Duration
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
@@ -110,7 +111,7 @@ class QueueService(
      * 판매 중이 아니면 줄 자체가 없어서 **토큰을 받을 길이 없다** — 그런 요청을 관문이 429 로 막으면
      * 「나중엔 된다」는 거짓말이 된다. 그 회차의 사정은 선점 서비스가 409·410 으로 더 정확히 말한다.
      */
-    fun isGated(performanceId: Long): Boolean = statusOf(performanceId) == OPEN
+    fun isGated(performanceId: Long): Boolean = statusOf(performanceId) == PerformanceStatus.OPEN.code
 
     /**
      * 판매 중인 회차에만 줄이 선다. 닫힌 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`),
@@ -120,7 +121,7 @@ class QueueService(
         val status = statusOf(performanceId)
             ?: throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
 
-        if (status != OPEN) {
+        if (status != PerformanceStatus.OPEN.code) {
             throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=$status")
         }
     }
@@ -156,8 +157,6 @@ class QueueService(
     }
 
     companion object {
-        private const val OPEN = "open"
-
         /** 하트비트가 이만큼 끊기면 줄에서 뺀다(ADR 0003). 폴링이 2초라 넉넉히 잡은 값이다 */
         val HEARTBEAT_TIMEOUT: Duration = Duration.ofSeconds(90)
 

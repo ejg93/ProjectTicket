@@ -4,6 +4,7 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.PerformanceStatus
 import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.observability.TicketMetrics
 import java.time.Duration
@@ -71,7 +72,7 @@ class SeatHoldService(
 
         // 회차 상태를 먼저 읽는 것은 **친절한 오류를 주기 위해서**다. 강제는 아래 조건부 UPDATE 의 `exists` 가 한다 — 그 사이에 닫혀도 0행이다.
         val performanceStatus = performanceStatusOf(command.performanceId)
-        if (performanceStatus != "open") {
+        if (performanceStatus != PerformanceStatus.OPEN.code) {
             throw TicketException(
                 ErrorCode.PERFORMANCE_NOT_OPEN,
                 "판매 중인 회차가 아니다: performance_id=${command.performanceId}, status=$performanceStatus",
@@ -112,7 +113,7 @@ class SeatHoldService(
         if (held.size != seatIds.size) {
             // 0행의 원인이 「좌석이 잡혔다」인지 「그 사이에 회차가 닫혔다」인지는 잠근 상태에서 다시 읽으면 갈린다.
             val statusNow = performanceStatusOf(command.performanceId)
-            if (statusNow != "open") {
+            if (statusNow != PerformanceStatus.OPEN.code) {
                 throw TicketException(ErrorCode.PERFORMANCE_NOT_OPEN, "회차가 닫혔다: status=$statusNow", mapOf("performance_status" to statusNow))
             }
             val taken = seatIds - held.toSet()
@@ -235,12 +236,13 @@ class SeatHoldService(
                and ps.performance_id = :performance
                and ps.performance_seat_id in (:seatIds)
                and ps.status = :available
-               and exists (select 1 from performance p where p.performance_id = :performance and p.status = 'open')
+               and exists (select 1 from performance p where p.performance_id = :performance and p.status = :open)
             returning ps.performance_seat_id, ps.performance_id
             """,
         )
             .param("held", PerformanceSeatStatus.HELD.code)
             .param("available", PerformanceSeatStatus.AVAILABLE.code)
+            .param("open", PerformanceStatus.OPEN.code)
             .param("reservation", reservationId)
             .param("performance", performanceId)
             .param("seatIds", seatIds)

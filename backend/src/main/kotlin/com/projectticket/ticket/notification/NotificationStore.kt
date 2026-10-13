@@ -3,6 +3,7 @@ package com.projectticket.ticket.notification
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.outbox.OutboxRelay
+import com.projectticket.ticket.reservation.ReservationStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
@@ -106,11 +107,11 @@ class NotificationStore(private val jdbc: JdbcClient) {
               from reservation r
               left join payment pm on pm.reservation_id = r.reservation_id and pm.status = 'approved'
               left join refund rf on rf.payment_id = pm.payment_id
-             where r.performance_id = :id and r.status = 'cancelled' and r.cancelled_by = :by
+             where r.performance_id = :id and r.status = :cancelled and r.cancelled_by = :by
              group by r.account_id
              order by r.account_id
             """,
-        ).param("id", performanceId).param("by", CancelledBy.ORGANIZER.code)
+        ).param("id", performanceId).param("cancelled", ReservationStatus.CANCELLED.code).param("by", CancelledBy.ORGANIZER.code)
             .query(CancelledLine::class.java).list().filterNotNull()
             .forEach {
                 val (subject, body) = NotificationTemplates.performanceCancelled(performance, it.refundAmount)
@@ -182,18 +183,18 @@ class NotificationStore(private val jdbc: JdbcClient) {
     /** 조건부다 — 남이 먼저 표시했으면 0행이고 그 알림은 그쪽이 보낸 것이다 */
     @Transactional
     fun markSent(notificationId: Long) =
-        jdbc.sql("update notification set status = :sent, sent_at = now() where notification_id = :id and status = 'pending'")
-            .param("sent", NotificationStatus.SENT.code).param("id", notificationId).update()
+        jdbc.sql("update notification set status = :sent, sent_at = now() where notification_id = :id and status = :pending")
+            .param("sent", NotificationStatus.SENT.code).param("pending", NotificationStatus.PENDING.code).param("id", notificationId).update()
 
     @Transactional
     fun markFailed(notificationId: Long, reason: String) =
-        jdbc.sql("update notification set status = :failed, failure_reason = :reason where notification_id = :id and status = 'pending'")
-            .param("failed", NotificationStatus.FAILED.code).param("reason", reason).param("id", notificationId).update()
+        jdbc.sql("update notification set status = :failed, failure_reason = :reason where notification_id = :id and status = :pending")
+            .param("failed", NotificationStatus.FAILED.code).param("pending", NotificationStatus.PENDING.code).param("reason", reason).param("id", notificationId).update()
 
     @Transactional
     fun markSkipped(notificationId: Long, reason: String) =
-        jdbc.sql("update notification set status = :skipped, failure_reason = :reason where notification_id = :id and status = 'pending'")
-            .param("skipped", NotificationStatus.SKIPPED.code).param("reason", reason).param("id", notificationId).update()
+        jdbc.sql("update notification set status = :skipped, failure_reason = :reason where notification_id = :id and status = :pending")
+            .param("skipped", NotificationStatus.SKIPPED.code).param("pending", NotificationStatus.PENDING.code).param("reason", reason).param("id", notificationId).update()
 
     /** @param email 탈퇴한 계정이면 null — 파기가 컬럼을 비운다 */
     data class Pending(val notificationId: Long, val subject: String, val body: String, val email: String?)

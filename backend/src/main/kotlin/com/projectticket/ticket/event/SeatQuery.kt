@@ -34,7 +34,7 @@ class SeatQuery(
             .query(String::class.java)
             .optional()
             .orElseThrow { TicketException(ErrorCode.PERFORMANCE_NOT_FOUND) }
-        if (status == "draft") throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
+        if (status == PerformanceStatus.DRAFT.code) throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
 
         return versions.current(performanceId)
     }

@@ -1,5 +1,13 @@
 package com.projectticket.ticket
 
+import com.projectticket.ticket.auth.AccountStatus
+import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.PerformanceStatus
+import com.projectticket.ticket.notification.NotificationStatus
+import com.projectticket.ticket.payment.PaymentStatus
+import com.projectticket.ticket.payment.RefundStatus
+import com.projectticket.ticket.reservation.ReservationStatus
+import com.projectticket.ticket.settlement.SettlementStatus
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.streams.asSequence
@@ -18,6 +26,9 @@ import org.junit.jupiter.api.Test
  * 그래서 조립 자체를 아래 두 시험이 막는다(`G10`, `D9` 「이름 바인딩만」). `sql(` 호출의 인자가 리터럴 하나가 아니거나
  * 리터럴 안에서 허용 밖의 값을 보간하면 「결합했다」. CodeQL 은 도우미가 `StringBuilder` 로 조립해 넘긴 SQL 을 못 잡았다(`46c` 탐침).
  * `JdbcClient` 밖의 입구(`JdbcTemplate` 등)는 안 본다 — 지금 main 에 없다.
+ *
+ * **상태 리터럴**(`I9-4`)도 같은 글을 읽는다 — `status = '…'` 의 값이 열거형 `code` 인가(오타면 조용히 0행), 그리고
+ * 부분 인덱스 조건·`on conflict … where` 와 짝인 자리에만 있나(`coding-rules.md` 「SQL」).
  *
  * 빠른 레인이다 — `src/main/kotlin` 만 읽는다. main 이 바뀌면 클래스가 바뀌어 `test` 가 다시 돈다.
  */
@@ -41,12 +52,41 @@ class SqlTextTest {
         }
 
     /** 원시 문자열 전부 + `sql(` 의 일반 리터럴 — 한 줄 `"update performance_seat …"` 도 읽는다(마무리 16차 독립 리뷰) */
-    private val statements: List<Pair<Path, String>> =
-        (
-            sources.flatMap { (path, text) -> RAW_STRING.findAll(text).map { path to it.groupValues[1] }.toList() } +
-                sqlCalls.mapNotNull { call -> call.literal?.takeUnless { it.raw }?.let { call.path to it.body } }
-            )
-            .filter { (_, sql) -> SEAT_UPDATE.containsMatchIn(sql) }
+    private val sqlTexts: List<Pair<Path, String>> =
+        sources.flatMap { (path, text) -> RAW_STRING.findAll(text).map { path to it.groupValues[1] }.toList() } +
+            sqlCalls.mapNotNull { call -> call.literal?.takeUnless { it.raw }?.let { call.path to it.body } }
+
+    private val statements: List<Pair<Path, String>> = sqlTexts.filter { (_, sql) -> SEAT_UPDATE.containsMatchIn(sql) }
+
+    /** SQL 에 박힌 상태 값 — 파일 이름과 값. `status in ('a', 'b')` 는 둘이다 */
+    private val statusLiterals: List<Pair<String, String>> =
+        sqlTexts.flatMap { (path, sql) ->
+            STATUS_LITERAL.findAll(sql)
+                .flatMap { match -> QUOTED.findAll(match.groupValues[1]).map { path.fileName.toString() to it.groupValues[1] } }
+                .toList()
+        }
+
+    @Test
+    fun status_literals_are_enum_codes() {
+        assertThat(statusLiterals).describedAs("SQL 의 상태 리터럴을 하나도 못 읽었다 — 꼴이 바뀌었으면 STATUS_LITERAL 을 고친다").isNotEmpty()
+
+        val unknown = statusLiterals.filterNot { (_, value) -> value in STATUS_CODES }.map { (file, value) -> "$file '$value'" }
+        assertThat(unknown)
+            .describedAs("열거형 `code` 에 없는 상태 리터럴이다 — 오타면 조건이 아무 오류 없이 0행이다(coding-rules.md 「SQL」)")
+            .isEmpty()
+    }
+
+    /**
+     * 목록과 **같아야** 한다 — 밖의 리터럴은 바인딩할 자리고, 목록의 리터럴을 바인딩으로 바꾸면 generic plan 이 그 부분 인덱스를 못 쓴다
+     * (Postgres 17 실측, `stack.md`). 짝인 인덱스를 새로 만들거나 지우면 이 표가 같이 바뀐다.
+     */
+    @Test
+    fun status_literals_sit_only_where_an_index_needs_them() {
+        val found = statusLiterals.groupBy({ it.first }, { it.second }).mapValues { (_, values) -> values.sorted() }
+        assertThat(found)
+            .describedAs("상태 리터럴은 부분 인덱스 조건·`on conflict … where` 와 짝인 자리에만 둔다 — 나머지는 열거형 `code` 를 바인딩한다(coding-rules.md 「SQL」)")
+            .isEqualTo(INDEXED_LITERALS)
+    }
 
     @Test
     fun every_seat_update_is_conditional_on_the_current_status() {
@@ -196,6 +236,36 @@ class SqlTextTest {
         val SUBQUERY_START = Regex("""(?i)\(\s*select\b""")
 
         const val RAW_QUOTE = "\"\"\""
+
+        /** `status = 'a'`·`p.status <> 'a'`·`status in ('a', 'b')`. `payment_status` 같은 다른 이름은 안 문다 */
+        val STATUS_LITERAL = Regex("""(?i)\bstatus\s*(?:=|<>|!=|in\b)\s*\(?\s*('[^']*'(?:\s*,\s*'[^']*')*)""")
+        val QUOTED = Regex("""'([^']*)'""")
+
+        /** 상태 열의 값은 전부 이 여덟 열거형에서 온다 — 거울은 `EnumConstraintTest` 가 `check` 와 맞춘다 */
+        val STATUS_CODES: Set<String> = listOf(
+            AccountStatus.entries.map { it.code },
+            PerformanceStatus.entries.map { it.code },
+            PerformanceSeatStatus.entries.map { it.code },
+            ReservationStatus.entries.map { it.code },
+            PaymentStatus.entries.map { it.code },
+            RefundStatus.entries.map { it.code },
+            NotificationStatus.entries.map { it.code },
+            SettlementStatus.entries.map { it.code },
+        ).flatten().toSet()
+
+        /** 리터럴이 있어야 하는 자리 — 파일 이름과 값(정렬). 각 줄의 짝은 그 부분 인덱스다(계층 예외 하나) */
+        val INDEXED_LITERALS: Map<String, List<String>> = mapOf(
+            // `performance_sales_close_at_idx`(V14)
+            "PerformanceCloser.kt" to listOf("open"),
+            // `payment_approved_idx`(V9) · `notification_pending_idx`(V15)
+            "NotificationStore.kt" to listOf("approved", "pending"),
+            // `settlement_scheduled_idx`(V16). `reserved` 는 인덱스가 아니라 **계층**이다 — 정산이 `ReservationStatus` 를 못 본다(`ArchitectureTest`)
+            "SettlementStore.kt" to listOf("reserved", "scheduled"),
+            // `on conflict … where` — `reservation_live_hold_idx`(V8)와 글자로 같아야 한다
+            "SeatHoldService.kt" to listOf("held", "paying"),
+            // `reservation_held_until_idx` · `reservation_paying_until_idx`(V7)
+            "HoldSweeper.kt" to listOf("held", "paying"),
+        )
 
         /**
          * `JdbcClient.sql(` 부르는 자리 — `jdbc.sql(`·`jdbc.sql (`·`with(jdbc) { sql(` 모두. 이름의 일부(`toSql(`)와 선언(`fun sql(`)은 안 문다.

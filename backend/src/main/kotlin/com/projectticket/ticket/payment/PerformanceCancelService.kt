@@ -4,6 +4,7 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.PerformanceStatus
 import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
@@ -41,7 +42,9 @@ class PerformanceCancelService(
     @Transactional
     fun cancel(performanceId: Long, actorAccountId: Long?): Int {
         // 조건부 UPDATE. `open` 이 아니면 0행이고, 그때 왜인지 다시 읽어 가른다.
-        val cancelled = jdbc.sql("update performance set status = 'cancelled' where performance_id = :id and status = 'open'")
+        val cancelled = jdbc.sql("update performance set status = :cancelled where performance_id = :id and status = :open")
+            .param("cancelled", PerformanceStatus.CANCELLED.code)
+            .param("open", PerformanceStatus.OPEN.code)
             .param("id", performanceId)
             .update()
         if (cancelled == 0) throw cannotCancel(performanceId)

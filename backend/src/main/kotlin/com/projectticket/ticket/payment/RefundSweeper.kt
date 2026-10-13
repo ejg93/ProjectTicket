@@ -71,11 +71,11 @@ class RefundSweeper(
             """
             select refund_id, refund_amount
               from refund
-             where status = 'requested'
+             where status = :requested
              order by refund_id
              limit :batch
             """,
-        ).param("batch", BATCH_SIZE).query(Row::class.java).list().filterNotNull()
+        ).param("requested", RefundStatus.REQUESTED.code).param("batch", BATCH_SIZE).query(Row::class.java).list().filterNotNull()
 
     data class Row(val refundId: Long, val refundAmount: Int)
 
