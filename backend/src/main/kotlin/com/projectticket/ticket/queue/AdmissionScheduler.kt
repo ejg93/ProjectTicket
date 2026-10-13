@@ -55,7 +55,7 @@ class AdmissionScheduler(
     }
 
     companion object {
-        /** 락 이름(33). 여기가 여러 대에서 돌면 입장 속도가 대수배가 된다 */
+        /** 락 이름(33). 겹침만 막는다 — 속도는 입장 예산의 창이 지킨다(`35f`) */
         const val LOCK_NAME = "admission-scheduler"
     }
 }

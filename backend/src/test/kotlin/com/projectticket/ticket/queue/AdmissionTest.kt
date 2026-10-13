@@ -146,17 +146,28 @@ class AdmissionTest : PostgresTestBase() {
 
         assertThat(admission.admit(performanceId)).isZero()
         // 아무도 안 들였는데 찍으면 정원이 비는 순간에도 한 주기를 헛기다린다.
-        assertThat(redis.hasKey(QueueKeys.admittedAt(performanceId))).isFalse()
+        assertThat(redis.hasKey(QueueKeys.admitWindow(performanceId))).isFalse()
     }
 
     @Test
-    fun the_empty_line_shortcut_ignores_the_interval() {
+    fun the_empty_line_shortcut_uses_what_is_left_of_the_budget() {
         lineUp(1)
         admission.admit(performanceId)
         queue.enter(performanceId, second)
 
-        // 줄이 비었을 때의 즉시 입장은 주기를 안 본다(`D12` 「항상 켠다」) — 한가한 시간에 둘째 사람이 5초를 기다리지 않는다.
+        // 한가한 시간에는 예산이 남아 줄이 빈 사람은 바로 들어간다(`D12` 「항상 켠다」) — 5초를 기다리지 않는다.
         assertThat(admission.tokenFor(performanceId, second)).isNotNull()
+    }
+
+    @Test
+    fun the_empty_line_shortcut_stops_when_the_budget_is_spent() {
+        lineUp(AdmissionService.BATCH_SIZE.toInt())
+        admission.admit(performanceId)
+        val entered = queue.enter(performanceId, second)
+
+        // 예산을 다 쓴 창에서는 줄이 비어 있어도 줄에 선다 — 즉시 입장만 따로 두면 하나씩 고르게 오는 도착을 R 과 무관하게 다 들인다(마무리 21차)
+        assertThat(entered.state).isEqualTo(QueueService.Position.WAITING)
+        assertThat(admission.tokenFor(performanceId, second)).isNull()
     }
 
     @Test
@@ -201,10 +212,9 @@ class AdmissionTest : PostgresTestBase() {
         repeat(count) { index -> redis.opsForZSet().add(QueueKeys.waiting(performanceId), "filler-$index", index.toDouble()) }
     }
 
-    /** 마지막 입장 시각을 한 주기 전으로 민다 — 시험이 5초를 기다리지 않게 */
+    /** 예산의 창을 지운다 — 다음 입장이 새 창을 연다. 시각을 심지 않는다: 앱 시계와 Redis `TIME` 이 다를 수 있다(`D7`) */
     private fun allowNextBatch() {
-        val earlier = System.currentTimeMillis() - AdmissionService.ADMIT_INTERVAL_MILLIS - 1_000
-        redis.opsForValue().set(QueueKeys.admittedAt(performanceId), earlier.toString())
+        redis.delete(QueueKeys.admitWindow(performanceId))
     }
 
     /** 활성 집합을 채운다. `expiresInMillis` 가 음수면 이미 죽은 토큰이다 */

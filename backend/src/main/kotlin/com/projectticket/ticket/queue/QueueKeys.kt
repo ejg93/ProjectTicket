@@ -18,10 +18,11 @@ object QueueKeys {
     fun active(performanceId: Long): String = "queue:$performanceId:active"
 
     /**
-     * 마지막으로 배치를 들인 시각(ms, Redis `TIME`). 입장 스크립트가 이 값으로 **한 주기에 한 배치**를 지킨다(`35f`) —
-     * 락은 겹침만 막아서, 이것이 없으면 대마다 5초에 한 번씩 돌아 입장 속도가 대수배가 된다.
+     * 입장 예산의 창(HASH `start`·`used`, ms 는 Redis `TIME`). 입장 스크립트가 이 값으로 **한 주기에 배치 크기만큼**을 지킨다(`35f`) —
+     * 락은 겹침만 막아서, 이것이 없으면 대마다 5초에 한 번씩 돌아 입장 속도가 대수배가 된다. 스케줄러와 줄이 빈 때의 즉시 입장이
+     * **같은 예산을 나눠 쓴다** — 즉시 입장만 따로 두면 하나씩 고르게 오는 도착을 R 과 무관하게 다 들인다(마무리 21차 독립 리뷰).
      */
-    fun admittedAt(performanceId: Long): String = "queue:$performanceId:admitted_at"
+    fun admitWindow(performanceId: Long): String = "queue:$performanceId:admit_window"
 
     /** 발급된 토큰 하나. 값은 `{account_id, performance_id, issued_at}` 이고 관문(23)이 그것을 대조한다 */
     fun admission(token: String): String = "$ADMISSION_PREFIX$token"
@@ -40,7 +41,7 @@ object QueueKeys {
      * 남아 있어도 선점은 회차 상태를 다시 보므로(13) 닫힌 회차의 토큰으로는 아무것도 못 한다.
      */
     fun ofPerformance(performanceId: Long): List<String> =
-        listOf(waiting(performanceId), seen(performanceId), active(performanceId), admittedAt(performanceId))
+        listOf(waiting(performanceId), seen(performanceId), active(performanceId), admitWindow(performanceId))
 
     /** 토큰 키의 접두. 스크립트가 이름을 만들 때 쓴다 */
     const val ADMISSION_PREFIX = "admit:"

@@ -40,8 +40,8 @@ class QueueService(
         // **줄이 비어 있으면 그 자리에서 들인다**(`D12` 「항상 켠다」). 한가한 시간에 5초를 기다리게 하지 않는다.
         // 앞에 한 명이라도 있으면 스케줄러에 맡긴다 — 그래야 입장 속도 R 이 등식대로 유지된다.
         if (place == 0L && redis.opsForZSet().size(QueueKeys.waiting(performanceId)) == 1L) {
-            // 주기를 안 본다(`35f`) — 한가한 시간에 둘째 사람이 5초를 기다리지 않게. 줄이 빌 때만 타서 R 을 못 넘긴다.
-            admission.admit(performanceId, paced = false)
+            // 스케줄러와 같은 예산을 쓴다(`35f`) — 한가하면 예산이 남아 바로 들어가고, 몰리면 바닥나 줄에 선다. 어느 길로든 R 이 상한이다.
+            admission.admit(performanceId, limit = 1)
             admission.tokenFor(performanceId, accountId)?.let { return Position.admitted(it) }
         }
         return position(place)

@@ -487,6 +487,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | `setup()` 반환값 | **VU 마다 따로 복사된다.** 세션 1만 × VU 500 이 수 GB 가 되어 Docker VM(7.75GB)이 메모리 부족으로 굳었다(`35c`) — `docker ps` 가 답을 안 하고 WSL 서비스가 시간 초과(0x8007274c), Docker Desktop 을 다시 켜야 풀렸다. 큰 데이터는 파일로 두고 `SharedArray`(init 단계 `open()`)로 한 벌만 읽는다 — 세션처럼 실행 중에 만들 것은 따로 한 판(`load/prelogin.js`)의 `handleSummary` 가 `setup_data` 를 파일로 쓴다 |
 | 표준입력 실행 | `k6 run - < x.js` 는 `import "./lib/…"` 를 못 푼다. 폴더를 마운트하고 경로로 돌린다(`-v "$(pwd -W)/load:/load" … run /load/x.js`, Git Bash 는 `MSYS_NO_PATHCONV=1`) |
 | 메모리 상한 | k6 컨테이너에 `--memory=2g` 를 건다 — 넘치면 VM 이 아니라 k6 만 죽는다 |
+| `docker stats --no-stream` | 한 번이 3초쯤 걸린다(컨테이너 열 남짓). 측정 중 CPU 표본은 횟수가 아니라 끝 시각으로 돌린다 — 횟수로 돌리면 앞 구간만 잰다(`35d-재`) |
 | 요약의 섞임 | `setup()` 의 요청도 `http_req_duration` 에 든다. 측정 요청에 꼬리표(`options.tags`)를 달고 그 하위 지표에 문턱을 하나 두면 요약에 따로 나온다(`phase:run`) |
 
 ## 데이터 접근은 `JdbcClient` 다

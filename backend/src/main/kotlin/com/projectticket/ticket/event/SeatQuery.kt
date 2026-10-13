@@ -97,11 +97,12 @@ class SeatQuery(
             }
         }
         return try {
-            buildAndCache(performanceId, version).also { mine.complete(it) }
-        } catch (e: RuntimeException) {
-            mine.completeExceptionally(e)
-            throw e
+            // 이겼어도 캐시를 한 번 더 본다 — 캐시를 비었다고 본 뒤 이기기 전에 앞 빌더가 쓰고 빠졌을 수 있다(마무리 21차 독립 리뷰)
+            val cached = versions.cachedSnapshot(performanceId, version)?.let { json.readValue(it, SeatMap::class.java) }
+            (cached ?: buildAndCache(performanceId, version)).also { mine.complete(it) }
         } finally {
+            // 무엇으로 끝나든(Error 포함) 기다리는 쪽을 놓아준다 — 그쪽은 실패를 받고 직접 만든다
+            if (!mine.isDone) mine.completeExceptionally(IllegalStateException("스냅샷을 만들지 못했다: $key"))
             building.remove(key, mine)
         }
     }

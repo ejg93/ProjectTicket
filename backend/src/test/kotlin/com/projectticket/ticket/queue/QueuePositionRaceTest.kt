@@ -21,7 +21,8 @@ import org.springframework.data.redis.core.StringRedisTemplate
  * 토큰도 없고 줄에도 없어 404 `not-in-queue` 였다 — 화면은 「대기열에서 빠졌습니다」로 읽는다. 줄 1만에서 8번 났다(`load-3` 「35c」).
  *
  * **롤백 없는 바탕이다** — 폴링 스레드들이 회차 상태를 DB 에서 읽어서, 커밋 안 된 회차는 404 `performance-not-found` 다.
- * Redis 는 이 바탕이 안 비운다 — 끝에 회차의 키를 지운다.
+ * Redis 는 이 바탕이 안 비운다 — 끝에 회차의 키(`QueueKeys.ofPerformance`)를 지운다. 토큰 키(`admit:*` 4,000개)는 회차로 못 훑어서
+ * TTL 10분과 다음 `PostgresTestBase` 의 `flushDb` 가 걷는다 — 회차 id 가 유일해 다른 시험에 안 닿는다.
  */
 class QueuePositionRaceTest : ConcurrencyTestBase() {
 
@@ -55,12 +56,17 @@ class QueuePositionRaceTest : ConcurrencyTestBase() {
         val admitted = AtomicInteger(0)
         val results = runConcurrently(POLLERS + 1) { index ->
             if (index == POLLERS) {
-                // 문지기 하나 — 배치를 빨리 거듭 들인다(주기를 안 보는 길이라 기다림이 없다). 사이를 조금 띄워 폴링이 끼게 한다
-                while ((redis.opsForZSet().size(QueueKeys.waiting(performanceId)) ?: 0) > 0) {
-                    admitted.addAndGet(admission.admit(performanceId, paced = false).toInt())
-                    Thread.sleep(ADMIT_GAP_MS)
+                // 문지기 하나 — 배치를 빨리 거듭 들인다(예산의 창을 지워 5초를 안 기다린다). 사이를 조금 띄워 폴링이 끼게 한다
+                try {
+                    while ((redis.opsForZSet().size(QueueKeys.waiting(performanceId)) ?: 0) > 0) {
+                        redis.delete(QueueKeys.admitWindow(performanceId))
+                        admitted.addAndGet(admission.admit(performanceId).toInt())
+                        Thread.sleep(ADMIT_GAP_MS)
+                    }
+                } finally {
+                    // 문지기가 예외로 끝나도 폴러가 시한까지 돌지 않게 — 원인이 시간 초과에 가려진다
+                    done.set(true)
                 }
-                done.set(true)
                 0
             } else {
                 var missing = 0

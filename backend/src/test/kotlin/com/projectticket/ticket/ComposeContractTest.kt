@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
  * |---|---|---|
  * | `upstream { server app:8080; }` | 이름을 기동 때 한 번만 풀어 `--scale app=3` 이어도 **한 대만** 받았다 | 변수 `proxy_pass` + `resolver` 를 요구한다 |
  * | healthcheck 가 `wget` | JRE 이미지에 없어 컨테이너가 늘 `unhealthy` 였다(앱은 멀쩡) | 쓰는 도구가 이미지에 깔리나 본다 |
- * | 앱에 메모리 상한이 없다 | JVM 셋이 VM 의 70% 씩 크려 해서 줄 1만에서 VM 이 굳었다(`35i`) | `deploy.resources.limits.memory` 를 요구한다 |
+ * | 앱에 메모리 상한이 없다 | JVM 셋이 VM 의 70% 씩 크려 한다 — 줄 1만에서 대당 1.2GB, 같은 날 VM 이 굳었다(k6 복사와 겹쳐 결정타는 못 갈랐다, `35i`) | `deploy.resources.limits.memory` 를 요구한다 |
  * | Prometheus `static_configs: app:8080` | 긁을 때마다 셋 중 하나만 골라 대수별 카운터가 섞였다(`35h`) | `dns_sd_configs` 와 게이지 `max()` 를 요구한다 |
  *
  * 파일을 글자로 읽는 검사라 컨테이너가 필요 없다 — `StackVersionConsistencyTest` 와 같은 자리다.
