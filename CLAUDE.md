@@ -157,7 +157,7 @@ ProjectShop 의 Java 를 포팅할 때는 **옮기면서 Kotlin 답게 고치고
 |---|---|---|
 | 청크 | 커밋 앞 | 빠른 레인. 새 `V*` 가 있으면 `verify.sh` 가 `integrationTest` 를 같이 돈다. Stop hook 과 commit hook(`work/*`)이 이 도장을 본다. 같은 지문을 이미 찍어 뒀으면 그 레인은 안 돈다 |
 | 번들 끝 | `/wrapup` | `--full` · 좌석 건드렸으면 `*Concurrency*` · 새 `V*` 있었으면 health 기동 · 화면 있었으면 e2e · 독립 리뷰 · PR. push hook 이 full 도장을 본다 |
-| push 뒤 | | CI. 빨가면 다음 청크보다 먼저 친다 |
+| push 뒤 | | CI. 빨가면 다음 청크보다 먼저 친다. SessionStart 가 `main` 의 마지막 CI 결론을 찍는다 |
 
 청크 층을 빼면 번들 끝에서 빨개진 커밋을 이분 탐색하게 된다 — 청크 하나 값이다. 그래서 안 뺀다.
 
