@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.redis.core.StringRedisTemplate
+import io.micrometer.core.instrument.MeterRegistry
 
 /**
  * 델타와 스냅샷(`10a` 의 닫힘 조건, `D20`).
@@ -25,6 +26,7 @@ class SeatChangesTest : ConcurrencyTestBase() {
     @Autowired lateinit var seatHoldService: SeatHoldService
     @Autowired lateinit var sweeper: HoldSweeper
     @Autowired lateinit var redis: StringRedisTemplate
+    @Autowired lateinit var meters: MeterRegistry
 
     private lateinit var fixture: EventFixture
     private var performanceId: Long = 0
@@ -105,6 +107,21 @@ class SeatChangesTest : ConcurrencyTestBase() {
         assertThat(seatVersions.cachedSnapshot(performanceId, seatQuery.version(performanceId))).isNull()
     }
 
+    /**
+     * 같은 판에 동시에 몰려도 이 대는 스냅샷을 **하나만** 만든다(`35j`). 늦게 온 요청은 만드는 쪽의 결과를 받는다 —
+     * 락이 없던 때는 판이 바뀐 직후의 요청이 각자 DB 를 읽어 1,000 rps 에서 판 하나에 약 20번 만들었다(`load-3` 「35d」).
+     */
+    @Test
+    fun one_build_per_version_per_instance() {
+        val version = seatQuery.version(performanceId)
+        val before = built()
+
+        val results = runConcurrently(CROWD) { seatQuery.seatMap(performanceId).version }
+
+        assertThat(results).allSatisfy { assertThat(it.getOrThrow()).isEqualTo(version) }
+        assertThat(built() - before).describedAs("같은 판을 여럿이 만들었다 — single-flight 가 안 먹는다(`35j`)").isEqualTo(1.0)
+    }
+
     @Test
     fun a_rolled_back_hold_never_reaches_the_screen() {
         val before = seatQuery.version(performanceId)
@@ -123,4 +140,10 @@ class SeatChangesTest : ConcurrencyTestBase() {
     private fun expire(reservationId: Long) =
         jdbc.sql("update reservation set held_until = now() - interval '1 minute' where reservation_id = :id")
             .param("id", reservationId).update()
+
+    private fun built(): Double = meters.find("seat.snapshot.built").counter()?.count() ?: 0.0
+
+    private companion object {
+        const val CROWD = 50
+    }
 }
