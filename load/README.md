@@ -64,7 +64,7 @@ delete from idempotency_key;"
 토큰(`admit:*`)이 남으면 다음 판의 계정이 줄을 안 서고 바로 입장한다:
 
 ```bash
-docker exec ticket-redis redis-cli del seat:ver:1 seat:log:1 queue:1 queue:1:seen queue:1:active
+docker exec ticket-redis redis-cli del seat:ver:1 seat:log:1 queue:1 queue:1:seen queue:1:active queue:1:admitted_at
 docker exec ticket-redis sh -c "redis-cli --scan --pattern 'admit:*' | xargs -r redis-cli del"
 ```
 

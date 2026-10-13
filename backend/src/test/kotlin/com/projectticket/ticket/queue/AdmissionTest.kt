@@ -118,6 +118,47 @@ class AdmissionTest : PostgresTestBase() {
         assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(1)
     }
 
+    /** 셋이 같은 5초에 돌아도 한 배치뿐이다(`35f`) — 락은 겹침만 막고 주기는 이 스크립트가 지킨다 */
+    @Test
+    fun a_second_batch_within_the_interval_is_refused() {
+        lineUp(AdmissionService.BATCH_SIZE.toInt() * 2)
+
+        assertThat(admission.admit(performanceId)).isEqualTo(AdmissionService.BATCH_SIZE)
+        assertThat(admission.admit(performanceId)).describedAs("주기 안의 둘째 배치 — 대수배 입장(`35f`)").isZero()
+        assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(AdmissionService.BATCH_SIZE)
+    }
+
+    @Test
+    fun the_next_interval_admits_again() {
+        lineUp(AdmissionService.BATCH_SIZE.toInt() * 2)
+        admission.admit(performanceId)
+
+        allowNextBatch()
+
+        assertThat(admission.admit(performanceId)).isEqualTo(AdmissionService.BATCH_SIZE)
+        assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isZero()
+    }
+
+    @Test
+    fun a_full_house_does_not_stamp_the_interval() {
+        fillActive(AdmissionService.CAPACITY, expiresInMillis = 60_000)
+        queueUp(first)
+
+        assertThat(admission.admit(performanceId)).isZero()
+        // 아무도 안 들였는데 찍으면 정원이 비는 순간에도 한 주기를 헛기다린다.
+        assertThat(redis.hasKey(QueueKeys.admittedAt(performanceId))).isFalse()
+    }
+
+    @Test
+    fun the_empty_line_shortcut_ignores_the_interval() {
+        lineUp(1)
+        admission.admit(performanceId)
+        queue.enter(performanceId, second)
+
+        // 줄이 비었을 때의 즉시 입장은 주기를 안 본다(`D12` 「항상 켠다」) — 한가한 시간에 둘째 사람이 5초를 기다리지 않는다.
+        assertThat(admission.tokenFor(performanceId, second)).isNotNull()
+    }
+
     @Test
     fun an_admitted_account_is_not_put_back_in_line() {
         queue.enter(performanceId, first)
@@ -153,6 +194,17 @@ class AdmissionTest : PostgresTestBase() {
      */
     private fun queueUp(accountId: Long) {
         redis.opsForZSet().add(QueueKeys.waiting(performanceId), accountId.toString(), accountId.toDouble())
+    }
+
+    /** 계정이 아닌 자리 채움을 `count` 명 세운다 */
+    private fun lineUp(count: Int) {
+        repeat(count) { index -> redis.opsForZSet().add(QueueKeys.waiting(performanceId), "filler-$index", index.toDouble()) }
+    }
+
+    /** 마지막 입장 시각을 한 주기 전으로 민다 — 시험이 5초를 기다리지 않게 */
+    private fun allowNextBatch() {
+        val earlier = System.currentTimeMillis() - AdmissionService.ADMIT_INTERVAL_MILLIS - 1_000
+        redis.opsForValue().set(QueueKeys.admittedAt(performanceId), earlier.toString())
     }
 
     /** 활성 집합을 채운다. `expiresInMillis` 가 음수면 이미 죽은 토큰이다 */

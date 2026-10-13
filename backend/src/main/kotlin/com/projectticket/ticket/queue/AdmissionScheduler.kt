@@ -15,8 +15,9 @@ import org.springframework.stereotype.Component
  * **고르는 것과 들이는 것이 갈려 있다** — 회차 목록은 DB 가 주고 입장은 Redis 안에서 끝난다.
  * 회차마다 스크립트가 따로 돌아서 한 회차가 정원이 차도 다른 회차가 안 막힌다.
  *
- * 인스턴스가 여럿이면 대수만큼 돈다. 같은 사람을 두 번 들이지는 않지만(Lua 가 원자다) 속도가 대수배가 되므로
- * 33 이 Redis 락으로 하나만 돌린다 — 속도가 설정값과 같아야 31 의 측정이 뜻을 갖는다.
+ * 인스턴스가 여럿이면 대수만큼 돈다. 같은 사람을 두 번 들이지는 않는다(Lua 가 원자다). **속도는 락이 아니라 스크립트가 지킨다** —
+ * 락은 겹침만 막고 끝나면 놓아서, 셋이면 5초에 많게는 세 번 돈다. 입장 스크립트가 마지막 입장 시각을 보고 주기 안이면
+ * 아무도 안 들인다(`35f`). 3차 측정이 그 전의 모양(R 의 약 2.2배)을 쟀다(`load-3` 「35c」).
  */
 @Component
 class AdmissionScheduler(
@@ -30,10 +31,7 @@ class AdmissionScheduler(
     private val log = LoggerFactory.getLogger(AdmissionScheduler::class.java)
 
     /** @return 이번에 들인 사람 수 */
-    /**
-     * 스케줄러 입구(33). **여기서 락이 특히 중요하다** — Lua 가 원자라 같은 사람을 두 번 들이지는 않지만,
-     * 세 대가 돌면 5초에 300명이 들어가 입장 속도 R 이 설정값의 세 배가 된다. 그러면 31 의 측정이 뜻을 잃는다.
-     */
+    /** 스케줄러 입구(33). 락은 셋이 같은 순간에 회차 목록을 같이 훑지 않게 한다 — 속도는 [AdmissionService.admit] 이 지킨다(`35f`) */
     @Scheduled(fixedDelayString = AdmissionService.ADMIT_INTERVAL)
     fun admitDueExclusively(): Long = lock.runExclusively(LOCK_NAME) { admitDue() } ?: 0
 

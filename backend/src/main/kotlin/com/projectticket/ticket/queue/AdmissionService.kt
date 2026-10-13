@@ -31,9 +31,15 @@ class AdmissionService(
     /**
      * 한 회차의 줄에서 들일 수 있는 만큼 들인다.
      *
-     * @return 이번에 들인 사람 수. 줄이 비었거나 정원이 찼으면 0
+     * **한 주기에 한 배치다**(`35f`, 사용자 결정 2026-10-13). 스케줄러는 대마다 [ADMIT_INTERVAL] 로 돌고 락은 겹침만 막아서,
+     * 주기를 Redis 에 안 두면 셋이면 5초에 많게는 세 배치가 들어간다 — R 이 대수배가 되고 `D12` 의 등식이 안 선다.
+     * 그래서 스크립트가 마지막 입장 시각([QueueKeys.admittedAt])을 보고, 주기 안이면 아무도 안 들인다. 어느 대가 돌든 R 은 상한이다.
+     *
+     * @param paced `false` 면 주기를 안 보고 시각도 안 찍는다 — **줄이 비었을 때의 즉시 입장**([QueueService.enter])이 쓴다.
+     *   그 길은 진입한 사람이 줄의 유일한 사람일 때만 타서, 도착률이 R 보다 작을 때만 쓰인다(`D12` 「항상 켠다」).
+     * @return 이번에 들인 사람 수. 줄이 비었거나 정원이 찼거나 주기 안이면 0
      */
-    fun admit(performanceId: Long): Long {
+    fun admit(performanceId: Long, paced: Boolean = true): Long {
         val waitingKey = QueueKeys.waiting(performanceId)
         val waiting = redis.opsForZSet().size(waitingKey) ?: 0
         if (waiting == 0L) return 0
@@ -46,9 +52,11 @@ class AdmissionService(
             QueueKeys.ADMISSION_PREFIX,
             QueueKeys.admissionByAccountPrefix(performanceId),
             performanceId.toString(),
+            (if (paced) ADMIT_INTERVAL_MILLIS else 0L).toString(),
         ) + tokens
 
-        val answer = redis.execute(ADMIT, listOf(waitingKey, QueueKeys.active(performanceId)), *args.toTypedArray())
+        val keys = listOf(waitingKey, QueueKeys.active(performanceId), QueueKeys.admittedAt(performanceId))
+        val answer = redis.execute(ADMIT, keys, *args.toTypedArray())
             ?: return 0
 
         // 「몇 명」과 「얼마나 기다렸나」를 같이 받는다 — 줄 앞에서 뺀 사람의 진입 시각은 스크립트 안에만 있다.
@@ -121,11 +129,17 @@ class AdmissionService(
         /** 한 번에 들이는 수 M. [ADMIT_INTERVAL] 과 묶여 입장 속도 R = 100/5초 = 20/초가 된다(`D12` 「등식」) */
         const val BATCH_SIZE = 100L
 
-        /** 스케줄러 주기. 이 값을 바꾸면 R 이 바뀌고 `D12` 의 등식을 다시 써야 한다 */
-        const val ADMIT_INTERVAL = "PT5S"
+        /** 입장 주기(초). 이 값을 바꾸면 R 이 바뀌고 `D12` 의 등식을 다시 써야 한다. 아래 셋이 모두 이 값에서 나온다 */
+        const val ADMIT_INTERVAL_SECONDS = 5L
 
-        /** R — 등식의 좌변. [BATCH_SIZE] 와 [ADMIT_INTERVAL] 에서 나온다. 순번의 예상 대기가 이 값으로 나눈다 */
-        const val ADMIT_PER_SECOND = BATCH_SIZE / 5
+        /** 스케줄러 주기 — `@Scheduled` 가 상수 문자열을 요구한다 */
+        const val ADMIT_INTERVAL = "PT${ADMIT_INTERVAL_SECONDS}S"
+
+        /** 입장 스크립트가 지키는 주기(`35f`) */
+        const val ADMIT_INTERVAL_MILLIS = ADMIT_INTERVAL_SECONDS * 1000
+
+        /** R — 등식의 좌변. **상한이다** — 대가 여럿이면 다음 틱의 위상만큼 늦어 실제는 R 이하다(`35f`). 순번의 예상 대기가 이 값으로 나눈다 */
+        const val ADMIT_PER_SECOND = BATCH_SIZE / ADMIT_INTERVAL_SECONDS
 
         /** 선점 5분 + 결제 여유(ADR 0003). 선점보다 짧으면 좌석을 쥔 채로 토큰이 죽는다 */
         val TOKEN_TTL: Duration = Duration.ofMinutes(10)
@@ -149,6 +163,8 @@ class AdmissionService(
          * 단일 노드라 되는 짓이고, 클러스터로 가면 슬롯이 갈려 깨진다. 지금 클러스터 계획은 없다(ADR 0001).
          *
          * 시각은 `TIME` 이다. 앱이 주면 인스턴스 시계가 어긋난 만큼 토큰 수명이 들쭉날쭉해진다.
+         * **주기도 같은 시계로 지킨다**(`35f`) — `ARGV[6]` 이 주기(ms, 0 이면 안 본다), `KEYS[3]` 이 마지막 입장 시각.
+         * 실제로 들였을 때만 찍는다 — 정원이 차서 0 이면 다음 틱이 다시 본다. 키는 주기의 두 배에 스스로 사라진다.
          */
         private val ADMIT = DefaultRedisScript<String>(
             """
@@ -159,10 +175,16 @@ class AdmissionService(
             local tokenPrefix = ARGV[3]
             local accountPrefix = ARGV[4]
             local performanceId = ARGV[5]
+            local interval = tonumber(ARGV[6])
+
+            if interval > 0 then
+                local last = redis.call('GET', KEYS[3])
+                if last and now - tonumber(last) < interval then return '0|' end
+            end
 
             redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
             local free = capacity - redis.call('ZCARD', KEYS[2])
-            local wanted = #ARGV - 5
+            local wanted = #ARGV - 6
             if free < wanted then wanted = free end
             if wanted <= 0 then return '0|' end
 
@@ -172,7 +194,7 @@ class AdmissionService(
             for i = 1, #popped, 2 do
                 local account = popped[i]
                 count = count + 1
-                local token = ARGV[5 + count]
+                local token = ARGV[6 + count]
                 redis.call('ZADD', KEYS[2], now + ttl, token)
                 redis.call(
                     'SET',
@@ -188,6 +210,9 @@ class AdmissionService(
                 redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
                 -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
                 waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
+            end
+            if count > 0 and interval > 0 then
+                redis.call('SET', KEYS[3], string.format('%d', now), 'PX', interval * 2)
             end
             return count .. '|' .. table.concat(waits, ',')
             """.trimIndent(),
