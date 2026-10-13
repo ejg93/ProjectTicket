@@ -93,6 +93,27 @@ MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -
 `poll_latency_ms` · `http_req_failed`. 대수별 입장은 아래 「대수가 실제로 갈렸나」처럼 앱마다 `queue_admitted_total` 을 읽는다 —
 **Prometheus 는 `app:8080` 하나를 긁어 셋 중 아무 대나 본다.**
 
+## 좌석 폴링(35d)
+
+공개 GET 을 계단으로 치는 `seat-poll.js` 와, 그동안 판을 바꾸는 `seat-rush.js`(`ROTATE=1`)를 같이 돌린다.
+**`ROTATE=1` 은 계정과 좌석을 반복마다 돌린다** — 안 돌리면 계정 수만큼 잡고 나서 판이 안 바뀐다.
+
+```bash
+# 1. 쓰는 쪽 — 미리 로그인(1천, 20초)이 끝난 뒤 2 를 띄운다
+MSYS_NO_PATHCONV=1 docker run --rm --memory=1g --network projectticket_default -v "$(pwd -W)/load:/load" \
+  -e VUS=10 -e RAMP=10s -e HOLD=230s -e PRELOGIN=1 -e ROTATE=1 -e ACCOUNTS=1000 grafana/k6:2.2.0 run /load/seat-rush.js
+
+# 2. 폴링 계단(200초)
+MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -v "$(pwd -W)/load:/load" \
+  grafana/k6:2.2.0 run /load/seat-poll.js
+
+# 3. 그동안 5초마다 판과 앱마다의 스냅샷 생성 수를 적는다 — 계단 구간(0~60·70~130·140~200초)의 앞뒤 차가 결과다
+while :; do echo "$(date -u +%s) $(docker exec ticket-redis redis-cli get seat:ver:1) $(for i in 1 2 3; do \
+  docker exec projectticket-app-$i curl -s localhost:8080/actuator/prometheus | awk '/^seat_snapshot_built_total/{printf "%s ", $2}'; done)"; sleep 5; done
+```
+
+판 변경 지표는 없다 — `seat:ver` 의 차로 센다. 스냅샷 생성을 Prometheus 로 읽지 않는 이유는 아래 절과 같다(`app:8080` 하나를 긁는다).
+
 ## 대수가 실제로 갈렸나 본다
 
 부하를 돌린 뒤 **인스턴스마다** 센다. 한 대에 몰려 있으면 문이 안 나눈 것이다(35).

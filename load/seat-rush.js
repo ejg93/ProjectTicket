@@ -17,6 +17,9 @@ const PERFORMANCE_ID = __ENV.PERFORMANCE_ID || "1";
 const ACCOUNTS = Number(__ENV.ACCOUNTS || 300);
 const PASSWORD = __ENV.PASSWORD || "demo-password-1234";
 const PRELOGIN = __ENV.PRELOGIN === "1";
+// 반복마다 다른 계정(35d). 기본은 VU 에 계정 하나가 고정이라 계정 수만큼 잡고 나면 판이 안 바뀐다 —
+// 좌석 폴링을 재는 동안 판을 계속 바꾸려면 새 계정이 계속 줄을 서야 한다. `ACCOUNTS` 가 반복 수보다 커야 겹치지 않는다.
+const ROTATE = __ENV.ROTATE === "1";
 
 // 무엇이 몇 번 일어났나. k6 기본 지표(응답 시간·오류율) 위에 **업무 결과**를 더한다.
 const seatsWon = new Counter("seats_won");
@@ -137,7 +140,8 @@ function waitForAdmission(jar, csrf) {
 }
 
 export default function (data) {
-  const index = ((__VU - 1) % ACCOUNTS) + 1;
+  const vus = Number(__ENV.VUS || 100);
+  const index = ROTATE ? ((__VU - 1 + __ITER * vus) % ACCOUNTS) + 1 : ((__VU - 1) % ACCOUNTS) + 1;
   let jar;
   let csrf;
   if (data.sessions) {
@@ -154,7 +158,9 @@ export default function (data) {
   if (!token) return;
 
   // 좌석은 VU 마다 다른 자리를 노린다 — 전원이 같은 한 석을 치면 재는 것이 경합이 아니라 한 행의 잠금이다.
-  const seatId = Number(__ENV.FIRST_SEAT_ID || 1) + ((__VU * 7) % Number(__ENV.SEATS || 1000));
+  // `ROTATE` 면 좌석도 반복을 따라 돈다 — VU 에만 묶으면 계정을 돌려도 같은 좌석을 쳐서 첫 판 뒤로 판이 안 바뀐다(35d 첫 판).
+  const slot = ROTATE ? __VU * 7 + __ITER * vus : __VU * 7;
+  const seatId = Number(__ENV.FIRST_SEAT_ID || 1) + (slot % Number(__ENV.SEATS || 1000));
   const started = Date.now();
   const res = http.post(
     `${BASE}/api/performances/${PERFORMANCE_ID}/reservations`,
