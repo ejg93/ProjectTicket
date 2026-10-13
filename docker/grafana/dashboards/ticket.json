@@ -30,8 +30,8 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
       "targets": [
-        { "expr": "queue_length", "legendFormat": "대기", "refId": "A" },
-        { "expr": "queue_active", "legendFormat": "활성", "refId": "B" }
+        { "expr": "max(queue_length)", "legendFormat": "대기", "refId": "A" },
+        { "expr": "max(queue_active)", "legendFormat": "활성", "refId": "B" }
       ]
     },
     {

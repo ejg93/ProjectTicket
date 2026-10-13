@@ -64,7 +64,7 @@ delete from idempotency_key;"
 토큰(`admit:*`)이 남으면 다음 판의 계정이 줄을 안 서고 바로 입장한다:
 
 ```bash
-docker exec ticket-redis redis-cli del seat:ver:1 seat:log:1 queue:1 queue:1:seen queue:1:active
+docker exec ticket-redis redis-cli del seat:ver:1 seat:log:1 queue:1 queue:1:seen queue:1:active queue:1:admit_window
 docker exec ticket-redis sh -c "redis-cli --scan --pattern 'admit:*' | xargs -r redis-cli del"
 ```
 
@@ -92,7 +92,7 @@ MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -
 
 요약에서 읽을 것: `entered`(= 계정 수) · `left` + `release_failed` + `dropped`(= `entered` 라야 한다) · `poll_round_ms`(바퀴 간격, 2초 언저리라야 한다) · `wait_over_expected`(대기 ÷ (순번 ÷ 20) — `D13` 은 ≤ 2) ·
 `poll_latency_ms` · `http_req_failed`. 대수별 입장은 아래 「대수가 실제로 갈렸나」처럼 앱마다 `queue_admitted_total` 을 읽는다 —
-**Prometheus 는 `app:8080` 하나를 긁어 셋 중 아무 대나 본다.**
+Prometheus 는 대마다 긁는다(`dns_sd_configs`, `35h`) — `sum by (instance) (increase(queue_admitted_total[…]))` 로도 읽힌다.
 
 ## 좌석 폴링(35d)
 
@@ -104,16 +104,20 @@ MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -
 MSYS_NO_PATHCONV=1 docker run --rm --memory=1g --network projectticket_default -v "$(pwd -W)/load:/load" \
   -e VUS=10 -e RAMP=10s -e HOLD=230s -e PRELOGIN=1 -e ROTATE=1 -e ACCOUNTS=1000 grafana/k6:2.2.0 run /load/seat-rush.js
 
-# 2. 폴링 계단(200초)
-MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -v "$(pwd -W)/load:/load" \
-  grafana/k6:2.2.0 run /load/seat-poll.js
+# 2. 폴링 계단(200초). 5,000 계단은 VU 가 모자라기 쉽다 — 상한을 올리고 메모리를 더 준다(35d-재)
+MSYS_NO_PATHCONV=1 docker run --rm --memory=3g --network projectticket_default -v "$(pwd -W)/load:/load" \
+  -e MAX_VUS=4000 grafana/k6:2.2.0 run /load/seat-poll.js
 
 # 3. 그동안 5초마다 판과 앱마다의 스냅샷 생성 수를 적는다 — 계단 구간(0~60·70~130·140~200초)의 앞뒤 차가 결과다
 while :; do echo "$(date -u +%s) $(docker exec ticket-redis redis-cli get seat:ver:1) $(for i in 1 2 3; do \
   docker exec projectticket-app-$i curl -s localhost:8080/actuator/prometheus | awk '/^seat_snapshot_built_total/{printf "%s ", $2}'; done)"; sleep 5; done
+
+# 4. 계단마다의 CPU — **횟수가 아니라 끝 시각으로 돈다.** `docker stats --no-stream` 한 번이 3초쯤이라 횟수로 돌리면 첫 계단에서 끝난다(35d-재)
+end=$(( $(date -u +%s) + 205 )); while [ "$(date -u +%s)" -lt $end ]; do echo "== $(date -u +%s)"; \
+  docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}'; done
 ```
 
-판 변경 지표는 없다 — `seat:ver` 의 차로 센다. 스냅샷 생성을 Prometheus 로 읽지 않는 이유는 아래 절과 같다(`app:8080` 하나를 긁는다).
+판 변경 지표는 없다 — `seat:ver` 의 차로 센다. 스냅샷 생성은 앱마다 직접 읽는다 — 5초 표본의 앞뒤 차가 Prometheus 의 긁기 주기(5초)와 안 섞이게. 3차 첫 측정 때는 Prometheus 가 `app:8080` 하나를 긁어 대수가 섞였다(`35h` 전).
 
 ## 대수가 실제로 갈렸나 본다
 

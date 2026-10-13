@@ -12,7 +12,15 @@ scrape_configs:
       - targets: ["host.docker.internal:8080"]
         labels:
           instance_kind: host
-      # compose 로 띄운 앱(33 이 `--scale app=3` 으로 늘린다). DNS 가 인스턴스 수만큼 답한다.
-      - targets: ["app:8080"]
-        labels:
-          instance_kind: compose
+    # compose 로 띄운 앱(33 이 `--scale app=3` 으로 늘린다). **`static_configs` 의 `app:8080` 은 긁을 때마다 셋 중 하나만 고른다** —
+    # 카운터의 `increase()` 가 대를 오가며 뜻을 잃었다(1만 입장에 2,947, `35h`). DNS 의 A 레코드를 대상 하나씩으로 편다.
+    dns_sd_configs:
+      - names: ["app"]
+        type: A
+        port: 8080
+    # `dns_sd_configs` 는 `labels:` 를 못 받는다. DNS 로 찾은 대상(`__meta_dns_name` 이 있다)에만 꼬리표를 단다 — 호스트 대상은 위 `host` 그대로.
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        regex: ".+"
+        target_label: instance_kind
+        replacement: compose

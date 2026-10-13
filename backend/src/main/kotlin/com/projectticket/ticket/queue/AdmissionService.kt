@@ -13,8 +13,8 @@ import tools.jackson.databind.ObjectMapper
  * 문을 여는 쪽(`D12` 「입장」). 줄 앞에서 정원이 허락하는 만큼 빼내 토큰을 발급한다.
  *
  * **Lua 하나로 한다.** 정원 계산과 `ZPOPMIN` 이 갈리면 두 인스턴스가 같은 사람을 두 번 들이거나
- * 정원을 넘겨 들인다 — 스크립트 안이면 그 사이에 아무도 못 끼어든다. 두 대가 돌면 5초에 200명이
- * 들어가는 것이지 한 명이 두 번 들어가는 것이 아니다(속도를 설정값과 맞추는 것은 33 의 Redis 락이다).
+ * 정원을 넘겨 들인다 — 스크립트 안이면 그 사이에 아무도 못 끼어든다. **속도도 스크립트가 지킨다**(`35f`) —
+ * 33 의 Redis 락은 겹침만 막아서, 대가 여럿이면 입장 예산의 창([QueueKeys.admitWindow])이 R 을 지킨다.
  *
  * **토큰은 서명이 아니라 저장이다**(`D12` 「토큰」). 서명 토큰은 만료 전에 못 죽이는데, 선점에 성공하면
  * 그 자리에서 반납받아야 정원이 돈다.
@@ -31,24 +31,33 @@ class AdmissionService(
     /**
      * 한 회차의 줄에서 들일 수 있는 만큼 들인다.
      *
-     * @return 이번에 들인 사람 수. 줄이 비었거나 정원이 찼으면 0
+     * **한 주기에 배치 크기만큼이다**(`35f`, 사용자 결정 2026-10-13 — R 은 대수와 무관). 스케줄러는 대마다 [ADMIT_INTERVAL] 로 돌고
+     * 락은 겹침만 막아서, 예산을 Redis 에 안 두면 셋이면 5초에 많게는 세 배치가 들어간다. 스크립트가 예산의 창([QueueKeys.admitWindow])을 보고
+     * 창 안에서 [BATCH_SIZE] 를 다 썼으면 아무도 안 들인다. **줄이 비었을 때의 즉시 입장**([QueueService.enter], `D12` 「항상 켠다」)도
+     * 같은 예산을 쓴다 — 한가한 시간에는 예산이 남아 바로 들어가고, 몰리면 예산이 바닥나 줄에 선다. 그래서 어느 길로 들어오든 R 은 상한이다.
+     *
+     * @param limit 이번에 들일 상한. 스케줄러는 [BATCH_SIZE], 즉시 입장은 1
+     * @return 이번에 들인 사람 수. 줄이 비었거나 정원이 찼거나 예산이 없으면 0
      */
-    fun admit(performanceId: Long): Long {
+    fun admit(performanceId: Long, limit: Long = BATCH_SIZE): Long {
         val waitingKey = QueueKeys.waiting(performanceId)
         val waiting = redis.opsForZSet().size(waitingKey) ?: 0
         if (waiting == 0L) return 0
 
         // 줄 길이보다 많은 토큰을 만들 이유가 없다. 토큰 생성은 앱이 한다 — Lua 에는 난수원이 없다.
-        val tokens = List(minOf(waiting, BATCH_SIZE).toInt()) { newToken() }
+        val tokens = List(minOf(waiting, limit, BATCH_SIZE).toInt()) { newToken() }
         val args = listOf(
             CAPACITY.toString(),
             TOKEN_TTL.toMillis().toString(),
             QueueKeys.ADMISSION_PREFIX,
             QueueKeys.admissionByAccountPrefix(performanceId),
             performanceId.toString(),
+            ADMIT_INTERVAL_MILLIS.toString(),
+            BATCH_SIZE.toString(),
         ) + tokens
 
-        val answer = redis.execute(ADMIT, listOf(waitingKey, QueueKeys.active(performanceId)), *args.toTypedArray())
+        val keys = listOf(waitingKey, QueueKeys.active(performanceId), QueueKeys.admitWindow(performanceId))
+        val answer = redis.execute(ADMIT, keys, *args.toTypedArray())
             ?: return 0
 
         // 「몇 명」과 「얼마나 기다렸나」를 같이 받는다 — 줄 앞에서 뺀 사람의 진입 시각은 스크립트 안에만 있다.
@@ -121,11 +130,17 @@ class AdmissionService(
         /** 한 번에 들이는 수 M. [ADMIT_INTERVAL] 과 묶여 입장 속도 R = 100/5초 = 20/초가 된다(`D12` 「등식」) */
         const val BATCH_SIZE = 100L
 
-        /** 스케줄러 주기. 이 값을 바꾸면 R 이 바뀌고 `D12` 의 등식을 다시 써야 한다 */
-        const val ADMIT_INTERVAL = "PT5S"
+        /** 입장 주기(초). 이 값을 바꾸면 R 이 바뀌고 `D12` 의 등식을 다시 써야 한다. 아래 셋이 모두 이 값에서 나온다 */
+        const val ADMIT_INTERVAL_SECONDS = 5L
 
-        /** R — 등식의 좌변. [BATCH_SIZE] 와 [ADMIT_INTERVAL] 에서 나온다. 순번의 예상 대기가 이 값으로 나눈다 */
-        const val ADMIT_PER_SECOND = BATCH_SIZE / 5
+        /** 스케줄러 주기 — `@Scheduled` 가 상수 문자열을 요구한다 */
+        const val ADMIT_INTERVAL = "PT${ADMIT_INTERVAL_SECONDS}S"
+
+        /** 입장 스크립트가 지키는 주기(`35f`) */
+        const val ADMIT_INTERVAL_MILLIS = ADMIT_INTERVAL_SECONDS * 1000
+
+        /** R — 등식의 좌변. **상한이다** — 대가 여럿이면 다음 틱의 위상만큼 늦어 실제는 R 이하다(`35f`). 순번의 예상 대기가 이 값으로 나눈다 */
+        const val ADMIT_PER_SECOND = BATCH_SIZE / ADMIT_INTERVAL_SECONDS
 
         /** 선점 5분 + 결제 여유(ADR 0003). 선점보다 짧으면 좌석을 쥔 채로 토큰이 죽는다 */
         val TOKEN_TTL: Duration = Duration.ofMinutes(10)
@@ -149,6 +164,8 @@ class AdmissionService(
          * 단일 노드라 되는 짓이고, 클러스터로 가면 슬롯이 갈려 깨진다. 지금 클러스터 계획은 없다(ADR 0001).
          *
          * 시각은 `TIME` 이다. 앱이 주면 인스턴스 시계가 어긋난 만큼 토큰 수명이 들쭉날쭉해진다.
+         * **예산도 같은 시계로 지킨다**(`35f`) — `ARGV[6]` 이 주기(ms), `ARGV[7]` 이 창 하나의 예산(배치 크기), `KEYS[3]` 이 창(HASH `start`·`used`).
+         * 창이 주기보다 오래됐으면 새 창이다. 실제로 들였을 때만 적는다 — 정원이 차서 0 이면 다음 틱이 다시 본다. 키는 주기의 두 배에 스스로 사라진다.
          */
         private val ADMIT = DefaultRedisScript<String>(
             """
@@ -159,11 +176,24 @@ class AdmissionService(
             local tokenPrefix = ARGV[3]
             local accountPrefix = ARGV[4]
             local performanceId = ARGV[5]
+            local interval = tonumber(ARGV[6])
+            local budget = tonumber(ARGV[7])
+
+            local w = redis.call('HMGET', KEYS[3], 'start', 'used')
+            local start = tonumber(w[1])
+            local used = tonumber(w[2]) or 0
+            if (not start) or now - start >= interval then
+                start = now
+                used = 0
+            end
+            local left = budget - used
+            if left <= 0 then return '0|' end
 
             redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
             local free = capacity - redis.call('ZCARD', KEYS[2])
-            local wanted = #ARGV - 5
+            local wanted = #ARGV - 7
             if free < wanted then wanted = free end
+            if left < wanted then wanted = left end
             if wanted <= 0 then return '0|' end
 
             local popped = redis.call('ZPOPMIN', KEYS[1], wanted)
@@ -172,7 +202,7 @@ class AdmissionService(
             for i = 1, #popped, 2 do
                 local account = popped[i]
                 count = count + 1
-                local token = ARGV[5 + count]
+                local token = ARGV[7 + count]
                 redis.call('ZADD', KEYS[2], now + ttl, token)
                 redis.call(
                     'SET',
@@ -188,6 +218,10 @@ class AdmissionService(
                 redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
                 -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
                 waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
+            end
+            if count > 0 then
+                redis.call('HSET', KEYS[3], 'start', string.format('%d', start), 'used', string.format('%d', used + count))
+                redis.call('PEXPIRE', KEYS[3], interval * 2)
             end
             return count .. '|' .. table.concat(waits, ',')
             """.trimIndent(),

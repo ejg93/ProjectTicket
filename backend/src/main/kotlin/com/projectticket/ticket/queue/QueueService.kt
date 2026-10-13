@@ -30,20 +30,18 @@ class QueueService(
     fun enter(performanceId: Long, accountId: Long): Position {
         requireOpen(performanceId)
         // 이미 들어온 사람을 다시 줄에 세우면 방금 얻은 자리를 스스로 버린다 — 새로고침이 그 모양이다(`D12`).
-        admission.tokenFor(performanceId, accountId)?.let { return Position.admitted(it) }
-
-        val rank = redis.execute(
-            ENTER,
-            listOf(QueueKeys.waiting(performanceId), QueueKeys.seen(performanceId)),
-            accountId.toString(),
-        )
-        // 방금 넣은 member 의 순번이라 없을 수가 없다. 없으면 스크립트가 바뀐 것이다.
-        val place = checkNotNull(rank) { "진입 직후 순번이 없다: performance_id=$performanceId" }
+        // 토큰 확인과 줄 세우기를 **한 스크립트로** 한다(`35g`) — 따로 읽으면 그 사이에 입장한 사람을 다시 줄에 세운다.
+        val answer = redis.execute(ENTER, keysOf(performanceId, accountId), accountId.toString())
+        // 진입은 늘 자리가 있다 — 토큰이거나 방금 넣은 순번이다. 없으면 스크립트가 바뀐 것이다.
+        val (kind, value) = checkNotNull(answer) { "진입 스크립트가 답을 안 했다: performance_id=$performanceId" }.split('|', limit = 2)
+        if (kind == ADMITTED) return Position.admitted(value)
+        val place = value.toLong()
 
         // **줄이 비어 있으면 그 자리에서 들인다**(`D12` 「항상 켠다」). 한가한 시간에 5초를 기다리게 하지 않는다.
         // 앞에 한 명이라도 있으면 스케줄러에 맡긴다 — 그래야 입장 속도 R 이 등식대로 유지된다.
         if (place == 0L && redis.opsForZSet().size(QueueKeys.waiting(performanceId)) == 1L) {
-            admission.admit(performanceId)
+            // 스케줄러와 같은 예산을 쓴다(`35f`) — 한가하면 예산이 남아 바로 들어가고, 몰리면 바닥나 줄에 선다. 어느 길로든 R 이 상한이다.
+            admission.admit(performanceId, limit = 1)
             admission.tokenFor(performanceId, accountId)?.let { return Position.admitted(it) }
         }
         return position(place)
@@ -52,19 +50,21 @@ class QueueService(
     /** 폴링(2초)이 부르는 자리(`D12`). 하트비트 기록은 24 가 여기에 더한다 */
     fun position(performanceId: Long, accountId: Long): Position {
         requireOpen(performanceId)
-        // 입장한 사람은 줄에서 빠져 있다(`ZPOPMIN`). 토큰을 먼저 보지 않으면 방금 들어온 사람이 404 를 받는다.
-        admission.tokenFor(performanceId, accountId)?.let { return Position.admitted(it) }
-
-        val rank = redis.opsForZSet().rank(QueueKeys.waiting(performanceId), accountId.toString())
-            ?: throw TicketException(
-                ErrorCode.NOT_IN_QUEUE,
-                "줄에 없다: performance_id=$performanceId account_id=$accountId",
-            )
-
-        // **폴링이 하트비트를 겸한다**(`D12`). 따로 보내면 줄만 보고 있는 사람과 떠난 사람을 못 가른다.
-        redis.execute(HEARTBEAT, listOf(QueueKeys.seen(performanceId)), accountId.toString())
-        return position(rank)
+        // 입장한 사람은 줄에서 빠져 있다(`ZPOPMIN`). **토큰·순번·하트비트를 한 스크립트로 읽는다**(`35g`) —
+        // 토큰을 먼저 보고 순번을 따로 읽으면 그 사이에 입장 스크립트가 끼어 방금 들어온 사람이 404 를 받는다(줄 1만에서 8, `load-3` 「35c」).
+        // **폴링이 하트비트를 겸한다**(`D12`) — 줄에 있을 때만 남긴다.
+        val answer = redis.execute(POSITION, keysOf(performanceId, accountId), accountId.toString())
+        val (kind, value) = checkNotNull(answer) { "순번 스크립트가 답을 안 했다: performance_id=$performanceId" }.split('|', limit = 2)
+        return when (kind) {
+            ADMITTED -> Position.admitted(value)
+            WAITING -> position(value.toLong())
+            else -> throw TicketException(ErrorCode.NOT_IN_QUEUE, "줄에 없다: performance_id=$performanceId account_id=$accountId")
+        }
     }
+
+    /** 스크립트 둘이 같은 순서로 받는다 — 계정의 토큰 · 줄 · 하트비트 */
+    private fun keysOf(performanceId: Long, accountId: Long): List<String> =
+        listOf(QueueKeys.admissionByAccount(performanceId, accountId), QueueKeys.waiting(performanceId), QueueKeys.seen(performanceId))
 
     /**
      * 줄을 떠난다(24). 줄에서 빼고 하트비트를 지우고 **토큰이 있으면 반납한다** —
@@ -172,31 +172,45 @@ class QueueService(
          */
         fun etaSecondsFor(rank: Long): Long = (rank + ADMIT_PER_SECOND - 1) / ADMIT_PER_SECOND
 
+        /** 스크립트 둘의 답 앞머리 — `A|토큰`(입장함) · `W|순번`(0부터) · `N|`(줄에 없음) */
+        private const val ADMITTED = "A"
+        private const val WAITING = "W"
+
         /**
-         * 진입 한 번을 원자로 만든다 — 시각을 Redis 가 주고(`TIME`), `NX` 로 첫 자리를 지키고, 순번까지 한 번에 답한다.
+         * 진입 한 번을 원자로 만든다 — 토큰이 있으면 줄에 안 세우고(`35g`), 없으면 시각을 Redis 가 주고(`TIME`),
+         * `NX` 로 첫 자리를 지키고, 순번까지 한 번에 답한다. KEYS = 계정의 토큰 · 줄 · 하트비트.
          *
          * 시각을 앱이 만들면 인스턴스 시계가 어긋난 만큼 순번이 뒤집힌다(`D7` 「앱 시계를 안 쓴다」의 Redis 판).
          * `TIME` 은 비결정 명령이라 예전 Redis 에서는 쓰기 앞에 못 썼다 — 7 은 효과 복제라 된다.
          */
-        private val ENTER = DefaultRedisScript<Long>(
+        private val ENTER = DefaultRedisScript<String>(
             """
+            local token = redis.call('GET', KEYS[1])
+            if token then return 'A|' .. token end
             local t = redis.call('TIME')
             local now = t[1] * 1000 + math.floor(t[2] / 1000)
-            redis.call('ZADD', KEYS[1], 'NX', now, ARGV[1])
-            redis.call('HSET', KEYS[2], ARGV[1], now)
-            return redis.call('ZRANK', KEYS[1], ARGV[1])
+            redis.call('ZADD', KEYS[2], 'NX', now, ARGV[1])
+            redis.call('HSET', KEYS[3], ARGV[1], now)
+            return 'W|' .. redis.call('ZRANK', KEYS[2], ARGV[1])
             """.trimIndent(),
-            Long::class.java,
+            String::class.java,
         )
 
-        /** 폴링이 남기는 자국. 시각은 여기서도 Redis 가 준다 — 스윕이 그 시각을 자기 시계와 비교한다 */
-        private val HEARTBEAT = DefaultRedisScript<Long>(
+        /**
+         * 폴링 한 번(`35g`) — 토큰 · 순번 · 하트비트를 한 번에. 입장 스크립트가 사이에 못 낀다.
+         * 하트비트는 줄에 있을 때만 남긴다 — 시각은 Redis 가 준다, 스윕이 그 시각을 자기 시계와 비교한다.
+         */
+        private val POSITION = DefaultRedisScript<String>(
             """
+            local token = redis.call('GET', KEYS[1])
+            if token then return 'A|' .. token end
+            local rank = redis.call('ZRANK', KEYS[2], ARGV[1])
+            if not rank then return 'N|' end
             local t = redis.call('TIME')
-            redis.call('HSET', KEYS[1], ARGV[1], t[1] * 1000 + math.floor(t[2] / 1000))
-            return 1
+            redis.call('HSET', KEYS[3], ARGV[1], t[1] * 1000 + math.floor(t[2] / 1000))
+            return 'W|' .. rank
             """.trimIndent(),
-            Long::class.java,
+            String::class.java,
         )
 
         /**

@@ -4,6 +4,13 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import org.springframework.jdbc.core.simple.JdbcClient
 import com.projectticket.ticket.observability.TicketMetrics
+import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 
@@ -23,6 +30,11 @@ class SeatQuery(
     private val json: ObjectMapper,
     private val metrics: TicketMetrics,
 ) {
+
+    /** 지금 이 대에서 만드는 중인 스냅샷 — `"$performanceId:$version"` 마다 하나(`35j`) */
+    private val building = ConcurrentHashMap<String, CompletableFuture<SeatMap>>()
+
+    private val log = LoggerFactory.getLogger(SeatQuery::class.java)
 
     /**
      * 회차의 현재 버전. **없거나 `draft` 면 404** — 아직 공개되지 않은 회차는 밖에서 보면 없는 것이다(`D5` 「403 이냐 404 냐」).
@@ -59,12 +71,44 @@ class SeatQuery(
     /**
      * 버전이 같으면 Redis 가 답한다(`D20`). DB 를 읽는 것은 **버전이 바뀐 직후 첫 요청** 하나뿐이고,
      * 나머지 폴링은 그 그림을 나눠 쓴다.
+     *
+     * **같은 대 안에서는 판마다 하나만 만든다**(single-flight, `35j`, 사용자 결정 2026-10-13). 판이 바뀐 직후 첫 생성이 끝나기 전에 온
+     * 요청이 각자 만들어서, 1,000 rps 에서 판 하나에 약 20번 만들었다(`load-3` 「35d」). 늦게 온 요청은 만드는 쪽의 결과를 기다린다.
+     * **대 사이는 안 잠근다** — Redis 락이 스냅샷보다 비싸다(`D20`). 그래서 같은 판의 생성 상한은 대수다.
+     * 기다림은 [BUILD_WAIT] 까지 — 만드는 쪽이 늦거나 죽으면 직접 만든다. 화면이 멈추는 것보다 한 번 더 만드는 것이 싸다.
      */
     fun seatMap(performanceId: Long): SeatMap {
         val version = version(performanceId)
         versions.cachedSnapshot(performanceId, version)?.let { return json.readValue(it, SeatMap::class.java) }
-        return buildSeatMap(performanceId, version).also { versions.cacheSnapshot(performanceId, version, json.writeValueAsString(it)) }
+
+        val key = "$performanceId:$version"
+        val mine = CompletableFuture<SeatMap>()
+        val running = building.putIfAbsent(key, mine)
+        if (running != null) {
+            return try {
+                running.get(BUILD_WAIT.toMillis(), TimeUnit.MILLISECONDS)
+            } catch (e: TimeoutException) {
+                // 드문 일이라 알아야 한다 — 만드는 쪽이 [BUILD_WAIT] 를 넘겼다(DB 가 느리다)
+                log.warn("스냅샷 기다림이 끝나 직접 만든다 performance_id={} version={}", performanceId, version, e)
+                buildAndCache(performanceId, version)
+            } catch (e: ExecutionException) {
+                log.warn("만드는 쪽이 실패해 직접 만든다 performance_id={} version={}", performanceId, version, e.cause ?: e)
+                buildAndCache(performanceId, version)
+            }
+        }
+        return try {
+            // 이겼어도 캐시를 한 번 더 본다 — 캐시를 비었다고 본 뒤 이기기 전에 앞 빌더가 쓰고 빠졌을 수 있다(마무리 21차 독립 리뷰)
+            val cached = versions.cachedSnapshot(performanceId, version)?.let { json.readValue(it, SeatMap::class.java) }
+            (cached ?: buildAndCache(performanceId, version)).also { mine.complete(it) }
+        } finally {
+            // 무엇으로 끝나든(Error 포함) 기다리는 쪽을 놓아준다 — 그쪽은 실패를 받고 직접 만든다
+            if (!mine.isDone) mine.completeExceptionally(IllegalStateException("스냅샷을 만들지 못했다: $key"))
+            building.remove(key, mine)
+        }
     }
+
+    private fun buildAndCache(performanceId: Long, version: Long): SeatMap =
+        buildSeatMap(performanceId, version).also { versions.cacheSnapshot(performanceId, version, json.writeValueAsString(it)) }
 
     private fun buildSeatMap(performanceId: Long, version: Long): SeatMap {
         // 이 수가 폴링 수에 비례하면 캐시가 안 먹는 것이다(`D10`).
@@ -123,6 +167,9 @@ class SeatQuery(
     )
 
     companion object {
+        /** 같은 판을 만드는 쪽을 기다리는 상한(`35j`) */
+        val BUILD_WAIT: Duration = Duration.ofSeconds(2)
+
         private val SECTION_CODE = Regex("^F([0-9]+)-([A-Z])$")
 
         /**

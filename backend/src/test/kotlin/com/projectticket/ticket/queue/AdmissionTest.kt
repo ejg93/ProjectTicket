@@ -118,6 +118,58 @@ class AdmissionTest : PostgresTestBase() {
         assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(1)
     }
 
+    /** 셋이 같은 5초에 돌아도 한 배치뿐이다(`35f`) — 락은 겹침만 막고 주기는 이 스크립트가 지킨다 */
+    @Test
+    fun a_second_batch_within_the_interval_is_refused() {
+        lineUp(AdmissionService.BATCH_SIZE.toInt() * 2)
+
+        assertThat(admission.admit(performanceId)).isEqualTo(AdmissionService.BATCH_SIZE)
+        assertThat(admission.admit(performanceId)).describedAs("주기 안의 둘째 배치 — 대수배 입장(`35f`)").isZero()
+        assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isEqualTo(AdmissionService.BATCH_SIZE)
+    }
+
+    @Test
+    fun the_next_interval_admits_again() {
+        lineUp(AdmissionService.BATCH_SIZE.toInt() * 2)
+        admission.admit(performanceId)
+
+        allowNextBatch()
+
+        assertThat(admission.admit(performanceId)).isEqualTo(AdmissionService.BATCH_SIZE)
+        assertThat(redis.opsForZSet().size(QueueKeys.waiting(performanceId))).isZero()
+    }
+
+    @Test
+    fun a_full_house_does_not_stamp_the_interval() {
+        fillActive(AdmissionService.CAPACITY, expiresInMillis = 60_000)
+        queueUp(first)
+
+        assertThat(admission.admit(performanceId)).isZero()
+        // 아무도 안 들였는데 찍으면 정원이 비는 순간에도 한 주기를 헛기다린다.
+        assertThat(redis.hasKey(QueueKeys.admitWindow(performanceId))).isFalse()
+    }
+
+    @Test
+    fun the_empty_line_shortcut_uses_what_is_left_of_the_budget() {
+        lineUp(1)
+        admission.admit(performanceId)
+        queue.enter(performanceId, second)
+
+        // 한가한 시간에는 예산이 남아 줄이 빈 사람은 바로 들어간다(`D12` 「항상 켠다」) — 5초를 기다리지 않는다.
+        assertThat(admission.tokenFor(performanceId, second)).isNotNull()
+    }
+
+    @Test
+    fun the_empty_line_shortcut_stops_when_the_budget_is_spent() {
+        lineUp(AdmissionService.BATCH_SIZE.toInt())
+        admission.admit(performanceId)
+        val entered = queue.enter(performanceId, second)
+
+        // 예산을 다 쓴 창에서는 줄이 비어 있어도 줄에 선다 — 즉시 입장만 따로 두면 하나씩 고르게 오는 도착을 R 과 무관하게 다 들인다(마무리 21차)
+        assertThat(entered.state).isEqualTo(QueueService.Position.WAITING)
+        assertThat(admission.tokenFor(performanceId, second)).isNull()
+    }
+
     @Test
     fun an_admitted_account_is_not_put_back_in_line() {
         queue.enter(performanceId, first)
@@ -153,6 +205,16 @@ class AdmissionTest : PostgresTestBase() {
      */
     private fun queueUp(accountId: Long) {
         redis.opsForZSet().add(QueueKeys.waiting(performanceId), accountId.toString(), accountId.toDouble())
+    }
+
+    /** 계정이 아닌 자리 채움을 `count` 명 세운다 */
+    private fun lineUp(count: Int) {
+        repeat(count) { index -> redis.opsForZSet().add(QueueKeys.waiting(performanceId), "filler-$index", index.toDouble()) }
+    }
+
+    /** 예산의 창을 지운다 — 다음 입장이 새 창을 연다. 시각을 심지 않는다: 앱 시계와 Redis `TIME` 이 다를 수 있다(`D7`) */
+    private fun allowNextBatch() {
+        redis.delete(QueueKeys.admitWindow(performanceId))
     }
 
     /** 활성 집합을 채운다. `expiresInMillis` 가 음수면 이미 죽은 토큰이다 */
