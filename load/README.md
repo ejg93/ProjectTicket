@@ -72,6 +72,27 @@ docker exec ticket-redis sh -c "redis-cli --scan --pattern 'admit:*' | xargs -r 
 `docker volume rm projectticket_db-load-data projectticket_redis-load-data`. **`down -v` 는 원래 볼륨까지 지운다.**
 끝나면 이 덧파일 없이 `docker compose up -d` — 원래 볼륨으로 돌아온다.
 
+## 대기열 1만(35c)
+
+줄에 선 사람 1만을 VU 500 이 계정 20 개씩 들고 돈다(`queue-surge.js`). 세션은 **먼저 한 판으로** 만든다 —
+`setup()` 반환값은 VU 마다 복사돼 1만 × 500 이 Docker VM 메모리를 넘긴다. 세션은 무활동 30분에 끝나니 바로 이어서 돌린다.
+
+```bash
+# 1. 세션 1만 → load/results/sessions.json (무시 목록). 3분쯤
+MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -v "$(pwd -W)/load:/load" \
+  -e ACCOUNTS=10000 grafana/k6:2.2.0 run /load/prelogin.js
+
+# 2. 줄을 비운다 — 위 「다시 돌릴 때」의 Redis 두 줄
+
+# 3. 줄에 선다. --memory 는 k6 가 넘치면 VM 이 아니라 k6 만 죽게 하려는 것이다
+MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -v "$(pwd -W)/load:/load" \
+  -e ACCOUNTS=10000 -e VUS=500 -e RAMP=60s -e HOLD=600s grafana/k6:2.2.0 run /load/queue-surge.js
+```
+
+요약에서 읽을 것: `entered`·`left`·`dropped`(합이 계정 수라야 한다) · `wait_over_expected`(대기 ÷ (순번 ÷ 20) — `D13` 은 ≤ 2) ·
+`poll_latency_ms` · `http_req_failed`. 대수별 입장은 아래 「대수가 실제로 갈렸나」처럼 앱마다 `queue_admitted_total` 을 읽는다 —
+**Prometheus 는 `app:8080` 하나를 긁어 셋 중 아무 대나 본다.**
+
 ## 대수가 실제로 갈렸나 본다
 
 부하를 돌린 뒤 **인스턴스마다** 센다. 한 대에 몰려 있으면 문이 안 나눈 것이다(35).
