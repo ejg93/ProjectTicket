@@ -66,6 +66,22 @@ class EventFixture(private val jdbc: JdbcClient) {
             .param("nudge", slotNudge.getAndIncrement())
             .query(Long::class.java).single()
 
+    /**
+     * 회차를 연 것처럼 지금 시행 중인 기본 정책을 박제한다(`D21`). 정산서는 회차의 박제와 같은 정책이어야 들어간다(`V23`) —
+     * `open` 은 좌석·등급을 요구해서 정산만 재는 시험에 무겁다. `performance_open_has_policy_check` 는 draft 에 정책이 있어도 안 막는다.
+     */
+    fun stampDefaultPolicy(performanceId: Long): Long =
+        jdbc.sql(
+            """
+            update performance
+               set settlement_policy_id = (select settlement_policy_id from settlement_policy
+                                            where organizer_id is null and effective_at <= now()
+                                            order by effective_at desc limit 1)
+             where performance_id = :id
+            returning settlement_policy_id
+            """,
+        ).param("id", performanceId).query(Long::class.java).single()
+
     fun account(email: String): Long =
         jdbc.sql("insert into account (email, password_hash, display_name, role) values (:email, 'x', '관객', 'audience') returning account_id")
             .param("email", email).query(Long::class.java).single()
