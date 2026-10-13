@@ -51,6 +51,15 @@ class ComposeContractTest {
     }
 
     @Test
+    fun the_gateway_has_more_than_one_worker() {
+        // 워커 1 × 1,024 연결에서 공개 GET 이 약 4,000 rps 에서 끊겼다(`35k`). `auto` 는 컨테이너에서 VM 의 CPU 수(22)를 읽는다 — 박는다.
+        val workers = Regex("""worker_processes\s+(\d+)\s*;""").find(nginx)?.groupValues?.get(1)?.toInt()
+        val connections = Regex("""worker_connections\s+(\d+)\s*;""").find(nginx)?.groupValues?.get(1)?.toInt()
+        assertThat(workers).describedAs("worker_processes 를 숫자로 박는다(`35k`)").isNotNull().isGreaterThanOrEqualTo(2)
+        assertThat(connections).describedAs("worker_connections").isNotNull().isGreaterThanOrEqualTo(4096)
+    }
+
+    @Test
     fun the_app_healthcheck_uses_a_tool_the_image_has() {
         val check = healthcheckOf("app")
 
