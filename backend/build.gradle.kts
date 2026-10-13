@@ -204,6 +204,9 @@ tasks.test {
 		// `StackVersionConsistencyTest` 가 k6 이미지 판을 글자로 읽는다(마무리 20차).
 		rootProject.file("../load/README.md"),
 		rootProject.file("../scripts/k8s-rollout-test.sh"),
+		// `ComposeContractTest` 가 수집 대상과 대시보드를 글자로 읽는다(`35h`).
+		fileTree("../docker/prometheus"),
+		fileTree("../docker/grafana"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test
  * |---|---|---|
  * | `upstream { server app:8080; }` | 이름을 기동 때 한 번만 풀어 `--scale app=3` 이어도 **한 대만** 받았다 | 변수 `proxy_pass` + `resolver` 를 요구한다 |
  * | healthcheck 가 `wget` | JRE 이미지에 없어 컨테이너가 늘 `unhealthy` 였다(앱은 멀쩡) | 쓰는 도구가 이미지에 깔리나 본다 |
+ * | Prometheus `static_configs: app:8080` | 긁을 때마다 셋 중 하나만 골라 대수별 카운터가 섞였다(`35h`) | `dns_sd_configs` 와 게이지 `max()` 를 요구한다 |
  *
  * 파일을 글자로 읽는 검사라 컨테이너가 필요 없다 — `StackVersionConsistencyTest` 와 같은 자리다.
  */
@@ -22,6 +23,9 @@ class ComposeContractTest {
     private val root: Path = Path.of("..").toAbsolutePath().normalize()
     private val compose = Files.readString(root.resolve("docker-compose.yml"))
     private val dockerfile = Files.readString(root.resolve("backend/Dockerfile"))
+    private val prometheus = Files.readString(root.resolve("docker/prometheus/prometheus.yml"))
+        .lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+    private val dashboard = Files.readString(root.resolve("docker/grafana/dashboards/ticket.json"))
 
     /** 주석은 걷어낸다 — 무엇을 안 쓰기로 했는지 설명하는 줄이 검사에 걸리면 안 된다 */
     private val nginx = Files.readString(root.resolve("docker/nginx/nginx.conf"))
@@ -61,6 +65,22 @@ class ComposeContractTest {
     fun the_app_healthcheck_asks_readiness() {
         // `liveness` 는 DB·Redis 를 안 본다(35a). 문이 붙일지 말지는 `readiness` 가 답한다.
         assertThat(healthcheckOf("app")).contains("/actuator/health/readiness")
+    }
+
+    @Test
+    fun prometheus_scrapes_every_app_instance() {
+        // `app:8080` 을 static 으로 두면 내장 DNS 가 돌려주는 하나만 긁는다 — 대가 셋이어도 시계열은 한 대씩 번갈아 온다.
+        assertThat(prometheus).contains("dns_sd_configs:").contains("names: [\"app\"]").contains("port: 8080")
+        assertThat(prometheus)
+            .describedAs("compose 앱을 static 대상으로 두면 셋 중 하나만 긁는다(`35h`)")
+            .doesNotContain("\"app:8080\"")
+    }
+
+    @Test
+    fun grafana_gauges_do_not_sum_instances() {
+        // 게이지 둘은 대마다 **같은** Redis 합을 보고한다 — 대가 여럿이면 시계열이 대수만큼 생겨 겹치거나, 더하면 대수배가 된다.
+        assertThat(dashboard).contains("\"max(queue_length)\"").contains("\"max(queue_active)\"")
+        assertThat(dashboard).doesNotContain("\"expr\": \"queue_length\"").doesNotContain("\"expr\": \"queue_active\"")
     }
 
     /** compose 의 그 서비스 healthcheck `test:` 한 줄. 두 칸 들여쓴 다음 서비스 머리 줄 전까지가 그 블록이다 */
