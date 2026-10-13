@@ -9,6 +9,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 root=$(pwd)
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+# `session-state` 가 진짜 `gh` 로 네트워크를 타지 않게 — CI 줄 경우만 가짜를 끼운다(`I9-5`).
+export GH=/nonexistent
 
 fx=$(mktemp -d); trap 'rm -rf "$fx"' EXIT
 mkdir -p "$fx/.claude/skills/verify"
@@ -75,6 +77,25 @@ hook 'PR base main'        pr-base-guard    "$(cmd 'gh pr create --base main')" 
 hook 'gradlew 맨몸'        java-home-guard  "$(cmd 'cd backend && ./gradlew test')" 2 'backend 명령 앞에'
 hook 'gradlew JAVA_HOME'   java-home-guard  "$(cmd 'JAVA_HOME=C:/jdk ./gradlew test')" 0 ''
 hook 'session-state'       session-state    '{}'                                 0 '## 현재 상태'
+# `main` CI 한 줄(`I9-5`). 「현재 상태」가 먼저 나와 앞머리로 못 재서 CI 줄만 뽑아 본다. 가짜 `gh` 는 `.git/` 에 둔다 — 작업 트리를 안 더럽힌다.
+fake_gh() {  # 경로 결론 실패잡
+  printf '#!/usr/bin/env bash\ncase "$1 $2" in\n  "run list") echo "42|%s|abcdef0123456789" ;;\n  "run view") echo "%s" ;;\nesac\n' "$2" "$3" > "$1"
+  chmod +x "$1"
+}
+ci() {  # 이름 GH 앞머리
+  local out rc
+  out=$(cd "$fx" && GH="$2" CLAUDE_PROJECT_DIR="$fx" bash "$fx/scripts/hooks/session-state.sh" 2>&1); rc=$?
+  check "$1" 0 "$3" "$rc" "$(printf '%s\n' "$out" | grep -m1 '^[*]*`main` CI')"
+}
+fake_gh "$fx/.git/gh-red" failure audit
+fake_gh "$fx/.git/gh-green" success ''
+fake_gh "$fx/.git/gh-running" '' ''
+printf '#!/usr/bin/env bash\necho "null|null|null"\n' > "$fx/.git/gh-empty"; chmod +x "$fx/.git/gh-empty"
+ci 'session-state CI 빨강'   "$fx/.git/gh-red"     '**`main` CI 빨강**(`audit`) — `abcdef0`'
+ci 'session-state CI 초록'   "$fx/.git/gh-green"   '`main` CI 초록(`abcdef0`)'
+ci 'session-state CI 도는 중' "$fx/.git/gh-running" '`main` CI 도는 중(`abcdef0`)'
+ci 'session-state gh 없음'   /nonexistent          ''
+ci 'session-state 실행 없음' "$fx/.git/gh-empty"   ''
 hook 'stop 깨끗한 트리'    stop-uncommitted '{"stop_hook_active":false}'         0 ''
 touch "$fx/dirty.txt"
 hook 'stop 더러운 트리'    stop-uncommitted '{"stop_hook_active":false}'         2 '커밋 안 된 작업물'

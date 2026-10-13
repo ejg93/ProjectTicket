@@ -62,7 +62,45 @@ describe("공연 등록", () => {
     });
   });
 
-  it("서버가 짚은 등급 줄을 문구로 가리킨다(`45d-b`)", async () => {
+  it("서버가 짚은 등급 줄의 그 칸 아래에 말한다(`45d-b`·`I8-2`)", async () => {
+    respond(
+      {
+        type: "tag:projectticket.example,2026:validation-failed",
+        detail: "등급 코드가 겹친다: VIP",
+        errors: [{ field: "grades[1].code", message: "등급 코드가 겹친다: VIP" }],
+      },
+      400,
+    );
+    render(<EventForm organizers={[{ organizer_id: 3, name: "기획" }]} sections={["F1-A"]} />);
+
+    await userEvent.type(screen.getByLabelText("공연 제목"), "겨울 콘서트");
+    await userEvent.click(screen.getByRole("button", { name: "등급 추가" }));
+    const codes = screen.getAllByLabelText("등급 코드(예: VIP)");
+    const prices = screen.getAllByLabelText("가격(원)");
+    const sections = screen.getAllByRole("checkbox", { name: "F1-A" });
+    for (const i of [0, 1]) {
+      await userEvent.type(codes[i], "VIP");
+      await userEvent.type(prices[i], "154000");
+      await userEvent.click(sections[i]);
+    }
+    await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
+
+    // `grades[1].code` 는 둘째 줄의 코드 칸이다 — 첫 줄은 안 짚는다
+    const second = screen.getAllByLabelText("등급 코드(예: VIP)")[1];
+    await expect.poll(() => second.getAttribute("aria-invalid")).toBe("true");
+    expect(second).toHaveAccessibleDescription(/앞 등급과 겹칠 수 없습니다/);
+    expect(screen.getAllByLabelText("등급 코드(예: VIP)")[0]).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("alert")).toHaveTextContent(/앞 등급과 겹칠 수 없습니다/);
+
+    // 그 줄을 빼고 다시 더하면 새 빈 줄이다 — 뺀 줄의 오류가 되살아나지 않는다(마무리 19차 독립 리뷰)
+    await userEvent.click(screen.getByRole("button", { name: "마지막 등급 빼기" }));
+    await userEvent.click(screen.getByRole("button", { name: "등급 추가" }));
+    expect(screen.getAllByLabelText("등급 코드(예: VIP)")[1]).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("그려지지 않은 줄을 짚으면 폼 전체에 말한다", async () => {
+    // 칸이 없으면 인라인을 달 자리가 없다 — 조용히 사라지지 않게 폼 전체로 떨어진다
     respond(
       {
         type: "tag:projectticket.example,2026:validation-failed",
@@ -79,7 +117,7 @@ describe("공연 등록", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "F1-A" }));
     await userEvent.click(screen.getByRole("button", { name: "공연 등록" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("2번째 등급의 코드를 확인해 주세요.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("입력을 다시 확인해 주세요.");
   });
 
   it("서버가 거절해도 친 값이 칸에 남는다(`39-4`)", async () => {
@@ -153,7 +191,7 @@ describe("회차 등록", () => {
     });
   });
 
-  it("판매 창을 어긴 400 은 판매 마감 기준을 말한다(`45d-b`)", async () => {
+  it("판매 창을 어긴 400 은 판매 시작 칸 아래에 판매 마감 기준을 말한다(`45d-b`·`I8-2`)", async () => {
     respond(
       {
         type: "tag:projectticket.example,2026:validation-failed",
@@ -168,7 +206,11 @@ describe("회차 등록", () => {
     await userEvent.type(screen.getByLabelText("판매 시작(한국 시간)"), "2026-10-01T19:00");
     await userEvent.click(screen.getByRole("button", { name: "회차 등록" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
+    const salesOpen = screen.getByLabelText("판매 시작(한국 시간)");
+    await expect.poll(() => salesOpen.getAttribute("aria-invalid")).toBe("true");
+    expect(salesOpen).toHaveAccessibleDescription("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
+    expect(screen.getByLabelText("관람 시각(한국 시간)")).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("alert")).toHaveTextContent("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
     expect(refresh).not.toHaveBeenCalled();
   });
 

@@ -6,9 +6,8 @@
 # **갱신 자체는 강제 지점이 아니다** — 여는 것뿐이고, 막는 것은 `ci.yml` 이다.
 # 초록이 아니면 머지가 안 된다.
 #
-# **머지는 `dependabot-automerge.yml` 이 한다**(`2f-3`). minor·patch 는 초록이 되면
-# 사람 없이 들어가고 메이저만 사람이 본다. **막는 것은 여전히 CI 다** — 자동 머지는
-# 예약이라 필수 검사가 빨가면 그냥 안 일어난다.
+# **자동 머지는 없다**(`P10` — 부르는 것이 없을 때 정했다. ProjectShop 의 `dependabot-automerge.yml` 을 안 가져왔다).
+# 버전표(`stack.md`)에 행이 있는 의존성은 PR 이 혼자 빨갛다 — 작업 가지에서 표와 같이 올리고 PR 은 닫는다(점검 9차).
 version: 2
 
 updates:
@@ -61,9 +60,13 @@ updates:
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       # `eslint-plugin-jsx-a11y` 의 peer 가 eslint 10 을 안 받아서 `npm ci` 가 ERESOLVE 로
-      # 죽는다(PR #14). **접근성 규칙이 그 플러그인에 있다**(`D20`) — 빼고 올리는 선택지가
-      # 없다. 플러그인이 eslint 10 을 받으면 이 줄을 지운다.
+      # 죽는다(PR #14). **접근성 규칙이 그 플러그인에 있다**(`D17`) — 빼고 올리는 선택지가
+      # 없다. 플러그인이 eslint 10 을 받으면 이 줄과 아래 줄을 같이 지운다.
       - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # `@eslint/js` 10 은 peer 가 eslint 10 이라 같은 ERESOLVE 로 죽는다(PR #22, 점검 9차).
+      # `eslint.config.mjs` 가 「eslint 와 판을 맞춰 박는다」고 적어 둔 짝이다 — 위 줄과 같이 풀린다.
+      - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "deps"

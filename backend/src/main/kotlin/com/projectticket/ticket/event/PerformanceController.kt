@@ -25,15 +25,11 @@ class PerformanceController(private val performanceQuery: PerformanceQuery, priv
     @GetMapping("/{performanceId}")
     fun performance(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser?): PerformanceQuery.PerformanceDetail {
         val detail = performanceQuery.detail(performanceId)
-        if (detail.status == DRAFT) {
+        if (detail.status == PerformanceStatus.DRAFT.code) {
             // 비로그인·남의 기획사는 없는 회차와 한 이름이다 — 존재를 안 흘린다.
             if (user == null) throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
             membership.requirePerformance(user.id, performanceId)
         }
         return detail
-    }
-
-    private companion object {
-        const val DRAFT = "draft"
     }
 }

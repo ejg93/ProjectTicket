@@ -5,6 +5,10 @@
  * 이름 없는 입력칸이 된다(KWCAG 2.2). eslint 의 jsx-a11y 가 빠진 것을 잡지만, 안 빠뜨리는 쪽이 낫다.
  *
  * 부르는 곳은 로그인·가입·결제·탈퇴와 기획사의 공연·회차 등록 폼이다. 칸 하나의 모양만 들고 판정은 폼이 한다.
+ *
+ * **틀린 칸은 그 칸 아래에 말한다**(`D17` 「오류는 자리를 가려서 보여준다」, `I8-2`). `error` 가 있으면 `aria-invalid` 와
+ * `aria-describedby` 로 문구를 칸에 묶는다 — 낭독기가 칸에 들어갈 때 이유를 같이 읽는다. 문구는 폼이 정한다.
+ * 문구 자리는 `role="alert"` 다 — 칸을 전부 짚으면 폼 전체 알림이 없어서, 안 붙이면 제출 뒤 아무 소리도 안 난다(`screen-rules.md` 「동적으로 바뀌는 것」).
  */
 export function Field({
   name,
@@ -15,6 +19,7 @@ export function Field({
   maxLength,
   minLength,
   defaultValue,
+  error,
 }: {
   name: string;
   label: string;
@@ -27,20 +32,32 @@ export function Field({
   minLength?: number;
   /** 서버가 거절한 뒤 다시 그릴 값(`39-4`). React 19 는 액션이 끝나면 폼을 비운다 — 폼이 친 값을 들고 있다가 여기로 돌려준다 */
   defaultValue?: string;
+  /** 이 칸이 틀린 이유(화면 문구). 서버 `message` 를 넣지 않는다 — `lib/field-errors.ts` 가 칸 이름으로 고른 것만 */
+  error?: string;
 }) {
+  const errorId = `${name}-error`;
   return (
-    <p>
-      <label htmlFor={name}>{label}</label>
-      <input
-        id={name}
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        required={required}
-        maxLength={maxLength}
-        minLength={minLength}
-        defaultValue={defaultValue}
-      />
-    </p>
+    <>
+      <p>
+        <label htmlFor={name}>{label}</label>
+        <input
+          id={name}
+          name={name}
+          type={type}
+          autoComplete={autoComplete}
+          required={required}
+          maxLength={maxLength}
+          minLength={minLength}
+          defaultValue={defaultValue}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+        />
+      </p>
+      {error ? (
+        <p id={errorId} className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </>
   );
 }

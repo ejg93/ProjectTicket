@@ -53,7 +53,8 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // 화면 코드는 `.message` 를 안 읽는다(`frontend-rules.md` 「원인을 화면에 안 적는다」, `G7c`). 서버 문구나 스택이 들어올 수 있다.
+  // 화면 코드는 `.message`·`.detail` 을 안 읽는다(`frontend-rules.md` 「원인을 화면에 안 적는다」·「`type` 으로 갈린다」, `G7c`·`I8`).
+  // 서버 문구나 스택이 들어올 수 있고, `detail` 로 분기하면 서버가 문구를 다듬는 순간 화면이 깨진다.
   // **변수 이름으로 안 가린다** — 이 저장소의 `catch` 변수는 `thrown` 이라 `error`·`err`·`e` 로 가리면 하나도 못 문다.
   {
     files: ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
@@ -64,8 +65,8 @@ const eslintConfig = defineConfig([
         {
           // 구조 분해(`const { message } = thrown`)도 같은 읽기다(마무리 12차 독립 리뷰).
           selector:
-            "MemberExpression[property.name='message'], MemberExpression[property.value='message'], ObjectPattern > Property[key.name='message']",
-          message: "화면은 원인 문구를 안 적는다 — 슬러그로 가르고 문구는 화면이 정한다. 되짚을 값은 digest 다(frontend-rules.md)",
+            "MemberExpression[property.name=/^(message|detail)$/], MemberExpression[property.value=/^(message|detail)$/], ObjectPattern > Property[key.name=/^(message|detail)$/]",
+          message: "화면은 원인 문구(message·detail)를 안 적는다 — 슬러그로 가르고 문구는 화면이 정한다. 되짚을 값은 digest 다(frontend-rules.md)",
         },
       ],
     },

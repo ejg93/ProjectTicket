@@ -119,4 +119,31 @@ describe("예매 취소", () => {
     expect(screen.getByText(/선점 시간 만료/)).toBeInTheDocument();
     await expectNoAxeViolations(container);
   });
+
+  it("미리보기를 받는 동안 그 버튼이 잠긴다", async () => {
+    let release: (response: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>((resolve) => (release = resolve))),
+    );
+    render(<CancelForm reservationId={9} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    // `onClick` 비동기 버튼은 폼 pending 이 안 걸린다 — 두 번 눌러 미리보기 두 벌이 겹치지 않게 그 버튼만 잠근다(`I8-1`)
+    expect(screen.getByRole("button", { name: "확인 중…" })).toBeDisabled();
+    release(new Response(JSON.stringify(PREVIEW), { status: 200, headers: { "Content-Type": "application/json" } }));
+    expect(await screen.findByText("277,200원")).toBeInTheDocument();
+  });
+
+  it("값이 없는 줄은 이름까지 안 그린다", async () => {
+    answers([{ ...PREVIEW, fee_amount: null, tier_rate: null }, 200]);
+    render(<CancelForm reservationId={9} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(await screen.findByText("277,200원")).toBeInTheDocument();
+    // 이름만 남은 줄은 「0원」으로 읽힌다(`D17`)
+    expect(screen.queryByText("취소 수수료")).toBeNull();
+  });
 });

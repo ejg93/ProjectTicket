@@ -50,10 +50,13 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // 미리보기는 GET 이라 `<form action>` 이 아니다 — 그 버튼만 잠근다(`D17` 「기다리는 동안」, `I8-1`)
+  const [busy, setBusy] = useState(false);
 
   /** 미리보기를 받는다. 못 받으면 옛 미리보기를 걷는다 — 남겨 두면 옛 금액으로 다시 누를 수 있다 */
   async function load(): Promise<boolean> {
     setError(null);
+    setBusy(true);
     try {
       setPreview(await api<Preview>(`/api/reservations/${reservationId}/refund-preview`));
       return true;
@@ -61,6 +64,8 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
       setPreview(null);
       setError(messageOf(slugOf(thrown)));
       return false;
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -101,8 +106,8 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
     return (
       <div>
         {alert}
-        <button type="button" onClick={load}>
-          취소
+        <button type="button" onClick={load} disabled={busy}>
+          {busy ? "확인 중…" : "취소"}
         </button>
       </div>
     );
@@ -114,18 +119,31 @@ export function CancelForm({ reservationId }: { reservationId: number }) {
 
   return (
     <form action={cancel} aria-label="취소 확인">
+      {/* 값이 null 이면 그 줄을 통째로 안 그린다 — 이름만 남은 줄은 「0원」으로 읽힌다(`D17`) */}
       <dl>
-        <dt>결제 금액</dt>
-        <dd>{preview.payment_amount != null ? money(preview.payment_amount) : null}</dd>
+        {preview.payment_amount != null ? (
+          <>
+            <dt>결제 금액</dt>
+            <dd>{money(preview.payment_amount)}</dd>
+          </>
+        ) : null}
         <dt>관람일까지</dt>
         <dd>{preview.days_before}일</dd>
-        <dt>취소 수수료</dt>
-        <dd>
-          {preview.fee_amount != null ? money(preview.fee_amount) : null}
-          {preview.tier_rate != null ? ` (${Math.round(preview.tier_rate * 100)}%)` : null}
-        </dd>
-        <dt>환불 금액</dt>
-        <dd>{preview.refund_amount != null ? money(preview.refund_amount) : null}</dd>
+        {preview.fee_amount != null ? (
+          <>
+            <dt>취소 수수료</dt>
+            <dd>
+              {money(preview.fee_amount)}
+              {preview.tier_rate != null ? ` (${Math.round(preview.tier_rate * 100)}%)` : null}
+            </dd>
+          </>
+        ) : null}
+        {preview.refund_amount != null ? (
+          <>
+            <dt>환불 금액</dt>
+            <dd>{money(preview.refund_amount)}</dd>
+          </>
+        ) : null}
       </dl>
       {alert}
       <SubmitButton label="이 금액으로 취소" pendingLabel="취소하는 중입니다" />

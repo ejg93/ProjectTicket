@@ -2,6 +2,7 @@ package com.projectticket.ticket.reservation
 
 import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.PerformanceStatus
 import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxWriter
@@ -36,11 +37,13 @@ class PerformanceCloseService(
         val closedAt = jdbc.sql(
             """
             update performance
-               set status = 'closed'
-             where performance_id = :id and status = 'open' and sales_close_at < now()
+               set status = :closed
+             where performance_id = :id and status = :open and sales_close_at < now()
             returning now() as closed_at
             """,
         )
+            .param("closed", PerformanceStatus.CLOSED.code)
+            .param("open", PerformanceStatus.OPEN.code)
             .param("id", performanceId)
             .query(OffsetDateTime::class.java)
             .optional()

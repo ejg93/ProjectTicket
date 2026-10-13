@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Field } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { ApiError, api } from "@/lib/api";
+import { fieldErrorsOf } from "@/lib/field-errors";
 
 import { kstIso, type Hall } from "../../types";
 
@@ -18,16 +19,23 @@ function messageOf(error: unknown): string {
     case "performance-slot-taken":
       return "그 홀의 그 시각에 이미 회차가 있습니다. 다른 시각을 골라 주세요.";
     case "validation-failed":
-      // 판매 창 제약(`V14`)은 서버가 `sales_open_at` 칸으로 준다(`45d-a`). 마감을 안 받으니 기준은 관람 1시간 전이다.
-      return error.errors.some((e) => e.field === "sales_open_at")
-        ? "판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다."
-        : "입력을 다시 확인해 주세요.";
+      // 짚은 칸은 그 칸 아래다(`I8-2`). 여기는 지목 못 한 나머지다
+      return "입력을 다시 확인해 주세요.";
     case "event-not-found":
       return "공연을 찾을 수 없습니다.";
     default:
       return "회차를 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
 }
+
+/**
+ * 서버가 짚는 칸과 그 칸 아래의 문구. 판매 창 제약(`V14`)은 서버가 `sales_open_at` 칸으로 준다(`45d-a`) —
+ * 마감을 안 받으니 기준은 관람 1시간 전이다. 홀은 `<select>` 라 `Field` 가 아니어서 폼 전체로 떨어진다.
+ */
+const FIELD_TEXT: Record<string, string> = {
+  starts_at: "관람 시각을 확인해 주세요.",
+  sales_open_at: "판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.",
+};
 
 /** 제출한 칸 글자 그대로(`datetime-local` 값은 오프셋을 붙이기 전). 서버가 거절하면 이것으로 칸을 다시 채운다 */
 type Draft = { hallId: string; startsAt: string; salesOpenAt: string };
@@ -42,9 +50,11 @@ export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Ha
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
 
   async function submit(form: FormData) {
     setError(null);
+    setInvalid({});
     setDraft({
       hallId: String(form.get("hall_id") ?? ""),
       startsAt: String(form.get("starts_at") ?? ""),
@@ -62,7 +72,9 @@ export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Ha
       setDraft(null);
       router.refresh();
     } catch (thrown) {
-      setError(messageOf(thrown));
+      const { named, rest } = fieldErrorsOf(thrown, FIELD_TEXT);
+      setInvalid(named);
+      if (rest) setError(messageOf(thrown));
     }
   }
 
@@ -79,8 +91,14 @@ export function PerformanceForm({ eventId, halls }: { eventId: number; halls: Ha
           ))}
         </select>
       </p>
-      <Field name="starts_at" label="관람 시각(한국 시간)" type="datetime-local" defaultValue={draft?.startsAt} />
-      <Field name="sales_open_at" label="판매 시작(한국 시간)" type="datetime-local" defaultValue={draft?.salesOpenAt} />
+      <Field name="starts_at" label="관람 시각(한국 시간)" type="datetime-local" defaultValue={draft?.startsAt} error={invalid.starts_at} />
+      <Field
+        name="sales_open_at"
+        label="판매 시작(한국 시간)"
+        type="datetime-local"
+        defaultValue={draft?.salesOpenAt}
+        error={invalid.sales_open_at}
+      />
       {error ? (
         <p className="error" role="alert">
           {error}

@@ -1,6 +1,7 @@
 package com.projectticket.ticket.queue
 
 import com.projectticket.ticket.SchedulerLock
+import com.projectticket.ticket.event.PerformanceStatus
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
@@ -29,7 +30,8 @@ class QueueSweeper(
     fun sweepDueExclusively(): Long = lock.runExclusively(LOCK_NAME) { sweepDue() } ?: 0
 
     fun sweepDue(): Long {
-        val open = jdbc.sql("select performance_id from performance where status = 'open' order by performance_id")
+        val open = jdbc.sql("select performance_id from performance where status = :open order by performance_id")
+            .param("open", PerformanceStatus.OPEN.code)
             .query(Long::class.java)
             .list()
             .filterNotNull()

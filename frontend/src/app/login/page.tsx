@@ -12,12 +12,14 @@ export const metadata: Metadata = {
  *
  * **모르는 값은 아무것도 안 그린다.** 주소는 사람이 고칠 수 있어서 여기 없는 값이 올 수 있고,
  * 그때 「로그인이 만료됐다」를 그리면 사실이 아닌 것을 말하게 된다.
+ *
+ * `Map` 인 이유: 객체로 두면 `?reason=__proto__`·`toString` 이 프로토타입을 찍어 객체·함수가 자식으로 들어가 `error.tsx` 로 떨어진다(점검 8차 `I8`).
  */
-const REASON_TEXT: Record<string, string> = {
-  "session-expired": "로그인이 만료되어 다시 로그인이 필요합니다.",
-  "login-required": "이 화면은 로그인하신 뒤에 이용하실 수 있습니다.",
-  "signed-up": "가입이 끝났습니다. 이제 로그인해 주세요.",
-};
+const REASON_TEXT = new Map<string, string>([
+  ["session-expired", "로그인이 만료되어 다시 로그인이 필요합니다."],
+  ["login-required", "이 화면은 로그인하신 뒤에 이용하실 수 있습니다."],
+  ["signed-up", "가입이 끝났습니다. 이제 로그인해 주세요."],
+]);
 
 /**
  * 로그인 화면.
@@ -31,7 +33,7 @@ export default async function LoginPage({
   searchParams: Promise<{ reason?: string }>;
 }) {
   const { reason } = await searchParams;
-  const notice = REASON_TEXT[reason ?? ""];
+  const notice = REASON_TEXT.get(reason ?? "");
 
   return (
     <div>

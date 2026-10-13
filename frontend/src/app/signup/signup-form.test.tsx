@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { expectNoAxeViolations } from "@/test/axe";
+
 import { SignupForm, type ConsentItem } from "./signup-form";
 
 /**
@@ -38,7 +40,7 @@ describe("가입", () => {
         }),
       ),
     );
-    render(<SignupForm items={ITEMS} />);
+    const { container } = render(<SignupForm items={ITEMS} />);
 
     await userEvent.type(screen.getByLabelText("이메일"), "fan@example.com");
     await userEvent.type(screen.getByLabelText("이름"), "관객");
@@ -47,10 +49,63 @@ describe("가입", () => {
     await userEvent.click(screen.getByRole("button", { name: "가입" }));
 
     await screen.findByRole("alert");
+    await expectNoAxeViolations(container);
     expect(screen.getByLabelText("이메일")).toHaveValue("fan@example.com");
     expect(screen.getByLabelText("이름")).toHaveValue("관객");
     expect(screen.getByLabelText("비밀번호")).toHaveValue("");
     expect(screen.getByRole("checkbox", { name: /이용약관/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /마케팅 수신/ })).not.toBeChecked();
+  });
+
+  it("짧은 비밀번호는 서버에 안 보내고 그 칸만 지목한다(`I8-2`)", async () => {
+    const spy = vi.fn();
+    vi.stubGlobal("fetch", spy);
+    const { container } = render(<SignupForm items={ITEMS} />);
+
+    await userEvent.type(screen.getByLabelText("이메일"), "fan@example.com");
+    await userEvent.type(screen.getByLabelText("이름"), "관객");
+    await userEvent.type(screen.getByLabelText("비밀번호"), "short");
+    await userEvent.click(screen.getByRole("checkbox", { name: /이용약관/ }));
+    await userEvent.click(screen.getByRole("button", { name: "가입" }));
+
+    // 칸 아래 인라인 + `aria-invalid` — 낭독기가 칸에 들어갈 때 이유를 같이 읽는다(`D17`)
+    const password = await screen.findByLabelText("비밀번호");
+    await expect.poll(() => password.getAttribute("aria-invalid")).toBe("true");
+    expect(password).toHaveAccessibleDescription("비밀번호는 15자 이상이어야 합니다.");
+    expect(screen.getByLabelText("이메일")).not.toHaveAttribute("aria-invalid");
+    // 알림은 칸 아래 그 하나다 — 폼 전체 문구는 안 뜬다
+    expect(screen.getByRole("alert")).toHaveTextContent("비밀번호는 15자 이상이어야 합니다.");
+    expect(spy).not.toHaveBeenCalled();
+    await expectNoAxeViolations(container);
+  });
+
+  it("서버가 짚은 칸에 서버 문구가 아니라 화면 문구를 단다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            type: "tag:projectticket.example,2026:validation-failed",
+            detail: "요청 형식이 맞지 않는다",
+            errors: [{ field: "password", message: "흔한 비밀번호다" }],
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    render(<SignupForm items={ITEMS} />);
+
+    await userEvent.type(screen.getByLabelText("이메일"), "fan@example.com");
+    await userEvent.type(screen.getByLabelText("이름"), "관객");
+    await userEvent.type(screen.getByLabelText("비밀번호"), "password password password");
+    await userEvent.click(screen.getByRole("checkbox", { name: /이용약관/ }));
+    await userEvent.click(screen.getByRole("button", { name: "가입" }));
+
+    const password = screen.getByLabelText("비밀번호");
+    await expect.poll(() => password.getAttribute("aria-invalid")).toBe("true");
+    expect(password).toHaveAccessibleDescription(/흔히 쓰는 비밀번호는 쓸 수 없습니다/);
+    expect(screen.queryByText("흔한 비밀번호다")).toBeNull();
+    // 칸을 전부 지목했으니 폼 전체 문구는 없다 — 알림은 칸 아래 그 하나다
+    expect(screen.getByRole("alert")).toHaveTextContent(/흔히 쓰는 비밀번호는 쓸 수 없습니다/);
   });
 });

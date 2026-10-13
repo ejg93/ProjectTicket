@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Field } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { ApiError, api } from "@/lib/api";
+import { fieldErrorsOf } from "@/lib/field-errors";
 
 /** 동의 항목. 서버 JSON 이 snake_case 라 **받은 그대로 적는다**(`D5`) */
 export type ConsentItem = {
@@ -30,12 +31,19 @@ function messageOf(error: unknown): string {
     case "required-consent-missing":
       return "필수 항목에 모두 동의해 주세요.";
     case "validation-failed":
-      // 비밀번호 규칙(NIST 15자·블록리스트)이 여기로 온다. 서버 문구를 그대로 안 쓴다(`D17`).
-      return "입력하신 내용을 다시 확인해 주세요. 비밀번호는 15자 이상이어야 합니다.";
+      // 짚은 칸은 그 칸 아래에 말한다(`I8-2`). 여기는 지목 못 한 나머지다. 서버 문구를 그대로 안 쓴다(`D17`).
+      return "입력하신 내용을 다시 확인해 주세요.";
     default:
       return "가입하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
 }
+
+/** 서버가 짚는 칸(`SignupRequest` 의 이름, snake_case)과 그 칸 아래의 문구 */
+const FIELD_TEXT: Record<string, string> = {
+  email: "이메일 형식을 확인해 주세요.",
+  display_name: "이름은 50자까지 쓸 수 있습니다.",
+  password: "비밀번호는 15자 이상이어야 하고, 흔히 쓰는 비밀번호는 쓸 수 없습니다.",
+};
 
 /** 제출한 값. 서버가 거절하면 이것으로 칸을 다시 채운다(`39-4`). 비밀번호 칸은 없다 */
 type Draft = { email: string; displayName: string; consents: Record<string, boolean> };
@@ -44,10 +52,12 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
   const [error, setError] = useState<string | null>(null);
   // 서버가 거절해도 친 값을 남긴다(`39-4` — React 19 는 액션 끝에 폼을 비운다). 비밀번호는 안 남긴다(`D9`).
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
   const router = useRouter();
 
   async function submit(form: FormData) {
     setError(null);
+    setInvalid({});
 
     // 체크 안 된 상자는 `FormData` 에 아예 안 실린다. **빠진 것과 거부한 것이 같아 보이면 안 돼서**
     // 항목 목록을 돌며 `false` 를 채운다 — 서버는 항목마다 답을 요구한다(`consents` 가 `@NotNull`).
@@ -55,6 +65,12 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
       items.map((item) => [item.code, form.get(`consent-${item.code}`) === "on"]),
     );
     setDraft({ email: String(form.get("email") ?? ""), displayName: String(form.get("display_name") ?? ""), consents });
+
+    // 길이는 화면이 아는 규칙이라 서버까지 안 간다 — `minLength` 와 같은 수다. 블록리스트는 서버만 안다
+    if (String(form.get("password") ?? "").length < 15) {
+      setInvalid({ password: "비밀번호는 15자 이상이어야 합니다." });
+      return;
+    }
 
     try {
       await api<SignupResponse>("/api/auth/signup", {
@@ -71,15 +87,32 @@ export function SignupForm({ items }: { items: ConsentItem[] }) {
       // 가입 화면을 뒤로가기에 안 남긴다 — 돌아가 봐야 같은 이메일로는 `email-taken` 이다.
       router.replace("/login?reason=signed-up");
     } catch (thrown) {
-      setError(messageOf(thrown));
+      const { named, rest } = fieldErrorsOf(thrown, FIELD_TEXT);
+      setInvalid(named);
+      if (rest) setError(messageOf(thrown));
     }
   }
 
   return (
     <form action={submit}>
-      <Field name="email" label="이메일" type="email" autoComplete="email" maxLength={254} defaultValue={draft?.email} />
-      <Field name="display_name" label="이름" autoComplete="name" maxLength={50} defaultValue={draft?.displayName} />
-      <Field name="password" label="비밀번호" type="password" autoComplete="new-password" maxLength={64} minLength={15} />
+      <Field name="email" label="이메일" type="email" autoComplete="email" maxLength={254} defaultValue={draft?.email} error={invalid.email} />
+      <Field
+        name="display_name"
+        label="이름"
+        autoComplete="name"
+        maxLength={50}
+        defaultValue={draft?.displayName}
+        error={invalid.display_name}
+      />
+      <Field
+        name="password"
+        label="비밀번호"
+        type="password"
+        autoComplete="new-password"
+        maxLength={64}
+        minLength={15}
+        error={invalid.password}
+      />
       <p className="muted">비밀번호는 15자 이상으로 정해 주세요.</p>
 
       <fieldset>

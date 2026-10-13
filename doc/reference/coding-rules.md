@@ -108,7 +108,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 |---|---|
 | 이름 바인딩만 쓴다 | 값을 이어 붙이면 인젝션이다(`D9`). `.sql(` 인자는 리터럴 하나고, 안의 보간은 정렬 조각·같은 파일의 `const val` 만이다 — `SqlTextTest`(`G10`) |
 | `select *` 를 안 쓴다 | 컬럼이 늘면 응답이 조용히 바뀐다 |
-| 상태 리터럴을 SQL 에 안 박는다 | 열거형이 유일한 출처다. `AccountStatus.ACTIVE.code` 를 바인딩한다 |
+| 상태는 열거형 `code` 를 바인딩한다 — **짝인 자리만 리터럴** | 열거형이 유일한 출처다(`AccountStatus.ACTIVE.code`). 예외는 부분 인덱스 조건·`on conflict … where` 와 짝인 자리다 — generic plan 은 바인딩한 조건으로 부분 인덱스를 못 쓴다(Postgres 17 실측, `stack.md`). 계층이 열거형을 못 보는 자리(정산 → 예매)도 리터럴이다. 리터럴이 열거형 `code` 인지·허용 목록 밖에 없는지는 `SqlTextTest`(`I9-4`) |
 | **좌석 상태를 바꾸는 것은 조건부 UPDATE** | `D4`. 읽고 판단하고 쓰면 그 사이에 남이 끼어든다 |
 
 마지막 줄이 이 저장소의 핵심 규칙이다. 좌석은 `update … where status = 'AVAILABLE'` 의 **갱신 행 수**로 판정하고,
@@ -186,7 +186,7 @@ Java 를 옮겨 적지 않는다. ProjectShop 에서 포팅한 코드도 옮기�
 
 **자원 단위로 판다.** 관객·기획사 같은 사람 단위로 안 판다 — 같은 자원을 두 사람이 다루면 코드가 두 벌이 된다.
 
-지금 있는 것: `account` · `audit` · `auth` · `consent` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `reservation` · `settlement`.
+지금 있는 것: `account` · `audit` · `auth` · `consent` · `demo` · `error` · `event` · `health` · `idempotency` · `notification` · `observability` · `outbox` · `payment` · `queue` · `reservation` · `settlement` · `web`. 뿌리에 스케줄러 둘(`SchedulerLock`·`SchedulingConfig`) — 모든 스케줄러가 부른다. `demo` 는 `local` 프로필의 시드(12), `web` 은 목록 규약(`Paging`, `D5`)이다.
 
 **의존 방향은 `payment → reservation → event → settlement`, 그리고 전부 `outbox`·`idempotency`·`audit`·`error` 로.** 취소 입구가 `payment` 에 있고 회차 종료가 `reservation` 에 있는 이유다 — 부르는 쪽이 아래로 간다.
 넷 사이의 방향은 `ArchitectureTest.resourcePackagesDependDownward` 가 막는다(`G7a`).

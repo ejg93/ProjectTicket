@@ -20,6 +20,9 @@ class StackVersionConsistencyTest {
     fun spring_boot_and_kotlin_match_the_build_file() {
         assertThat(gradle).contains("id(\"org.springframework.boot\") version \"${tableVersion("Spring Boot")}\"")
         assertThat(gradle).contains("kotlin(\"jvm\") version \"${tableVersion("Kotlin")}\"")
+        // 플러그인 둘은 같은 판이어야 한다 — `jvm` 만 보면 `plugin.spring` 이 혼자 남는다(점검 9차).
+        assertThat(gradle).contains("kotlin(\"plugin.spring\") version \"${tableVersion("Kotlin")}\"")
+        assertThat(gradle).contains("id(\"io.spring.dependency-management\") version \"${tableVersion("dependency-management")}\"")
         assertThat(gradle).contains("JavaLanguageVersion.of(${tableVersion("Java")})")
     }
 
@@ -28,6 +31,8 @@ class StackVersionConsistencyTest {
         assertThat(gradle).contains("org.testcontainers:testcontainers-bom:${tableVersion("Testcontainers")}")
         assertThat(gradle).contains("com.tngtech.archunit:archunit-junit6:${tableVersion("ArchUnit")}")
         assertThat(gradle).contains("id(\"dev.detekt\") version \"${tableVersion("detekt")}\"")
+        assertThat(gradle).contains("org.pitest:pitest-command-line:${tableVersion("pitest")}")
+        assertThat(gradle).contains("org.pitest:pitest-junit5-plugin:${tableVersion("pitest-junit5-plugin")}")
     }
 
     @Test
@@ -52,6 +57,34 @@ class StackVersionConsistencyTest {
             .contains("\"apache/kafka:${tableVersion("Kafka")}\"")
     }
 
+    /** 이미지를 굽는 판이 CI 판과 갈리면 CI 가 초록이어도 이미지 안에서 깨진다. `FROM` 이 여럿이라 전부 본다 */
+    @Test
+    fun dockerfiles_match_the_table() {
+        assertThat(fromTags("frontend/Dockerfile", "node"))
+            .isNotEmpty
+            .allSatisfy { assertThat(it).startsWith("${tableVersion("Node")}-") }
+        assertThat(fromTags("backend/Dockerfile", "eclipse-temurin"))
+            .isNotEmpty
+            .allSatisfy { assertThat(it).startsWith("${tableVersion("Java")}-") }
+    }
+
+    /** 차트는 compose 다음의 셋째 사본이다(`37`) */
+    @Test
+    fun chart_images_match_the_table() {
+        val values = Files.readString(root.resolve("k8s/chart/values.yaml"))
+        assertThat(values).contains("image: postgres:${tableVersion("PostgreSQL")}")
+        assertThat(values).contains("image: redis:${tableVersion("Redis")}")
+        assertThat(values).contains("image: apache/kafka:${tableVersion("Kafka")}")
+    }
+
+    @Test
+    fun helm_and_playwright_match_the_table() {
+        val ci = Files.readString(root.resolve(".github/workflows/ci.yml"))
+        assertThat(ci).containsPattern("""uses: azure/setup-helm@\S+\s+with:\s+version: v${Regex.escape(tableVersion("Helm"))}\s""")
+        assertThat(Files.readString(root.resolve("frontend/package.json")))
+            .contains("\"@playwright/test\": \"^${tableVersion("Playwright")}\"")
+    }
+
     @Test
     fun ci_jdk_and_node_match_the_table() {
         val ci = Files.readString(root.resolve(".github/workflows/ci.yml"))
@@ -71,6 +104,12 @@ class StackVersionConsistencyTest {
                 .contains("\"$dependency\": \"${tableVersion(subject)}\"")
         }
     }
+
+    private fun fromTags(dockerfile: String, image: String): List<String> =
+        Regex("""^FROM ${Regex.escape(image)}:(\S+)""", RegexOption.MULTILINE)
+            .findAll(Files.readString(root.resolve(dockerfile)))
+            .map { it.groupValues[1] }
+            .toList()
 
     /**
      * 버전표의 한 행 — `| 대상 | 버전 | …` 에서 둘째 칸.

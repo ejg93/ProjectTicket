@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { expectNoAxeViolations } from "@/test/axe";
+
 import { EventList, type EventPage } from "./event-list";
 
 /**
@@ -64,8 +66,9 @@ describe("공연 목록", () => {
     expect(screen.queryByRole("navigation", { name: "쪽 이동" })).not.toBeInTheDocument();
   });
 
-  it("다음 쪽이 있으면 링크를 준다", () => {
-    render(<EventList events={page({ total: 45 })} />);
+  it("다음 쪽이 있으면 링크를 준다", async () => {
+    const { container } = render(<EventList events={page({ total: 45 })} />);
+    await expectNoAxeViolations(container);
 
     expect(screen.getByRole("link", { name: "다음" })).toHaveAttribute("href", "/events?page=1");
     // 첫 쪽에서는 이전이 없다. 눌러 봐야 같은 자리다.

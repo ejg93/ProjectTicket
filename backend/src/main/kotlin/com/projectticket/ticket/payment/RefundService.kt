@@ -45,7 +45,7 @@ class RefundService(private val gateway: MockPaymentGateway, private val transit
             tierRate = requested.tierRate,
             feeAmount = requested.feeAmount,
             refundAmount = requested.refundAmount,
-            status = if (done) "done" else "requested",
+            status = if (done) RefundStatus.DONE.code else RefundStatus.REQUESTED.code,
         )
     }
 }

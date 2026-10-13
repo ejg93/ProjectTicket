@@ -4,7 +4,9 @@
  */
 
 :root {
-  --surface: #ffffff;
+  /* 순수 흰·검을 안 쓴다(D17 「시각 디자인은 아직 안 정한다」). 글자가 accent 위에 놓일 때는 --on-accent 다 */
+  --surface: #fafafa;
+  --on-accent: #f7f9ff;
   --text: #1a1a1a;
   --text-muted: #5c5c5c;
   --border: #d4d4d4;
@@ -48,7 +50,7 @@ button {
   border: 1px solid var(--accent);
   border-radius: 0.25rem;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   font: inherit;
   cursor: pointer;
 }
@@ -148,7 +150,7 @@ footer {
 .seat:has(input:checked) {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 .seat:has(input:disabled) {

@@ -14,7 +14,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Spring Boot | 4.1.1 | `backend/build.gradle.kts` |
 | Kotlin | 2.3.21 | 같은 파일의 플러그인. **Boot BOM 이 관리하는 값과 맞춘다** — 플러그인은 BOM 밖이라 직접 적는다 |
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
-| Gradle | 9.7.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
+| Gradle | 9.8.0 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
@@ -23,16 +23,19 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Prometheus | v3.1.0 | `docker-compose.yml`. 수집기 — 앱은 `micrometer-registry-prometheus` 로 `/actuator/prometheus` 를 연다(30) |
 | Grafana | 11.5.0 | `docker-compose.yml`. 데이터 소스·대시보드는 `docker/grafana/provisioning/` 이 심는다 |
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
-| ArchUnit | 1.5.0 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
+| ArchUnit | 1.5.1 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
+| dependency-management | 1.1.7 | `build.gradle.kts` 의 `io.spring.dependency-management` 플러그인. Boot BOM 을 들이는 도구라 BOM 밖이다 |
+| pitest | 1.30.0 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
+| pitest-junit5-plugin | 1.2.3 | 같은 구성. JUnit 플랫폼에서 시험을 찾는다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
 | Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
-| Next | 16.3.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
+| Next | 16.4.0 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
 | React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
-| kind | 0.33.0 | `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
+| kind | 0.33.0 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
 | Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
-| kubectl | 1.36.1 | Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
-| Playwright | 1.63.0 | `frontend/package.json`(`^1.63.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
+| kubectl | 1.36.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
+| Playwright | 1.64.0 | `frontend/package.json`(`^1.64.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
 **버전을 물으면 이 표가 아니라 위 파일들을 본다.** 표가 낡을 수 있다 — `StackVersionConsistencyTest` 가 이 표와 파일을 대조해서 낡으면 빨개진다.
@@ -200,6 +203,7 @@ commit                 ← 앞의 예약분이 null 로 터진다
 유일 인덱스 위반을 예외로 받으면 그 트랜잭션은 `25P02` 라 다음 문장이 못 돈다. 「이미 있으면 그 행을 읽어 답한다」는 흐름은 예외가 아니라 **`on conflict … do nothing` 의 0행**으로 받는다 —
 `SeatHoldService.insertReservation`(`duplicate-hold` 에 기존 예매 id), `TicketService.issueOne`(번호 재추첨), `IdempotencyService.claim`.
 `on conflict` 의 `where` 는 부분 인덱스의 조건과 **글자까지 같은 리터럴**이어야 한다 — 바인딩하면 플래너가 인덱스를 못 맞춘다.
+**부분 인덱스를 타려는 질의도 같다.** `where status = 'held'` 인덱스 위에서 `status = $1` 의 `explain (generic_plan)` 은 Seq Scan, 리터럴·custom plan 은 Index Scan 이다(Postgres 17.10, 번들 7 설계 실측). JDBC 는 같은 문장을 다섯 번 넘게 돌리면 서버 쪽 준비 문장으로 넘어가고, 그 뒤 generic plan 으로 갈지는 `plan_cache_mode = auto` 의 비용 비교라 **리터럴만이 확정이다.** 그 자리 목록은 `SqlTextTest.INDEXED_LITERALS`.
 
 ### 부분 유일 인덱스가 앱 검증을 경합에서 지킨다
 
@@ -233,6 +237,8 @@ ProjectShop 이 시드를 `V900` 대로 뒀더니 **적용 이력의 최고 버�
 
 **이 저장소는 그 길을 안 간다**(12) — `local` 프로필의 `DemoSeeder` 가 기동 뒤에 서비스를 불러 만든다. Flyway 이력이 안 더럽혀지고, 시드가 실제 경로를 밟아서 그 경로가 도는지도 같이 확인된다.
 대신 **멱등을 스스로 들어야 한다** — Flyway 가 공짜로 주던 「한 번만」이 없어져서, 러너가 이미 시드된 DB 를 알아보고 건너뛴다.
+
+**건너뛰는 탓에 회차 시각이 첫 기동에 묶인다.** 여는 시드 회차는 「첫 기동 + 14일」(`DemoSeeder.PERFORMANCE_DAY_OFFSETS`)이라 재사용 DB(`ticket-db`)에서 두 주가 지나면 열린 회차가 닫혀 있고, e2e 가 「판매 중인 공연이 없습니다」에서 공연 링크를 못 찾고 선다(`I9-1` 실측 — 화면 탓이 아니다). 로컬 e2e 는 `/verify` 의 health 기동과 같은 **빈 클러스터**(`ticket-check-db`, 5499)에 백엔드를 띄워 돈다. CI 는 늘 빈 DB 라 안 걸린다.
 
 ### 동의 항목·정책 행은 「지금 판」을 골라야 한다
 
@@ -411,6 +417,11 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 
 의존 그래프가 기본 가지 기준이라 작업 가지에 올려도 경보가 그대로다. `main` 에 머지돼야 `fixed` 로 닫힌다. 오탐은 사람이 `inaccurate` 로 닫는다.
 
+### 버전표에 행이 있는 의존성의 Dependabot PR 은 혼자서는 빨갛다
+
+`StackVersionConsistencyTest` 가 이 표와 빌드 파일을 대조하는데 Dependabot 은 이 표를 안 고친다 — Next·ArchUnit·Gradle 을 올린 PR(#34·#30)이 `backend` 잡에서 그 시험으로 섰다(점검 9차). **설계대로다.** 판을 올리는 것은 작업 가지의 청크가 표와 같이 하고, 그 PR 은 닫는다.
+`npm audit` 의 전이 의존성은 Dependabot 그룹 PR 이 안 고친다 — 직접 의존만 올린다. 잠금 파일은 `npm audit fix` 가 고친다. **고친 판이 없는 권고**(`braces *`)는 둘 다 못 고친다.
+
 ### Redis 는 테스트 롤백이 안 되돌린다
 
 `PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.
@@ -483,13 +494,9 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ## 아직 안 정한 것
 
-| 대상 | 언제 |
-|---|---|
-| Redisson(스케줄러 락·좌석 락) | 33, ADR 0003. Lettuce 는 `20a` 가 스타터로 들였다 |
-| 품질 게이트 도구(detekt·CodeQL·SpotBugs) | `P10`(46·47). ProjectShop 의 SpotBugs·find-sec-bugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봤다 — 그 판단은 그때 다시 |
-| Kafka | 28, ADR 0007 |
+지금 없다. 있던 셋은 정해졌다(점검 9차 `I9`) — Redisson 은 **안 쓴다**(33, `SchedulerLock` 이 Lettuce 위의 `SET NX`), 품질 게이트는 detekt·CodeQL 이고 SpotBugs 는 안 들였다(`P10`·`47`, `quality-gates.md`), Kafka 는 위 버전표에 있다(28).
 
-정해지면 위 버전표에 줄을 더한다.
+새로 미정인 것이 생기면 여기 행을 세우고, 정해지면 위 버전표로 옮긴다.
 
 ## 버전을 올릴 때
 

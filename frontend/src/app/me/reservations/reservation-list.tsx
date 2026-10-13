@@ -23,7 +23,11 @@ export type MyReservation = {
  */
 export function ReservationList({ items }: { items: MyReservation[] }) {
   if (items.length === 0) {
-    return <p>아직 예매가 없습니다.</p>;
+    return (
+      <p>
+        아직 예매가 없습니다. <Link href="/events">공연 목록</Link>에서 예매를 시작해 주세요.
+      </p>
+    );
   }
   return (
     <ul>

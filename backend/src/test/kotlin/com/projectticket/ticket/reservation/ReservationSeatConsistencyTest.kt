@@ -198,6 +198,16 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         }.hasStackTraceContaining("멱등키에 응답이 안 붙었다")
     }
 
+    /** `V23` — 「무엇이 물렀나」는 끝난 예매에만 있다. 사유 열 하나만 보는 질의가 살아 있는 예매를 「관객이 무른 것」으로 세지 않게 */
+    @Test
+    fun live_reservation_cannot_carry_a_cancel_reason() {
+        val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(1)))
+
+        assertThatThrownBy {
+            jdbc.sql("update reservation set cancelled_by = 'audience' where reservation_id = :id").param("id", reservationId).update()
+        }.hasStackTraceContaining("reservation_cancelled_by_status_check")
+    }
+
     private fun pointerSet(reservationId: Long): Set<Long> =
         jdbc.sql("select performance_seat_id from performance_seat where reservation_id = :id").param("id", reservationId)
             .query(Long::class.java).list().filterNotNull().toSet()

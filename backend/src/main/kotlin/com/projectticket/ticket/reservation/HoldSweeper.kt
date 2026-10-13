@@ -38,19 +38,19 @@ class HoldSweeper(
      */
     @Transactional
     fun sweep(): Int {
+        // 상태를 **리터럴로 박는다** — 부분 인덱스(`reservation_held_until_idx`·`reservation_paying_until_idx`)의 조건과 글자로 같아야
+        // generic plan 에서도 그 인덱스를 쓴다. 바인딩하면 Seq Scan 이다(`coding-rules.md` 「SQL」, `I9-4` 실측).
         val expired = jdbc.sql(
             """
             update reservation
                set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by
-             where status = :held and held_until < now()
-                or status = :paying and paying_until < now()
+             where status = 'held' and held_until < now()
+                or status = 'paying' and paying_until < now()
             returning reservation_id
             """,
         )
             .param("expired", ReservationStatus.EXPIRED.code)
             .param("by", CancelledBy.EXPIRED.code)
-            .param("held", ReservationStatus.HELD.code)
-            .param("paying", ReservationStatus.PAYING.code)
             .query(Long::class.java)
             .list()
             .filterNotNull()

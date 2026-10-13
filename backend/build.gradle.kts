@@ -85,7 +85,7 @@ dependencies {
 	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	// 계층 규칙을 문서에서 테스트로 내린다(D14). JUnit 6 아티팩트다 — Boot 4 BOM 이 JUnit 6 을 준다.
-	testImplementation("com.tngtech.archunit:archunit-junit6:1.5.0")
+	testImplementation("com.tngtech.archunit:archunit-junit6:1.5.1")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -199,6 +199,8 @@ tasks.test {
 		fileTree("../k8s"),
 		rootProject.file("../scripts/k8s-up.sh"),
 		rootProject.file("../frontend/Dockerfile"),
+		// `StackVersionConsistencyTest` 가 Next·React·Playwright 판을 글자로 읽는다(`I9-3`).
+		rootProject.file("../frontend/package.json"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -51,8 +52,10 @@ function etaText(seconds: number | null | undefined): string | null {
 export function QueueStatus({ performanceId }: { performanceId: string }) {
   const router = useRouter();
   const [position, setPosition] = useState<Position | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // `closed` 면 다시 줄을 서도 같은 410 이다 — 할 수 없는 조작은 안 그린다(`I8-1`)
+  const [error, setError] = useState<{ text: string; closed: boolean } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [leaving, setLeaving] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
@@ -79,7 +82,7 @@ export function QueueStatus({ performanceId }: { performanceId: string }) {
       if (!live) return;
       live = false;
       stop();
-      setError(messageOf(thrown));
+      setError({ text: messageOf(thrown), closed: thrown instanceof ApiError && thrown.slug === "queue-closed" });
     };
     const poll = () => api<Position>(path).then(settle, fail);
     // 돌아오면 바로 한 번 묻는다 — 숨은 동안 브라우저가 타이머를 늦췄을 수 있다. 줄에 서기 전(첫 POST 전)에는 안 묻는다.
@@ -106,10 +109,13 @@ export function QueueStatus({ performanceId }: { performanceId: string }) {
   async function leave() {
     clearInterval(timer.current);
     timer.current = undefined;
+    setLeaving(true);
     try {
       await api<void>(`/api/queue/${performanceId}`, { method: "DELETE" });
     } catch {
       // 줄에 없어도 204 다. 네트워크가 끊겼으면 하트비트가 끊겨 서버가 빼 준다(24)
+    } finally {
+      setLeaving(false);
     }
     dropAdmission(performanceId);
     router.push("/events");
@@ -119,19 +125,23 @@ export function QueueStatus({ performanceId }: { performanceId: string }) {
     return (
       <div>
         <p className="error" role="alert">
-          {error}
+          {error.text}
         </p>
         <p>
-          <button
-            type="button"
-            onClick={() => {
-              // 오류를 지우고 효과를 다시 돌린다 — 효과 안에서 지우면 렌더가 한 번 더 돈다(`react-hooks`)
-              setError(null);
-              setAttempt((n) => n + 1);
-            }}
-          >
-            다시 줄 서기
-          </button>
+          {error.closed ? (
+            <Link href="/events">공연 목록으로</Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                // 오류를 지우고 효과를 다시 돌린다 — 효과 안에서 지우면 렌더가 한 번 더 돈다(`react-hooks`)
+                setError(null);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              다시 줄 서기
+            </button>
+          )}
         </p>
       </div>
     );
@@ -147,8 +157,8 @@ export function QueueStatus({ performanceId }: { performanceId: string }) {
       </p>
       <p className="muted">차례가 되면 좌석 선택 화면으로 자동으로 넘어갑니다. 이 창을 닫으면 순서가 사라집니다.</p>
       <p>
-        <button type="button" onClick={leave}>
-          줄 나가기
+        <button type="button" onClick={leave} disabled={leaving}>
+          {leaving ? "나가는 중…" : "줄 나가기"}
         </button>
       </p>
     </div>

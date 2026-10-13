@@ -180,8 +180,8 @@ class RefundTransitionService(
         jdbc.sql(
             "update refund set status = :done, refund_number = :number, done_at = now() where refund_id = :id and status = :requested",
         )
-            .param("done", "done")
-            .param("requested", "requested")
+            .param("done", RefundStatus.DONE.code)
+            .param("requested", RefundStatus.REQUESTED.code)
             .param("number", refundNumber)
             .param("id", refundId)
             .update() == 1
