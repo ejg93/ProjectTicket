@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { Field } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { ApiError, api } from "@/lib/api";
+import { fieldErrorsOf } from "@/lib/field-errors";
 import { money } from "@/lib/format";
 
 type PaymentResult = {
@@ -29,11 +30,15 @@ function messageOf(error: unknown): string {
     case "invalid-transition":
       return "이미 처리된 예매입니다. 예매 내역을 확인해 주세요.";
     case "validation-failed":
-      return "카드번호를 다시 확인해 주세요.";
+      // 카드번호 칸을 짚으면 그 칸 아래다(`I8-2`). 여기는 지목 못 한 나머지다
+      return "입력을 다시 확인해 주세요.";
     default:
       return "결제하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   }
 }
+
+/** 서버가 짚는 칸(`PayRequest`)과 그 칸 아래의 문구 */
+const FIELD_TEXT: Record<string, string> = { card_number: "카드번호를 다시 확인해 주세요." };
 
 /**
  * 모의 결제(`19`).
@@ -47,6 +52,7 @@ function messageOf(error: unknown): string {
 export function CheckoutForm({ reservationId, amount }: { reservationId: number; amount: number }) {
   const [error, setError] = useState<string | null>(null);
   const [declined, setDeclined] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
   const idempotencyKey = useRef<string | null>(null);
   const lastCard = useRef<string | null>(null);
   const router = useRouter();
@@ -54,6 +60,7 @@ export function CheckoutForm({ reservationId, amount }: { reservationId: number;
   async function submit(form: FormData) {
     setError(null);
     setDeclined(null);
+    setInvalid({});
 
     const cardNumber = String(form.get("card_number") ?? "");
     if (cardNumber !== lastCard.current) {
@@ -88,13 +95,15 @@ export function CheckoutForm({ reservationId, amount }: { reservationId: number;
       // 승인됐다. 상태와 티켓은 서버 컴포넌트가 다시 읽는다.
       router.refresh();
     } catch (thrown) {
-      setError(messageOf(thrown));
+      const { named, rest } = fieldErrorsOf(thrown, FIELD_TEXT);
+      setInvalid(named);
+      if (rest) setError(messageOf(thrown));
     }
   }
 
   return (
     <form action={submit}>
-      <Field name="card_number" label="카드번호" autoComplete="cc-number" />
+      <Field name="card_number" label="카드번호" autoComplete="cc-number" error={invalid.card_number} />
 
       {/* **제출 버튼 위, 입력칸 아래다**(`D17`) */}
       {declined ? (

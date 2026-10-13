@@ -6,27 +6,23 @@ import { useState } from "react";
 import { Field } from "@/components/field";
 import { SubmitButton } from "@/components/submit-button";
 import { ApiError, api } from "@/lib/api";
+import { fieldErrorsOf } from "@/lib/field-errors";
 
 import type { Organizer } from "../../types";
 
-/** 등급 줄을 가리키는 칸(`grades[1].code`)을 줄 번호와 칸으로 가른다(`45d-a` 가 싣는 꼴) */
-const GRADE_FIELD = /^grades\[(\d+)\]\.(code|sections)$/;
-
 /**
- * 틀린 칸이 등급 줄이면 그 줄을 짚는 문구. 아니면 null — 슬러그 문구로 떨어진다.
+ * 서버가 짚는 칸과 그 칸 아래의 문구. 등급 줄의 칸은 `grades[1].code` 로 오고 화면 이름은 `grade_code_1` 이다(`lib/field-errors.ts`).
  * **같은 칸 이름을 두 원인이 낸다** — 형식(Bean Validation: 코드 꼴·구역 없음)과 DB 제약(코드 중복·한 구역에 등급 둘, `45d-a`).
- * 칸 이름만으로는 못 가르니 문구가 둘 다 말한다.
+ * 칸 이름만으로는 못 가르니 문구가 둘 다 말한다. 열쇠는 **지금 그려진 줄**만 — 없는 줄을 짚으면 폼 전체로 떨어진다.
  */
-function gradeMessageOf(error: ApiError): string | null {
-  for (const { field } of error.errors) {
-    const match = GRADE_FIELD.exec(field);
-    if (!match) continue;
-    const row = Number(match[1]) + 1;
-    return match[2] === "code"
-      ? `${row}번째 등급의 코드를 확인해 주세요. 영문 대문자로 시작해야 하고, 앞 등급과 겹칠 수 없습니다.`
-      : `${row}번째 등급의 구역을 확인해 주세요. 하나 이상 골라야 하고, 앞 등급이 고른 구역은 고를 수 없습니다.`;
+function fieldTextFor(rows: number): Record<string, string> {
+  const text: Record<string, string> = { title: "공연 제목을 확인해 주세요. 200자까지 쓸 수 있습니다." };
+  for (let i = 0; i < rows; i++) {
+    text[`grade_code_${i}`] = "등급 코드는 영문 대문자로 시작해야 하고, 앞 등급과 겹칠 수 없습니다.";
+    text[`grade_price_${i}`] = "가격을 확인해 주세요.";
+    text[`grade_sections_${i}`] = "구역을 하나 이상 골라야 하고, 앞 등급이 고른 구역은 고를 수 없습니다.";
   }
-  return null;
+  return text;
 }
 
 /** 서버가 준 오류를 화면 문구로 옮긴다. `slug` 로 갈린다(`D5`) */
@@ -36,10 +32,8 @@ function messageOf(error: unknown): string {
   }
   switch (error.slug) {
     case "validation-failed":
-      return (
-        gradeMessageOf(error) ??
-        "입력을 다시 확인해 주세요. 등급 코드는 영문 대문자로 시작하고, 등급마다 구역을 하나 이상 골라야 합니다."
-      );
+      // 짚은 칸은 그 칸 아래다(`I8-2`). 여기는 지목 못 한 나머지다
+      return "입력을 다시 확인해 주세요. 등급 코드는 영문 대문자로 시작하고, 등급마다 구역을 하나 이상 골라야 합니다.";
     case "organizer-not-found":
       return "이 기획사로 등록할 권한이 없습니다.";
     default:
@@ -62,6 +56,7 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
   const [error, setError] = useState<string | null>(null);
   const [grades, setGrades] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
 
   /** 뺀 줄의 값을 `draft` 에서도 걷는다 — 안 걷으면 다시 「등급 추가」한 줄이 뺀 줄의 값으로 되살아난다(마무리 17차) */
   function removeLastGrade() {
@@ -71,6 +66,7 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
 
   async function submit(form: FormData) {
     setError(null);
+    setInvalid({});
     const rows = Array.from({ length: grades }, (_, i) => ({
       code: String(form.get(`grade_code_${i}`) ?? ""),
       price: Number(form.get(`grade_price_${i}`) ?? 0),
@@ -89,7 +85,9 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
       });
       router.push(`/organizer/events/${created.event_id}`);
     } catch (thrown) {
-      setError(messageOf(thrown));
+      const { named, rest } = fieldErrorsOf(thrown, fieldTextFor(grades));
+      setInvalid(named);
+      if (rest) setError(messageOf(thrown));
     }
   }
 
@@ -106,23 +104,43 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
           ))}
         </select>
       </p>
-      <Field name="title" label="공연 제목" maxLength={200} defaultValue={draft?.title} />
+      <Field name="title" label="공연 제목" maxLength={200} defaultValue={draft?.title} error={invalid.title} />
       {Array.from({ length: grades }, (_, i) => (
         <fieldset key={i}>
           <legend>등급 {i + 1}</legend>
-          <Field name={`grade_code_${i}`} label="등급 코드(예: VIP)" defaultValue={draft?.grades[i]?.code} />
-          <Field name={`grade_price_${i}`} label="가격(원)" type="number" defaultValue={draft?.grades[i]?.price} />
-          <p>구역</p>
-          {sections.map((code) => (
-            <label key={code}>
-              <input
-                type="checkbox"
-                name={`grade_sections_${i}`}
-                value={code}
-                defaultChecked={draft?.grades[i]?.sections.includes(code) ?? false}
-              /> {code}
-            </label>
-          ))}
+          <Field
+            name={`grade_code_${i}`}
+            label="등급 코드(예: VIP)"
+            defaultValue={draft?.grades[i]?.code}
+            error={invalid[`grade_code_${i}`]}
+          />
+          <Field
+            name={`grade_price_${i}`}
+            label="가격(원)"
+            type="number"
+            defaultValue={draft?.grades[i]?.price}
+            error={invalid[`grade_price_${i}`]}
+          />
+          {/* 체크박스 묶음의 이름은 `legend` 가 든다 — `<p>` 면 낭독기가 묶음 이름을 안 읽는다(`I8-2`) */}
+          <fieldset aria-describedby={invalid[`grade_sections_${i}`] ? `grade_sections_${i}-error` : undefined}>
+            <legend>구역</legend>
+            {sections.map((code) => (
+              <label key={code}>
+                <input
+                  type="checkbox"
+                  name={`grade_sections_${i}`}
+                  value={code}
+                  defaultChecked={draft?.grades[i]?.sections.includes(code) ?? false}
+                />{" "}
+                {code}
+              </label>
+            ))}
+          </fieldset>
+          {invalid[`grade_sections_${i}`] ? (
+            <p id={`grade_sections_${i}-error`} className="error">
+              {invalid[`grade_sections_${i}`]}
+            </p>
+          ) : null}
         </fieldset>
       ))}
       <p>
