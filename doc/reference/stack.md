@@ -27,12 +27,12 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
 | Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
-| Next | 16.3.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
+| Next | 16.4.0 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
 | React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
 | kind | 0.33.0 | `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
 | Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
 | kubectl | 1.36.1 | Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
-| Playwright | 1.63.0 | `frontend/package.json`(`^1.63.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
+| Playwright | 1.64.0 | `frontend/package.json`(`^1.64.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
 **버전을 물으면 이 표가 아니라 위 파일들을 본다.** 표가 낡을 수 있다 — `StackVersionConsistencyTest` 가 이 표와 파일을 대조해서 낡으면 빨개진다.
@@ -233,6 +233,8 @@ ProjectShop 이 시드를 `V900` 대로 뒀더니 **적용 이력의 최고 버�
 
 **이 저장소는 그 길을 안 간다**(12) — `local` 프로필의 `DemoSeeder` 가 기동 뒤에 서비스를 불러 만든다. Flyway 이력이 안 더럽혀지고, 시드가 실제 경로를 밟아서 그 경로가 도는지도 같이 확인된다.
 대신 **멱등을 스스로 들어야 한다** — Flyway 가 공짜로 주던 「한 번만」이 없어져서, 러너가 이미 시드된 DB 를 알아보고 건너뛴다.
+
+**건너뛰는 탓에 회차 시각이 첫 기동에 묶인다.** 여는 시드 회차는 「첫 기동 + 14일」(`DemoSeeder.PERFORMANCE_DAY_OFFSETS`)이라 재사용 DB(`ticket-db`)에서 두 주가 지나면 열린 회차가 닫혀 있고, e2e 가 「판매 중인 공연이 없습니다」에서 공연 링크를 못 찾고 선다(`I9-1` 실측 — 화면 탓이 아니다). 로컬 e2e 는 `/verify` 의 health 기동과 같은 **빈 클러스터**(`ticket-check-db`, 5499)에 백엔드를 띄워 돈다. CI 는 늘 빈 DB 라 안 걸린다.
 
 ### 동의 항목·정책 행은 「지금 판」을 골라야 한다
 

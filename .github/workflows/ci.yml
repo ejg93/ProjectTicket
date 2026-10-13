@@ -138,7 +138,7 @@ jobs:
             frontend/playwright-report
             backend.log
 
-  # 화면 의존성의 알려진 취약점. **필수 검사가 아니다**(`B0-5`, 사용자 결정) — 전이 의존성에 새 권고가 뜨면
+  # 화면 런타임 의존성의 알려진 취약점 — 개발 도구는 standalone 이미지에 안 실려 `--omit=dev`(`I9-1`). **필수 검사가 아니다**(`B0-5`, 사용자 결정) — 전이 의존성에 새 권고가 뜨면
   # 우리 커밋과 무관하게 빨개져서, `frontend` 잡 안에 두면 머지가 선다. 여기서는 배지로 보이고 dependabot 이 고침을 맡는다.
   audit:
     runs-on: ubuntu-latest
@@ -161,7 +161,7 @@ jobs:
         working-directory: frontend
 
       - if: steps.has.outputs.ok == 'true'
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
         working-directory: frontend
 
   # 시크릿이 커밋에 들어갔나. 두 번째 그물이다 — 첫째는 GitHub push protection.
