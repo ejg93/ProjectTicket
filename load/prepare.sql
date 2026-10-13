@@ -1,15 +1,15 @@
--- 부하 시험용 계정(31). 비밀번호 해시는 **데모 계정의 것을 그대로 쓴다** —
--- bcrypt 를 1천 번 계산하는 데 몇 분이 걸리고, 여기서 재려는 것은 로그인 비용이 아니라 좌석 경합이다.
+-- 부하 시험용 계정(31·35b). 1만 개 — 대기열 ZSET 의 원소가 계정이라 계정 수가 줄 길이의 상한이다(35c).
 --
--- 데모 시드(`local` 프로필)가 먼저 돌아 있어야 한다. 없으면 이 문장이 0행을 넣고, k6 가 로그인에서 전부 401 이다.
+-- **비밀번호 해시는 bcrypt 비용 4 리터럴이다**(= `demo-password-1234`). 재는 것은 좌석 경합·대기열이지 bcrypt 가 아니다 —
+-- 비용 10(운영, `SecurityConfig`)이면 1만 번 로그인에 CPU 가 수백 초 든다. `$2b` 는 Spring 이 `$2a` 와 같이 받는다(설계 실측).
+-- 2차(`load-2`)까지는 데모 계정의 비용 10 해시를 베꼈다 — 로그인이 섞인 숫자를 비교할 때 그 차이를 같이 적는다.
 insert into account (email, password_hash, display_name, role)
 select
     'load' || g || '@test.local',
-    (select password_hash from account where email = 'audience1@demo.local'),
+    '{bcrypt}$2b$04$UMq/AYQzOga3nBY6Ibg2zeiajKTP/kgUU7Pld3MyTI9biXL.OcEOW',
     'load' || g,
     'audience'
-from generate_series(1, 300) g
-where exists (select 1 from account where email = 'audience1@demo.local')
+from generate_series(1, 10000) g
 on conflict do nothing;
 
 -- 회차와 좌석 번호의 시작값. k6 의 `PERFORMANCE_ID`·`FIRST_SEAT_ID`·`SEATS` 에 이 값을 넣는다.

@@ -257,8 +257,8 @@ class SqlTextTest {
         val INDEXED_LITERALS: Map<String, List<String>> = mapOf(
             // `performance_sales_close_at_idx`(V14)
             "PerformanceCloser.kt" to listOf("open"),
-            // `payment_approved_idx`(V9) · `notification_pending_idx`(V15)
-            "NotificationStore.kt" to listOf("approved", "pending"),
+            // `notification_pending_idx`(V15). 결제의 `approved` 는 `payment_reservation_idx` 로도 풀려 짝이 아니다(`I9-6`)
+            "NotificationStore.kt" to listOf("pending"),
             // `settlement_scheduled_idx`(V16). `reserved` 는 인덱스가 아니라 **계층**이다 — 정산이 `ReservationStatus` 를 못 본다(`ArchitectureTest`)
             "SettlementStore.kt" to listOf("reserved", "scheduled"),
             // `on conflict … where` — `reservation_live_hold_idx`(V8)와 글자로 같아야 한다

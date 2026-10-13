@@ -3,6 +3,7 @@ package com.projectticket.ticket.notification
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.reservation.CancelledBy
 import com.projectticket.ticket.outbox.OutboxRelay
+import com.projectticket.ticket.payment.PaymentStatus
 import com.projectticket.ticket.reservation.ReservationStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Component
@@ -105,13 +106,14 @@ class NotificationStore(private val jdbc: JdbcClient) {
             """
             select r.account_id, coalesce(sum(rf.refund_amount), 0)::int as refund_amount
               from reservation r
-              left join payment pm on pm.reservation_id = r.reservation_id and pm.status = 'approved'
+              left join payment pm on pm.reservation_id = r.reservation_id and pm.status = :approved
               left join refund rf on rf.payment_id = pm.payment_id
              where r.performance_id = :id and r.status = :cancelled and r.cancelled_by = :by
              group by r.account_id
              order by r.account_id
             """,
-        ).param("id", performanceId).param("cancelled", ReservationStatus.CANCELLED.code).param("by", CancelledBy.ORGANIZER.code)
+        ).param("id", performanceId).param("approved", PaymentStatus.APPROVED.code)
+            .param("cancelled", ReservationStatus.CANCELLED.code).param("by", CancelledBy.ORGANIZER.code)
             .query(CancelledLine::class.java).list().filterNotNull()
             .forEach {
                 val (subject, body) = NotificationTemplates.performanceCancelled(performance, it.refundAmount)

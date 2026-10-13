@@ -14,7 +14,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Spring Boot | 4.1.1 | `backend/build.gradle.kts` |
 | Kotlin | 2.3.21 | 같은 파일의 플러그인. **Boot BOM 이 관리하는 값과 맞춘다** — 플러그인은 BOM 밖이라 직접 적는다 |
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
-| Gradle | 9.8.0 | `backend/gradle/wrapper/gradle-wrapper.properties` |
+| Gradle | 9.8.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
@@ -35,6 +35,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | kind | 0.33.0 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
 | Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
 | kubectl | 1.36.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
+| k6 | 2.2.0 | `grafana/k6:2.2.0` 컨테이너 — `load/README.md`, `scripts/k8s-rollout-test.sh`. 쓰는 법의 함정은 아래 「k6」 |
 | Playwright | 1.64.0 | `frontend/package.json`(`^1.64.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
@@ -473,6 +474,15 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | 비밀번호 블록리스트 | 가입을 손으로 밟을 때 `password` 가 든 문자열은 15자를 넘겨도 막힌다(`PasswordBlocklist`). 400 이 `validation-failed` 로 나온다 |
 | Puppeteer 진입점 | `lib/puppeteer/puppeteer.js` 다. `lib/esm/...` 은 없다 |
 | 접근성 헛것 | 이름 없는 `<input>` 은 `page.accessibility.snapshot()` 으로 브라우저에게 묻고, `<nextjs-portal>`(개발 오버레이)은 걷어낸다 — 판정을 뒤집기 전에 재는 도구부터 의심한다 |
+
+### k6
+
+| 무엇 | 사실 |
+|---|---|
+| `setup()` 반환값 | **VU 마다 따로 복사된다.** 세션 1만 × VU 500 이 수 GB 가 되어 Docker VM(7.75GB)이 메모리 부족으로 굳었다(`35c`) — `docker ps` 가 답을 안 하고 WSL 서비스가 시간 초과(0x8007274c), Docker Desktop 을 다시 켜야 풀렸다. 큰 데이터는 파일로 두고 `SharedArray`(init 단계 `open()`)로 한 벌만 읽는다 — 세션처럼 실행 중에 만들 것은 따로 한 판(`load/prelogin.js`)의 `handleSummary` 가 `setup_data` 를 파일로 쓴다 |
+| 표준입력 실행 | `k6 run - < x.js` 는 `import "./lib/…"` 를 못 푼다. 폴더를 마운트하고 경로로 돌린다(`-v "$(pwd -W)/load:/load" … run /load/x.js`, Git Bash 는 `MSYS_NO_PATHCONV=1`) |
+| 메모리 상한 | k6 컨테이너에 `--memory=2g` 를 건다 — 넘치면 VM 이 아니라 k6 만 죽는다 |
+| 요약의 섞임 | `setup()` 의 요청도 `http_req_duration` 에 든다. 측정 요청에 꼬리표(`options.tags`)를 달고 그 하위 지표에 문턱을 하나 두면 요약에 따로 나온다(`phase:run`) |
 
 ## 데이터 접근은 `JdbcClient` 다
 

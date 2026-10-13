@@ -85,6 +85,14 @@ class StackVersionConsistencyTest {
             .contains("\"@playwright/test\": \"^${tableVersion("Playwright")}\"")
     }
 
+    /** 부하 도구도 판을 박는다 — 안 박으면 그날의 latest 로 재서 다른 판의 숫자를 견주게 된다(`35b`) */
+    @Test
+    fun k6_image_matches_the_table() {
+        val image = "grafana/k6:${tableVersion("k6")}"
+        assertThat(Files.readString(root.resolve("load/README.md"))).contains(image).doesNotContain("grafana/k6 run")
+        assertThat(Files.readString(root.resolve("scripts/k8s-rollout-test.sh"))).contains(image)
+    }
+
     @Test
     fun ci_jdk_and_node_match_the_table() {
         val ci = Files.readString(root.resolve(".github/workflows/ci.yml"))
