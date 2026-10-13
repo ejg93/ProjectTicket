@@ -113,4 +113,14 @@ describe("대기열", () => {
 
     await expectNoAxeViolations(container);
   });
+
+  it("닫힌 회차는 다시 줄 서기 대신 공연 목록으로 보낸다", async () => {
+    answers([{ type: "tag:projectticket.example,2026:queue-closed", detail: "닫혔다" }, 410]);
+    render(<QueueStatus performanceId="7" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("닫힌 회차입니다");
+    // 다시 서도 같은 410 이다 — 할 수 없는 조작은 안 그린다(`I8-1`)
+    expect(screen.queryByRole("button", { name: "다시 줄 서기" })).toBeNull();
+    expect(screen.getByRole("link", { name: "공연 목록으로" })).toHaveAttribute("href", "/events");
+  });
 });

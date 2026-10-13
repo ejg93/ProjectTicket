@@ -128,10 +128,13 @@ describe("카운트다운", () => {
     await expectNoAxeViolations(container);
   });
 
-  it("0 이면 다시 고르라고 말한다", async () => {
+  it("0 이면 서버 판정 대신 새로 고치라고 말한다", async () => {
     render(<Countdown deadline={new Date(Date.now() - 1000).toISOString()} label="남은 시간" />);
 
     // 화면이 선점을 푸는 것이 아니다 — 푸는 것은 만료 배치고, 여기는 서두를 이유를 보여주는 자리다.
-    expect(await screen.findByRole("alert")).toHaveTextContent(/좌석을 다시 골라 주세요/);
+    // 결제 처리 중에도 같은 컴포넌트다 — 「좌석이 풀렸다」는 서버만 말할 수 있다(`I8-1`).
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("시간이 지났습니다. 새로 고쳐 지금 상태를 확인해 주세요.");
+    expect(alert).not.toHaveTextContent(/풀렸/);
   });
 });

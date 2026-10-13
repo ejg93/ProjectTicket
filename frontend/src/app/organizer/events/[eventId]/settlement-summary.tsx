@@ -45,7 +45,7 @@ export function SettlementSummary({ settlement }: { settlement: SettlementSlot }
       <ul>
         {settlement.lines.map((line) => (
           <li key={line.kind}>
-            {KIND[line.kind] ?? line.kind} {money(line.amount)}
+            {KIND[line.kind] ?? "기타"} {money(line.amount)}
           </li>
         ))}
       </ul>

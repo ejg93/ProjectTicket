@@ -91,7 +91,7 @@ export function SeatMap({
               <span aria-hidden="true">{row.label}</span>
               {row.seats.map((seat) => {
                 const price = priceOf(section.grade);
-                const status = STATUS_TEXT[seat.s] ?? seat.s;
+                const status = STATUS_TEXT[seat.s] ?? "알 수 없음";
                 return (
                   <label key={seat.id} className={`seat seat-${seat.s}`}>
                     <input
