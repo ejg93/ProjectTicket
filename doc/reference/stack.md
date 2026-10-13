@@ -14,7 +14,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Spring Boot | 4.1.1 | `backend/build.gradle.kts` |
 | Kotlin | 2.3.21 | 같은 파일의 플러그인. **Boot BOM 이 관리하는 값과 맞춘다** — 플러그인은 BOM 밖이라 직접 적는다 |
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
-| Gradle | 9.8.0 | `backend/gradle/wrapper/gradle-wrapper.properties` |
+| Gradle | 9.8.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
