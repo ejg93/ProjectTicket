@@ -199,6 +199,8 @@ tasks.test {
 		fileTree("../k8s"),
 		rootProject.file("../scripts/k8s-up.sh"),
 		rootProject.file("../frontend/Dockerfile"),
+		// `StackVersionConsistencyTest` 가 Next·React·Playwright 판을 글자로 읽는다(`I9-3`).
+		rootProject.file("../frontend/package.json"),
 	).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
