@@ -12,7 +12,8 @@ run=$(timeout 6 "$GH" run list --branch main --workflow ci.yml --limit 1 \
   --json databaseId,conclusion,headSha \
   --jq '.[0] | "\(.databaseId)|\(.conclusion)|\(.headSha)"' 2>/dev/null) || exit 0
 IFS="|" read -r id conclusion sha <<<"$run"
-[ -n "${sha:-}" ] || exit 0
+# 실행이 하나도 없으면 `.[0]` 이 null 이라 세 칸이 `null` 이다 — 빈 결과와 같이 무음.
+[ -n "${sha:-}" ] && [ "$sha" != null ] || exit 0
 sha=${sha:0:7}
 
 echo

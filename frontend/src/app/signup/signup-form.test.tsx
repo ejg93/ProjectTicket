@@ -73,7 +73,8 @@ describe("가입", () => {
     await expect.poll(() => password.getAttribute("aria-invalid")).toBe("true");
     expect(password).toHaveAccessibleDescription("비밀번호는 15자 이상이어야 합니다.");
     expect(screen.getByLabelText("이메일")).not.toHaveAttribute("aria-invalid");
-    expect(screen.queryByRole("alert")).toBeNull();
+    // 알림은 칸 아래 그 하나다 — 폼 전체 문구는 안 뜬다
+    expect(screen.getByRole("alert")).toHaveTextContent("비밀번호는 15자 이상이어야 합니다.");
     expect(spy).not.toHaveBeenCalled();
     await expectNoAxeViolations(container);
   });
@@ -104,7 +105,7 @@ describe("가입", () => {
     await expect.poll(() => password.getAttribute("aria-invalid")).toBe("true");
     expect(password).toHaveAccessibleDescription(/흔히 쓰는 비밀번호는 쓸 수 없습니다/);
     expect(screen.queryByText("흔한 비밀번호다")).toBeNull();
-    // 칸을 전부 지목했으니 폼 전체 문구는 없다 — 남은 것만 거기로 간다
-    expect(screen.queryByRole("alert")).toBeNull();
+    // 칸을 전부 지목했으니 폼 전체 문구는 없다 — 알림은 칸 아래 그 하나다
+    expect(screen.getByRole("alert")).toHaveTextContent(/흔히 쓰는 비밀번호는 쓸 수 없습니다/);
   });
 });

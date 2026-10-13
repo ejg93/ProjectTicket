@@ -237,8 +237,8 @@ class SqlTextTest {
 
         const val RAW_QUOTE = "\"\"\""
 
-        /** `status = 'a'`·`p.status <> 'a'`·`status in ('a', 'b')`. `payment_status` 같은 다른 이름은 안 문다 */
-        val STATUS_LITERAL = Regex("""(?i)\bstatus\s*(?:=|<>|!=|in\b)\s*\(?\s*('[^']*'(?:\s*,\s*'[^']*')*)""")
+        /** `status = 'a'`·`p.status <> 'a'`·`status in ('a', 'b')`·`status not in (…)`. `payment_status` 같은 다른 이름은 안 문다 */
+        val STATUS_LITERAL = Regex("""(?i)\bstatus\s*(?:=|<>|!=|(?:not\s+)?in\b)\s*\(?\s*('[^']*'(?:\s*,\s*'[^']*')*)""")
         val QUOTED = Regex("""'([^']*)'""")
 
         /** 상태 열의 값은 전부 이 여덟 열거형에서 온다 — 거울은 `EnumConstraintTest` 가 `check` 와 맞춘다 */

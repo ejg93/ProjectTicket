@@ -33,20 +33,46 @@ test("가입한 관객이 좌석 하나를 잡고 결제까지 마친다", async
   await expect(page.getByRole("heading", { name: "좌석 선택" })).toBeVisible();
 
   await holdOneSeat(page);
-
-  // 열린 회차는 관문을 지난다(`QueueService`). 대기열이 입장을 주면 좌석 화면으로 돌려보낸다 — 다시 잡는다.
-  if (/\/queue\//.test(page.url())) {
-    await expect(page).toHaveURL(/\/performances\/\d+/, { timeout: 60_000 });
-    await holdOneSeat(page);
-  }
-
-  await expect(page).toHaveURL(/\/reservations\/\d+/);
   await page.getByLabel("카드번호", { exact: true }).fill("4242424242424242");
   await page.getByRole("button", { name: /결제$/ }).click();
   await expect(page.getByRole("heading", { name: "티켓" })).toBeVisible();
 });
 
+const HOLD_PATH = /\/api\/performances\/\d+\/reservations$/;
+const QUEUE_PATH = /\/api\/queue\/\d+$/;
+
+/**
+ * 좌석 하나를 잡고 결제 화면까지 간다. 열린 회차는 관문을 지난다(`QueueService`) — 선점이 429 면 화면이 대기열로 갔다가
+ * 입장하면 좌석 화면으로 돌아온다. 거기서 다시 잡는다.
+ *
+ * **URL 이 아니라 응답으로 가른다**(`46b-1`). 대기열이 첫 POST 에서 곧바로 입장을 주면 `/queue/` 에 머무는 시간이
+ * `toHaveURL` 의 폴링 사이로 빠져 「좌석 화면에 그대로 있다」로 보였다(마무리 19차, 여섯 판에 한 번).
+ */
 async function holdOneSeat(page: Page) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await pickOneSeat(page);
+    const hold = page.waitForResponse((r) => r.request().method() === "POST" && HOLD_PATH.test(new URL(r.url()).pathname));
+    // 입장은 첫 POST 의 답일 수도, 폴링(GET)의 답일 수도 있다. 선점이 201 이면 안 오니 기다림을 버린다.
+    const admitted = page
+      .waitForResponse(
+        async (r) => QUEUE_PATH.test(new URL(r.url()).pathname) && (await r.json().catch(() => null))?.state === "admitted",
+        { timeout: 60_000 },
+      )
+      .catch(() => null);
+    await page.getByRole("button", { name: "선택한 좌석 예매" }).click();
+
+    if ((await hold).status() !== 429) {
+      await expect(page).toHaveURL(/\/reservations\/\d+/);
+      return;
+    }
+    expect(await admitted, "관문이 막았는데 대기열이 입장을 안 줬다").not.toBeNull();
+    await expect(page).toHaveURL(/\/performances\/\d+/);
+    await expect(page.getByRole("heading", { name: "좌석 선택" })).toBeVisible();
+  }
+  throw new Error("관문을 두 번 지나도 좌석을 못 잡았다");
+}
+
+async function pickOneSeat(page: Page) {
   const open = page.getByRole("checkbox", { name: /선택 가능/ });
   await open.first().waitFor();
   const seat = open.nth(Math.floor(Math.random() * (await open.count())));
@@ -56,6 +82,4 @@ async function holdOneSeat(page: Page) {
     await seat.check();
     await expect(page.getByRole("status").filter({ hasText: "석 선택" })).toHaveText(/^1석 선택/, { timeout: 1_000 });
   }).toPass();
-  await page.getByRole("button", { name: "선택한 좌석 예매" }).click();
-  await expect(page).toHaveURL(/\/(reservations|queue)\/\d+/);
 }

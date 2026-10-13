@@ -8,6 +8,7 @@
  *
  * **틀린 칸은 그 칸 아래에 말한다**(`D17` 「오류는 자리를 가려서 보여준다」, `I8-2`). `error` 가 있으면 `aria-invalid` 와
  * `aria-describedby` 로 문구를 칸에 묶는다 — 낭독기가 칸에 들어갈 때 이유를 같이 읽는다. 문구는 폼이 정한다.
+ * 문구 자리는 `role="alert"` 다 — 칸을 전부 짚으면 폼 전체 알림이 없어서, 안 붙이면 제출 뒤 아무 소리도 안 난다(`screen-rules.md` 「동적으로 바뀌는 것」).
  */
 export function Field({
   name,
@@ -53,7 +54,7 @@ export function Field({
         />
       </p>
       {error ? (
-        <p id={errorId} className="error">
+        <p id={errorId} className="error" role="alert">
           {error}
         </p>
       ) : null}

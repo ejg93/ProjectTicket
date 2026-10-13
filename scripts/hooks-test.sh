@@ -90,10 +90,12 @@ ci() {  # 이름 GH 앞머리
 fake_gh "$fx/.git/gh-red" failure audit
 fake_gh "$fx/.git/gh-green" success ''
 fake_gh "$fx/.git/gh-running" '' ''
+printf '#!/usr/bin/env bash\necho "null|null|null"\n' > "$fx/.git/gh-empty"; chmod +x "$fx/.git/gh-empty"
 ci 'session-state CI 빨강'   "$fx/.git/gh-red"     '**`main` CI 빨강**(`audit`) — `abcdef0`'
 ci 'session-state CI 초록'   "$fx/.git/gh-green"   '`main` CI 초록(`abcdef0`)'
 ci 'session-state CI 도는 중' "$fx/.git/gh-running" '`main` CI 도는 중(`abcdef0`)'
 ci 'session-state gh 없음'   /nonexistent          ''
+ci 'session-state 실행 없음' "$fx/.git/gh-empty"   ''
 hook 'stop 깨끗한 트리'    stop-uncommitted '{"stop_hook_active":false}'         0 ''
 touch "$fx/dirty.txt"
 hook 'stop 더러운 트리'    stop-uncommitted '{"stop_hook_active":false}'         2 '커밋 안 된 작업물'

@@ -16,8 +16,8 @@ export function fieldErrors(errors: readonly FieldError[], text: Record<string, 
   const named: Record<string, string> = {};
   for (const { field } of errors) {
     const name = inputNameOf(field);
-    const message = text[name];
-    if (message !== undefined) named[name] = message;
+    // 제 열쇠만 본다 — `text["constructor"]` 는 함수다(`login/page.tsx` 가 `Map` 으로 바꾼 것과 같은 이유)
+    if (Object.hasOwn(text, name)) named[name] = text[name];
   }
   return named;
 }
@@ -30,6 +30,6 @@ export function fieldErrors(errors: readonly FieldError[], text: Record<string, 
 export function fieldErrorsOf(thrown: unknown, text: Record<string, string>): { named: Record<string, string>; rest: boolean } {
   if (!(thrown instanceof ApiError) || thrown.slug !== "validation-failed") return { named: {}, rest: true };
   const named = fieldErrors(thrown.errors, text);
-  const rest = thrown.errors.length === 0 || thrown.errors.some(({ field }) => !(inputNameOf(field) in named));
+  const rest = thrown.errors.length === 0 || thrown.errors.some(({ field }) => !Object.hasOwn(named, inputNameOf(field)));
   return { named, rest };
 }

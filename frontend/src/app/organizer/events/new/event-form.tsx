@@ -58,10 +58,14 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
   const [draft, setDraft] = useState<Draft | null>(null);
   const [invalid, setInvalid] = useState<Record<string, string>>({});
 
-  /** 뺀 줄의 값을 `draft` 에서도 걷는다 — 안 걷으면 다시 「등급 추가」한 줄이 뺀 줄의 값으로 되살아난다(마무리 17차) */
+  /** 뺀 줄의 값과 칸 오류를 같이 걷는다 — 안 걷으면 다시 「등급 추가」한 줄이 뺀 줄의 값·오류로 되살아난다(마무리 17차·19차) */
   function removeLastGrade() {
+    const removed = grades - 1;
     setGrades((n) => n - 1);
-    setDraft((d) => (d ? { ...d, grades: d.grades.slice(0, grades - 1) } : d));
+    setDraft((d) => (d ? { ...d, grades: d.grades.slice(0, removed) } : d));
+    setInvalid((errors) =>
+      Object.fromEntries(Object.entries(errors).filter(([name]) => !name.startsWith("grade_") || !name.endsWith(`_${removed}`))),
+    );
   }
 
   async function submit(form: FormData) {
@@ -137,7 +141,7 @@ export function EventForm({ organizers, sections }: { organizers: Organizer[]; s
             ))}
           </fieldset>
           {invalid[`grade_sections_${i}`] ? (
-            <p id={`grade_sections_${i}-error`} className="error">
+            <p id={`grade_sections_${i}-error`} className="error" role="alert">
               {invalid[`grade_sections_${i}`]}
             </p>
           ) : null}

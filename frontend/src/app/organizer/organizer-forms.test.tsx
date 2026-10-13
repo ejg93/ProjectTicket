@@ -90,6 +90,12 @@ describe("공연 등록", () => {
     await expect.poll(() => second.getAttribute("aria-invalid")).toBe("true");
     expect(second).toHaveAccessibleDescription(/앞 등급과 겹칠 수 없습니다/);
     expect(screen.getAllByLabelText("등급 코드(예: VIP)")[0]).not.toHaveAttribute("aria-invalid");
+    expect(screen.getByRole("alert")).toHaveTextContent(/앞 등급과 겹칠 수 없습니다/);
+
+    // 그 줄을 빼고 다시 더하면 새 빈 줄이다 — 뺀 줄의 오류가 되살아나지 않는다(마무리 19차 독립 리뷰)
+    await userEvent.click(screen.getByRole("button", { name: "마지막 등급 빼기" }));
+    await userEvent.click(screen.getByRole("button", { name: "등급 추가" }));
+    expect(screen.getAllByLabelText("등급 코드(예: VIP)")[1]).not.toHaveAttribute("aria-invalid");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -204,7 +210,7 @@ describe("회차 등록", () => {
     await expect.poll(() => salesOpen.getAttribute("aria-invalid")).toBe("true");
     expect(salesOpen).toHaveAccessibleDescription("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
     expect(screen.getByLabelText("관람 시각(한국 시간)")).not.toHaveAttribute("aria-invalid");
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("판매 시작은 판매 마감(기본: 관람 1시간 전)보다 앞이어야 합니다.");
     expect(refresh).not.toHaveBeenCalled();
   });
 
