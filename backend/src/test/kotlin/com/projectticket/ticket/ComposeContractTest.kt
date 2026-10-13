@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test
  * |---|---|---|
  * | `upstream { server app:8080; }` | 이름을 기동 때 한 번만 풀어 `--scale app=3` 이어도 **한 대만** 받았다 | 변수 `proxy_pass` + `resolver` 를 요구한다 |
  * | healthcheck 가 `wget` | JRE 이미지에 없어 컨테이너가 늘 `unhealthy` 였다(앱은 멀쩡) | 쓰는 도구가 이미지에 깔리나 본다 |
+ * | 앱에 메모리 상한이 없다 | JVM 셋이 VM 의 70% 씩 크려 해서 줄 1만에서 VM 이 굳었다(`35i`) | `deploy.resources.limits.memory` 를 요구한다 |
  * | Prometheus `static_configs: app:8080` | 긁을 때마다 셋 중 하나만 골라 대수별 카운터가 섞였다(`35h`) | `dns_sd_configs` 와 게이지 `max()` 를 요구한다 |
  *
  * 파일을 글자로 읽는 검사라 컨테이너가 필요 없다 — `StackVersionConsistencyTest` 와 같은 자리다.
@@ -68,6 +69,15 @@ class ComposeContractTest {
     }
 
     @Test
+    fun the_app_has_a_memory_limit() {
+        // 차트는 768Mi(`K8sManifestTest`) — 숫자가 다른 것이 결정이다. compose 는 셋 고정으로 줄 1만을 받는다(`35i`).
+        assertThat(blockOf("app"))
+            .describedAs("compose 앱에 메모리 상한이 없다 — JVM 이 VM 의 70% 까지 큰다(`35i`)")
+            .contains("limits:")
+            .contains("memory: 1g")
+    }
+
+    @Test
     fun prometheus_scrapes_every_app_instance() {
         // `app:8080` 을 static 으로 두면 내장 DNS 가 돌려주는 하나만 긁는다 — 대가 셋이어도 시계열은 한 대씩 번갈아 온다.
         assertThat(prometheus).contains("dns_sd_configs:").contains("names: [\"app\"]").contains("port: 8080")
@@ -83,19 +93,21 @@ class ComposeContractTest {
         assertThat(dashboard).doesNotContain("\"expr\": \"queue_length\"").doesNotContain("\"expr\": \"queue_active\"")
     }
 
-    /** compose 의 그 서비스 healthcheck `test:` 한 줄. 두 칸 들여쓴 다음 서비스 머리 줄 전까지가 그 블록이다 */
-    private fun healthcheckOf(service: String): String {
+    /** compose 의 그 서비스 블록. 두 칸 들여쓴 다음 서비스 머리 줄 전까지다 */
+    private fun blockOf(service: String): String {
         val lines = compose.lines()
         val from = lines.indexOfFirst { it == "  $service:" }
         require(from >= 0) { "compose 에 $service 서비스가 없다" }
 
         val rest = lines.drop(from + 1)
         val until = rest.indexOfFirst { SERVICE_HEADER.matches(it) }
-        val block = (if (until < 0) rest else rest.take(until)).joinToString("\n")
-
-        return block.lines().firstOrNull { it.trimStart().startsWith("test:") }
-            ?: error("$service 에 healthcheck 가 없다")
+        return (if (until < 0) rest else rest.take(until)).joinToString("\n")
     }
+
+    /** compose 의 그 서비스 healthcheck `test:` 한 줄 */
+    private fun healthcheckOf(service: String): String =
+        blockOf(service).lines().firstOrNull { it.trimStart().startsWith("test:") }
+            ?: error("$service 에 healthcheck 가 없다")
 
     private companion object {
         /** compose 의 서비스 머리 줄 — 두 칸 들여쓰고 콜론으로 끝난다 */

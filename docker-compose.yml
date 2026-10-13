@@ -107,6 +107,14 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+    # **메모리 상한**(`35i`). 없으면 JVM 이 `MaxRAMPercentage=70`(Dockerfile)으로 Docker VM 의 70% 까지 크려 해서
+    # 셋이면 VM(7.75GB)을 넘는다 — 줄 1만에서 대당 1.2GB 까지 올랐고 그날 VM 이 굳었다(`load-3` 「35c」).
+    # 차트(768Mi)보다 큰 1g 인 이유: 차트는 HPA 가 대수로 받고, compose 는 셋 고정으로 줄 1만을 받아야 한다(힙 약 716MB).
+    # swarm 없이도 `docker compose up` 이 건다 — 설계가 `docker inspect … .HostConfig.Memory` 1073741824 로 봤다(2026-10-13).
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   # 인스턴스 앞의 문(33). sticky 없이 라운드로빈이다 — 세션이 Redis 라 어느 대로 가도 같은 사람이다.
   nginx:

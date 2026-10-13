@@ -57,6 +57,12 @@ class K8sManifestTest {
         assertThat(grace).describedAs("앱의 graceful 상한 20초보다 넉넉해야 한다").isGreaterThanOrEqualTo(MIN_GRACE_SECONDS)
     }
 
+    /** compose 는 1g(`ComposeContractTest`) — 숫자가 다른 것이 결정이다. 여기는 HPA 가 대수로 받는다(`35i`) */
+    @Test
+    fun app_pods_have_a_memory_limit() {
+        assertThat(app).contains("limits:").contains("memory: 768Mi")
+    }
+
     @Test
     fun the_image_is_the_one_the_script_loads() {
         assertThat(app).contains("imagePullPolicy: Never")

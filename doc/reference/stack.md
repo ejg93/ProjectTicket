@@ -475,6 +475,11 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | Puppeteer 진입점 | `lib/puppeteer/puppeteer.js` 다. `lib/esm/...` 은 없다 |
 | 접근성 헛것 | 이름 없는 `<input>` 은 `page.accessibility.snapshot()` 으로 브라우저에게 묻고, `<nextjs-portal>`(개발 오버레이)은 걷어낸다 — 판정을 뒤집기 전에 재는 도구부터 의심한다 |
 
+### compose 의 자원 상한
+
+`deploy.resources.limits.memory` 는 **swarm 없이도 `docker compose up` 이 건다**(compose v5.3.1 — `docker inspect … .HostConfig.Memory` 가 1073741824, `35i`).
+`mem_limit` 로 바꿀 필요가 없다. 컨테이너 안 `nproc` 은 상한과 무관하게 Docker VM 의 CPU 수(22)를 읽는다 — `worker_processes auto` 같은 값은 박는다(`35k`).
+
 ### k6
 
 | 무엇 | 사실 |
