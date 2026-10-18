@@ -480,6 +480,29 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 `deploy.resources.limits.memory` 는 **swarm 없이도 `docker compose up` 이 건다**(compose v5.3.1 — `docker inspect … .HostConfig.Memory` 가 1073741824, `35i`).
 `mem_limit` 로 바꿀 필요가 없다. 컨테이너 안 `nproc` 은 상한과 무관하게 Docker VM 의 CPU 수(22)를 읽는다 — `worker_processes auto` 같은 값은 박는다(`35k`).
 
+### Docker 를 ProjectShop 과 나눠 쓴다
+
+이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다.
+
+**2026-10-18 ProjectShop 세션과 합의한 규칙 셋:**
+
+| 규칙 | 무엇 |
+|---|---|
+| 무거운 판 앞에 본다 | 부하·k8s 판(`49` · `52` 꼴)을 시작하기 직전에 `docker stats --no-stream` 으로 VM 사용량을 본다. 남은 메모리가 그 판의 필요량보다 적으면 시작하지 않고 기다린다 |
+| 상대 컨테이너는 안 내린다 | 상대 저장소의 컨테이너를 `stop`·`rm` 하지 않는다. `wsl --shutdown`·Docker 재시작이 필요하면 먼저 상대 세션에 메시지를 보낸다 |
+| 포트를 나눈다 | 아래 표. 겹치는 둘은 같은 날 한쪽이 기다린다 |
+
+| 포트 | ProjectTicket | ProjectShop |
+|---|---|---|
+| 5432 · 6379 · 9092 | — | Postgres · Redis · Kafka(상주) |
+| 5433 · 6380 · 9094 | Postgres · Redis · Kafka(`.env`) | — |
+| 9090 | Prometheus | — |
+| 9091 | — | Prometheus(`observe` 프로필) |
+| **8081 · 3001** | **nginx · Grafana(compose `app` 스택)** | **부하 백엔드 · Grafana(`load`·`observe` 프로필)** |
+
+ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcontainers 재사용(1~2GB)이다. `load`·`observe` 프로필은 부하 대조 때만 뜬다.
+8081·3001 이 겹치는 날 포트를 바꿔야 하면 이쪽은 `GATEWAY_PORT`·`GRAFANA_PORT` 로 compose 를 고치지 않고 옮길 수 있다. 다만 `load/README.md` 의 주소도 같이 바뀐다.
+
 ### k6
 
 | 무엇 | 사실 |
