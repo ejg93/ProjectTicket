@@ -94,6 +94,37 @@ MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -
 `poll_latency_ms` · `http_req_failed`. 대수별 입장은 아래 「대수가 실제로 갈렸나」처럼 앱마다 `queue_admitted_total` 을 읽는다 —
 Prometheus 는 대마다 긁는다(`dns_sd_configs`, `35h`) — `sum by (instance) (increase(queue_admitted_total[…]))` 로도 읽힌다.
 
+## 오픈 순간(49)
+
+줄에 선 사람 1만이 입장하면 **한 석을 선점한다**(`open-rush.js`). 모양은 「대기열 1만」과 같다 — VU 500 × 계정 20, 세션 파일.
+좌석은 `FIRST_SEAT_ID + (계정 색인 mod SEATS)` 라 좌석마다 `ACCOUNTS ÷ SEATS` 명이 다툰다. 이긴 쪽은 서버가 토큰을 반납하고, **진 쪽은 스크립트가 `DELETE` 로 돌려준다** —
+409 는 토큰을 안 뺏어서(`23`) 안 돌려주면 정원 2,000 이 차고 입장이 멈춘다.
+
+```bash
+# 0. 판 앞에 본다 — VM 남은 메모리 ≥ 약 7GB, 8081·3001 이 비었나(stack.md 「Docker 를 ProjectShop 과 나눠 쓴다」)
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}}'
+
+# 1. 빈 볼륨 셋 — 위 「돌리는 법」 1 · 2(prepare.sql 의 회차·첫 좌석·좌석 수를 아래 2 에 넣는다)
+# 2. 세션 1만 — 「대기열 1만」 1. 그리고 바로(세션은 무활동 30분에 끝난다)
+MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -v "$(pwd -W)/load:/load"   -e ACCOUNTS=10000 -e VUS=500 -e RAMP=60s -e HOLD=660s -e PERFORMANCE_ID=1 -e FIRST_SEAT_ID=1 -e SEATS=1000   grafana/k6:2.2.0 run --summary-export=/load/results/open-rush-summary.json /load/open-rush.js
+
+# 3. 그동안 CPU — 「좌석 폴링」 4 의 끝 시각 고리를 750초로
+```
+
+요약에서 읽을 것: `entered`(= 계정 수) · `seats_won` ·
+`seats_won + seats_taken + hold_other + gate_rejected + dropped = entered` · `left + release_failed = 진 쪽` · `hold_won_ms`·`hold_lost_ms` · 문턱 셋(`http_req_failed`·`poll_latency_ms`·`wait_over_expected`).
+**`seats_won` 이 좌석 수를 넘어도 초과 판매가 아니다** — 판이 선점 수명(5분)보다 길면 만료된 좌석을 줄 뒤쪽이 다시 잡는다(`load-4`). 초과 판매는 DB 로 본다 — 결제·취소가 없는 이 판에서는 다음 선점이 앞 선점의 만료 시각보다 늦어야 하고, 0 이라야 한다:
+
+```bash
+docker exec -i ticket-db psql -U ticket -d ticket -tA -c "
+with p as (select rs.performance_seat_id s, r.created_at c, r.held_until h,
+                  row_number() over (partition by rs.performance_seat_id order by r.created_at) n
+             from reservation_seat rs join reservation r using (reservation_id) where r.performance_id = 1)
+select count(*) from p a join p b on a.s = b.s and b.n = a.n + 1 where b.c < a.h;"
+```
+
+다시 돌리려면 「다시 돌릴 때」의 좌석 SQL 과 Redis 두 줄 — 선점이 남긴 예매와 토큰을 같이 지운다.
+
 ## 좌석 폴링(35d)
 
 공개 GET 을 계단으로 치는 `seat-poll.js` 와, 그동안 판을 바꾸는 `seat-rush.js`(`ROTATE=1`)를 같이 돌린다.
