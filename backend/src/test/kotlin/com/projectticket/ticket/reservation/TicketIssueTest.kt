@@ -110,7 +110,8 @@ class TicketIssueTest : PostgresTestBase() {
         val reservationId = reserved(seats = 1)
         assertThatThrownBy {
             jdbc.sql("update ticket set ticket_number = '20260915-ABCDEF' where reservation_seat_id in (select reservation_seat_id from reservation_seat where reservation_id = :id)")
-                .param("id", reservationId).update()
+                .param("id", reservationId)
+                .update()
         }.hasStackTraceContaining("티켓은 고칠 수 없다")
     }
 

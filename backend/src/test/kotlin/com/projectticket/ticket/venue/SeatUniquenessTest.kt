@@ -24,9 +24,12 @@ class SeatUniquenessTest : PostgresTestBase() {
     @BeforeEach
     fun createHall() {
         val venueId = jdbc.sql("insert into venue (name, address) values ('테스트홀', '서울') returning venue_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
         hallId = jdbc.sql("insert into hall (venue_id, name) values (:venueId, '1관') returning hall_id")
-            .param("venueId", venueId).query(Long::class.java).single()
+            .param("venueId", venueId)
+            .query(Long::class.java)
+            .single()
     }
 
     @Test
@@ -42,7 +45,9 @@ class SeatUniquenessTest : PostgresTestBase() {
     fun same_position_in_another_hall_is_fine() {
         insertSeat(section = "F1-A", rowLabel = "A", number = 1)
         val other = jdbc.sql("insert into hall (venue_id, name) select venue_id, '2관' from hall where hall_id = :id returning hall_id")
-            .param("id", hallId).query(Long::class.java).single()
+            .param("id", hallId)
+            .query(Long::class.java)
+            .single()
 
         val seatId = jdbc.sql(
             "insert into seat (hall_id, section, row_label, seat_number) values (:hall, 'F1-A', 'A', 1) returning seat_id",
@@ -107,12 +112,17 @@ class SeatUniquenessTest : PostgresTestBase() {
             returning seat_id
             """,
         )
-            .param("hall", hallId).param("section", section).param("rowLabel", rowLabel).param("number", number)
-            .query(Long::class.java).single()
+            .param("hall", hallId)
+            .param("section", section)
+            .param("rowLabel", rowLabel)
+            .param("number", number)
+            .query(Long::class.java)
+            .single()
 
     private fun insertOrganizer(): Long =
         jdbc.sql("insert into organizer (code, name) values ('test-org', '테스트기획') returning organizer_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
     private fun insertAccount(email: String, role: String): Long =
         jdbc.sql(
@@ -125,7 +135,9 @@ class SeatUniquenessTest : PostgresTestBase() {
 
     private fun join(organizerId: Long, accountId: Long) =
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:org, :acc)")
-            .param("org", organizerId).param("acc", accountId).update()
+            .param("org", organizerId)
+            .param("acc", accountId)
+            .update()
     @Test
     fun seat_position_cannot_be_changed() {
         val seatId = insertSeat(section = "F1-A", rowLabel = "A", number = 1)

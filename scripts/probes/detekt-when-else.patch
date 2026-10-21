@@ -3,13 +3,15 @@
 # 문구: ElseCaseInsteadOfExhaustiveWhen
 diff --git a/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt b/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt
 new file mode 100644
-index 0000000..857e88b
+index 0000000..0dab7c4
 --- /dev/null
 +++ b/backend/src/main/kotlin/com/projectticket/ticket/payment/ProbeWhenElse.kt
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,8 @@
 +package com.projectticket.ticket.payment
 +
++/** 탐침 — 열거 `when` 에 `else` 가 `detektMain` 을 세우나(`G7a`). 갈래가 둘이면 `UseIfInsteadOfWhen` 이 먼저 서서 셋을 둔다(`G15`) */
 +internal fun probeElse(status: PaymentStatus): Int = when (status) {
 +    PaymentStatus.APPROVED -> 1
++    PaymentStatus.DECLINED -> 2
 +    else -> 0
 +}

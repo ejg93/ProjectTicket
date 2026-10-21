@@ -129,7 +129,10 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
 
     private fun eventCount(reservationId: Long, type: String): Long =
         jdbc.sql("select count(*) from outbox where type = :type and aggregate_id = :id")
-            .param("type", type).param("id", reservationId).query(Long::class.java).single()
+            .param("type", type)
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .single()
 
     @Suppress("UNCHECKED_CAST")
     private fun payloadOf(row: Row): Map<String, Any?> = json.readValue(row.payload, Map::class.java) as Map<String, Any?>

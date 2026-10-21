@@ -114,5 +114,7 @@ class ReservationLimitTest : ConcurrencyTestBase() {
 
     private fun liveReservationCount(): Long =
         jdbc.sql("select count(*) from reservation where account_id = :id and status in ('held', 'paying')")
-            .param("id", accountId).query(Long::class.java).single()
+            .param("id", accountId)
+            .query(Long::class.java)
+            .single()
 }

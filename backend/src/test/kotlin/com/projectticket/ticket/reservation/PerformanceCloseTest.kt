@@ -46,7 +46,9 @@ class PerformanceCloseTest : PostgresTestBase() {
         // 입구가 값을 안 주면 트리거가 채운다(`V14`). 앱이 계산하면 입구가 늘 때 하나가 빠뜨린다.
         assertThat(
             jdbc.sql("select starts_at - sales_close_at = interval '1 hour' from performance where performance_id = :id")
-                .param("id", performanceId).query(Boolean::class.java).single(),
+                .param("id", performanceId)
+                .query(Boolean::class.java)
+                .single(),
         ).isTrue()
     }
 
@@ -62,7 +64,9 @@ class PerformanceCloseTest : PostgresTestBase() {
 
         assertThat(
             jdbc.sql("select starts_at - sales_close_at > interval '1 hour' from performance where performance_id = :id")
-                .param("id", given).query(Boolean::class.java).single(),
+                .param("id", given)
+                .query(Boolean::class.java)
+                .single(),
         ).describedAs("기획사가 준 값을 트리거가 덮으면 안 된다").isTrue()
     }
 
@@ -142,7 +146,8 @@ class PerformanceCloseTest : PostgresTestBase() {
     /** 마감을 이미 지난 시각으로. `sales_close_at` 은 트리거가 없어 `update` 로 되돌아간다(`stack.md`) */
     private fun passTheDeadline() =
         jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id")
-            .param("id", performanceId).update()
+            .param("id", performanceId)
+            .update()
 
     private fun statusOf(performanceId: Long): String =
         jdbc.sql("select status from performance where performance_id = :id").param("id", performanceId).query(String::class.java).single()
@@ -152,9 +157,14 @@ class PerformanceCloseTest : PostgresTestBase() {
 
     private fun availableSeatCount(): Long =
         jdbc.sql("select count(*) from performance_seat where performance_id = :id and status = 'available'")
-            .param("id", performanceId).query(Long::class.java).single()
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     private fun eventCount(type: String): Long =
         jdbc.sql("select count(*) from outbox where type = :type and aggregate_id = :id")
-            .param("type", type).param("id", performanceId).query(Long::class.java).single()
+            .param("type", type)
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 }

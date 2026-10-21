@@ -87,6 +87,8 @@ class OutboxRelayTest : PostgresTestBase() {
 
     private fun publishedAtIsSet(eventId: UUID): Boolean =
         jdbc.sql("select published_at is not null from outbox where event_id = :id")
-            .param("id", eventId).query(Boolean::class.java).single()
+            .param("id", eventId)
+            .query(Boolean::class.java)
+            .single()
 
 }

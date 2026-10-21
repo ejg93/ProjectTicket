@@ -55,7 +55,10 @@ class RefundPreviewTest : PostgresTestBase() {
 
         val preview = json.readTree(
             mvc.get("/api/reservations/$reservationId/refund-preview") { with(user(buyer)) }
-                .andExpect { status { isOk() } }.andReturn().response.contentAsString,
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString,
         )
         assertThat(preview["cancellable"].asBoolean()).isTrue()
         assertThat(preview["payment_amount"].asInt()).isEqualTo(308_000)

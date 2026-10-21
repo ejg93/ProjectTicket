@@ -77,7 +77,8 @@ class SettlementReadTest : PostgresTestBase() {
             """,
         ).param("performance", performanceId).param("policy", policyId).query(Long::class.java).single()
         jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, 'sale', 100000), (:id, 'platform_fee', -10000)")
-            .param("id", settlementId).update()
+            .param("id", settlementId)
+            .update()
     }
 
     private fun organizerUser(email: String, organizerId: Long): TicketUser {
@@ -85,7 +86,9 @@ class SettlementReadTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values (:email, 'x', '담당자', 'organizer') returning account_id",
         ).param("email", email).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
         return TicketUser(id = accountId, email = email, role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 }

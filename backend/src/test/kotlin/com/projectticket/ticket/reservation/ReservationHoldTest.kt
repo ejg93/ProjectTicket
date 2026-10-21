@@ -75,13 +75,17 @@ class ReservationHoldTest : PostgresTestBase() {
                 jsonPath("$.seats.length()") { value(2) }
                 jsonPath("$.seats[0].price") { value(154_000) }
             }
-            .andReturn().response.contentAsString
+            .andReturn()
+            .response
+            .contentAsString
         val reservationId = json.readTree(body)["reservation_id"].asLong()
 
         assertThat(seatStatuses(reservationId)).containsExactly("held", "held")
         assertThat(
             jdbc.sql("select count(*) from audit_log where event_type = 'reservation.held' and target_id = :id")
-                .param("id", reservationId).query(Long::class.java).single(),
+                .param("id", reservationId)
+                .query(Long::class.java)
+                .single(),
         ).isOne()
     }
 
@@ -212,5 +216,7 @@ class ReservationHoldTest : PostgresTestBase() {
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql("select status from performance_seat where reservation_id = :id").param("id", reservationId)
-            .query(String::class.java).list().filterNotNull()
+            .query(String::class.java)
+            .list()
+            .filterNotNull()
 }

@@ -52,7 +52,9 @@ class MyReservationsTest : PostgresTestBase() {
         val body = json.readTree(
             mvc.get("/api/me/reservations") { with(user(me)) }
                 .andExpect { status { isOk() } }
-                .andReturn().response.contentAsString,
+                .andReturn()
+                .response
+                .contentAsString,
         )
 
         // 남의 것은 없는 것이다 — 조건이 SQL 에 있다.

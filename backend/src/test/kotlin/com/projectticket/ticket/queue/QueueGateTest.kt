@@ -106,13 +106,17 @@ class QueueGateTest : PostgresTestBase() {
         val key = UUID.randomUUID().toString()
 
         val first = hold(seatIds.take(1), token, key).andExpect { status { isCreated() } }
-            .andReturn().response.contentAsString
+            .andReturn()
+            .response
+            .contentAsString
 
         // 첫 응답을 못 받은 클라이언트가 같은 키로 다시 온다. 관문이 여기서 429 를 내면
         // `D4` 가 약속한 「저장된 본문을 그대로 돌려준다」에 영영 못 닿는다.
         hold(seatIds.take(1), token, key)
             .andExpect { status { isCreated() } }
-            .andReturn().response.contentAsString
+            .andReturn()
+            .response
+            .contentAsString
             .let { assertThat(it).isEqualTo(first) }
     }
 

@@ -93,7 +93,9 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
 
     private fun notificationCount(eventId: UUID): Long =
         jdbc.sql("select count(*) from notification where event_id = :id")
-            .param("id", eventId).query(Long::class.java).single()
+            .param("id", eventId)
+            .query(Long::class.java)
+            .single()
 
     private companion object {
         /** 둘째 메시지가 처리될 시간을 준 뒤에 센다. 안 주면 「아직 안 왔다」를 「안 만들었다」로 읽는다 */

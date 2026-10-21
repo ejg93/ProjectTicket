@@ -19,8 +19,10 @@ class EventCatalogTest {
     fun enum_matches_the_catalog_table() {
         // 「아직 안 내는 것」 표가 바로 아래에 있다 — 거기서 끊는다. 헤더 행(`type`)도 같은 모양이라 뺀다.
         val catalog = Files.readString(root.resolve("doc/reference/event-catalog.md"))
-            .substringAfter("## 카탈로그").substringBefore("**아직 안 내는 것**")
-            .lineSequence().filter { it.startsWith("| `") }
+            .substringAfter("## 카탈로그")
+            .substringBefore("**아직 안 내는 것**")
+            .lineSequence()
+            .filter { it.startsWith("| `") }
             .map { it.split("|")[1].trim().trim('`') }
             .filterNot { it == "type" }
             .toSet()
@@ -35,7 +37,10 @@ class EventCatalogTest {
         val migration = Files.readString(root.resolve("backend/src/main/resources/db/migration/V13__outbox.sql"))
         val values = migration.substringAfter("constraint outbox_type_check check (type in (")
             .substringBefore("))")
-            .split(",").map { it.trim().trim('\'', '\n', ' ') }.filter { it.isNotEmpty() }.toSet()
+            .split(",")
+            .map { it.trim().trim('\'', '\n', ' ') }
+            .filter { it.isNotEmpty() }
+            .toSet()
 
         assertThat(values).isEqualTo(EventType.entries.map { it.code }.toSet())
     }

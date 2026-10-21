@@ -52,7 +52,9 @@ class SeatHandoverTest : PostgresTestBase() {
 
     private fun seatOf(reservationId: Long): Long =
         jdbc.sql("select performance_seat_id from performance_seat where reservation_id = :id")
-            .param("id", reservationId).query(Long::class.java).single()
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .single()
 
     private fun point(performanceSeatId: Long, reservationId: Long): Int =
         jdbc.sql(
@@ -66,5 +68,6 @@ class SeatHandoverTest : PostgresTestBase() {
 
     private fun release(performanceSeatId: Long): Int =
         jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_seat_id = :seat")
-            .param("seat", performanceSeatId).update()
+            .param("seat", performanceSeatId)
+            .update()
 }

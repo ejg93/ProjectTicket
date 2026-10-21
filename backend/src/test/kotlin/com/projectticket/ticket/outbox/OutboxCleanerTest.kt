@@ -67,5 +67,7 @@ class OutboxCleanerTest : PostgresTestBase() {
 
     private fun exists(eventId: UUID): Boolean =
         jdbc.sql("select exists(select 1 from outbox where event_id = :id)")
-            .param("id", eventId).query(Boolean::class.java).single()
+            .param("id", eventId)
+            .query(Boolean::class.java)
+            .single()
 }

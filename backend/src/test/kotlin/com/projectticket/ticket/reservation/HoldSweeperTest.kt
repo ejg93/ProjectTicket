@@ -112,5 +112,8 @@ class HoldSweeperTest : PostgresTestBase() {
 
     private fun auditCount(eventType: String, targetId: Long): Long =
         jdbc.sql("select count(*) from audit_log where event_type = :type and target_id = :id")
-            .param("type", eventType).param("id", targetId).query(Long::class.java).single()
+            .param("type", eventType)
+            .param("id", targetId)
+            .query(Long::class.java)
+            .single()
 }

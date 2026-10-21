@@ -231,7 +231,9 @@ class ReservationCancelTest : PostgresTestBase() {
 
     private fun reservation(reservationId: Long): Pair<String, Boolean> =
         jdbc.sql("select status, cancelled_at is not null as cancelled from reservation where reservation_id = :id")
-            .param("id", reservationId).query { rs, _ -> rs.getString("status") to rs.getBoolean("cancelled") }.single()
+            .param("id", reservationId)
+            .query { rs, _ -> rs.getString("status") to rs.getBoolean("cancelled") }
+            .single()
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql(
@@ -254,5 +256,8 @@ class ReservationCancelTest : PostgresTestBase() {
 
     private fun auditCount(eventType: String, targetId: Long): Long =
         jdbc.sql("select count(*) from audit_log where event_type = :type and target_id = :id")
-            .param("type", eventType).param("id", targetId).query(Long::class.java).single()
+            .param("type", eventType)
+            .param("id", targetId)
+            .query(Long::class.java)
+            .single()
 }

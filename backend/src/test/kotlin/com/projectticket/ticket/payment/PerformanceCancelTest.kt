@@ -130,7 +130,8 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         // 앱 검증이 아니라 트리거다 — 새 취소 경로가 생겨도 이 열을 빠뜨릴 수가 없다(`D14`).
         assertThatThrownBy {
             jdbc.sql("update reservation set status = 'cancelled', cancelled_at = now() where reservation_id = :id")
-                .param("id", reservationId).update()
+                .param("id", reservationId)
+                .update()
         }.hasMessageContaining("무엇이 물렀는지 없이")
     }
 
@@ -204,7 +205,9 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         cancelService.cancel(performanceId, actorAccountId = null)
 
         assertThatThrownBy { cancelService.cancel(performanceId, actorAccountId = null) }
-            .isInstanceOf(TicketException::class.java).extracting("code").isEqualTo(ErrorCode.INVALID_TRANSITION)
+            .isInstanceOf(TicketException::class.java)
+            .extracting("code")
+            .isEqualTo(ErrorCode.INVALID_TRANSITION)
         assertThat(eventCount()).describedAs("사건이 둘이면 메일이 두 번 간다").isOne()
     }
 
@@ -244,11 +247,15 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
 
     private fun freeSeatCount(): Long =
         jdbc.sql("select count(*) from performance_seat where performance_id = :id and status = 'available'")
-            .param("id", performanceId).query(Long::class.java).single()
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     private fun eventCount(): Long =
         jdbc.sql("select count(*) from outbox where type = 'performance.cancelled' and aggregate_id = :id")
-            .param("id", performanceId).query(Long::class.java).single()
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     private fun cancelMailCountFor(accountId: Long): Long =
         jdbc.sql(
@@ -257,7 +264,9 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
 
     private fun cancelledByOf(reservationId: Long): String =
         jdbc.sql("select cancelled_by from reservation where reservation_id = :id")
-            .param("id", reservationId).query(String::class.java).single()
+            .param("id", reservationId)
+            .query(String::class.java)
+            .single()
 
     private fun mailCount(): Long =
         jdbc.sql("select count(*) from notification where event_type = 'performance.cancelled'").query(Long::class.java).single()

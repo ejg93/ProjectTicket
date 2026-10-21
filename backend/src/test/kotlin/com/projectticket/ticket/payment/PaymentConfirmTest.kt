@@ -119,11 +119,15 @@ class PaymentConfirmTest : PostgresTestBase() {
         val reservationId = hold(1)
 
         assertThatThrownBy { transitions.startPaying(fixture.account("stranger@test.local"), reservationId) }
-            .isInstanceOf(TicketException::class.java).extracting("code").isEqualTo(ErrorCode.RESERVATION_NOT_FOUND)
+            .isInstanceOf(TicketException::class.java)
+            .extracting("code")
+            .isEqualTo(ErrorCode.RESERVATION_NOT_FOUND)
 
         jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
         assertThatThrownBy { transitions.startPaying(accountId, reservationId) }
-            .isInstanceOf(TicketException::class.java).extracting("code").isEqualTo(ErrorCode.HOLD_EXPIRED)
+            .isInstanceOf(TicketException::class.java)
+            .extracting("code")
+            .isEqualTo(ErrorCode.HOLD_EXPIRED)
 
         jdbc.sql("update reservation set held_until = now() + interval '5 minutes' where reservation_id = :id").param("id", reservationId).update()
         fixture.reserve(reservationId)
@@ -209,17 +213,25 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql("select status from performance_seat where reservation_id = :id").param("id", reservationId)
-            .query(String::class.java).list().filterNotNull()
+            .query(String::class.java)
+            .list()
+            .filterNotNull()
 
     private fun freeSeatCount(): Long =
         jdbc.sql("select count(*) from performance_seat where performance_id = :id and status = 'available'")
-            .param("id", performanceId).query(Long::class.java).single()
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     private fun paymentRow(paymentId: Long): Pair<String, Int> =
         jdbc.sql("select status, amount from payment where payment_id = :id").param("id", paymentId)
-            .query { rs, _ -> rs.getString("status") to rs.getInt("amount") }.single()
+            .query { rs, _ -> rs.getString("status") to rs.getInt("amount") }
+            .single()
 
     private fun auditCount(eventType: String, targetId: Long): Long =
         jdbc.sql("select count(*) from audit_log where event_type = :type and target_id = :id")
-            .param("type", eventType).param("id", targetId).query(Long::class.java).single()
+            .param("type", eventType)
+            .param("id", targetId)
+            .query(Long::class.java)
+            .single()
 }

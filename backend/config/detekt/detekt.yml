@@ -4,7 +4,7 @@
 # 규칙을 끄거나 문턱을 올릴 때는 **근거를 여기 같이 적는다.** 근거 없이 끈 규칙은 다음 사람이 되돌릴 수가 없다.
 #
 # `allRules = true`(`G14`) — 기본 꺼진 규칙까지 켠다. 여기의 `active: false` 가 그것을 이긴다(2026-10-21 실측).
-# 「`Gxx` 가 켠다」·「`Gxx` 가 지운다」 표시는 번들 11 이 아직 안 고친 몫이다 — 번들이 끝나면 0줄이어야 한다.
+# 번들 11(`G14`~`G18-1`)이 걸린 42규칙을 고치며 단 임시 끔·임시 제외는 다 걷었다 — 끈 것은 아래 근거가 있는 것뿐이다.
 
 config:
   validation: true
@@ -40,8 +40,6 @@ style:
   TrimMultilineRawString:
     # `"""…""".trimIndent()` 는 `SqlTextTest` 의 「`sql(` 인자는 리터럴 하나」(`G10`)를 깬다 — SQL 공백은 DB 가 무시해 얻는 것이 없다
     active: false
-  CascadingCallWrapping:
-    excludes: ['**/test/kotlin/com/projectticket/ticket/idempotency/**', '**/test/kotlin/com/projectticket/ticket/notification/**', '**/test/kotlin/com/projectticket/ticket/observability/**', '**/test/kotlin/com/projectticket/ticket/outbox/**', '**/test/kotlin/com/projectticket/ticket/payment/**', '**/test/kotlin/com/projectticket/ticket/queue/**', '**/test/kotlin/com/projectticket/ticket/reservation/**', '**/test/kotlin/com/projectticket/ticket/settlement/**', '**/test/kotlin/com/projectticket/ticket/venue/**']  # G18-1 가 지운다
 
 exceptions:
   TooGenericExceptionCaught:

@@ -57,7 +57,8 @@ class SettlementKeyTest : PostgresTestBase() {
     fun settlement_on_an_unstamped_performance_is_rejected() {
         val performanceId = draftPerformance("settle-draft")
         val current = jdbc.sql("select settlement_policy_id from settlement_policy where organizer_id is null and effective_at <= now() order by effective_at desc limit 1")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
         // 실패가 트랜잭션을 깨므로 경우마다 시험 하나다(롤백 바탕).
         assertThatThrownBy { insertSettlement(performanceId, current) }
@@ -89,5 +90,7 @@ class SettlementKeyTest : PostgresTestBase() {
 
     private fun insertSettlement(performanceId: Long, policyId: Long) =
         jdbc.sql("insert into settlement (performance_id, settlement_policy_id, settle_at) values (:performance, :policy, now())")
-            .param("performance", performanceId).param("policy", policyId).update()
+            .param("performance", performanceId)
+            .param("policy", policyId)
+            .update()
 }

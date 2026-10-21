@@ -113,7 +113,8 @@ class QueueRankTest : PostgresTestBase() {
     fun closing_the_performance_drops_the_queue() {
         queue.enter(performanceId, first)
         jdbc.sql("update performance set sales_close_at = now() - interval '1 hour' where performance_id = :id")
-            .param("id", performanceId).update()
+            .param("id", performanceId)
+            .update()
 
         assertThat(closer.closeDue()).isEqualTo(1)
 
