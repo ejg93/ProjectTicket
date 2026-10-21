@@ -28,6 +28,7 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 | `queue:{performanceId}` | ZSET | 대기 줄. **member = accountId**, score = 진입 시각(ms) | 회차 종료 때 삭제 |
 | `queue:{performanceId}:seen` | HASH | accountId → 마지막 하트비트(ms) | 위와 같이 |
 | `queue:{performanceId}:active` | ZSET | 활성 토큰. member = token, score = 만료 시각(ms) | 위와 같이 |
+| `queue:{performanceId}:admit_window` | HASH | 입장 예산의 창 — `start`(창 시작, Redis `TIME` ms)·`used`(이 창에 들인 수). 토큰 버킷이다(`35f`, ADR 0009) | 주기 × 2(`PEXPIRE`) |
 | `admit:{token}` | STRING(JSON) | `{account_id, performance_id, issued_at}` | 10분(ADR 0003) |
 | `admit:by-account:{performanceId}:{accountId}` | STRING | 그 계정의 현재 토큰 | 10분 |
 
@@ -43,7 +44,7 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 관객 ─GET  /api/queue/{perf}─> ZRANK    ──> waiting | admitted     ② 폴링 2초 (43)
                                  + HSET seen                    ③ 하트비트는 폴링이 겸한다
 스케줄러 ─5초마다─> Lua: 만료 정리 → 빈자리 = C - 활성 → 앞에서 min(빈자리, 100) 을 ZPOPMIN → 토큰 발급
-관객 ─POST /api/reservations + X-Admission-Token─> 관문 → 선점(13) → 성공하면 토큰 삭제(정원 반납)
+관객 ─POST /api/performances/{perf}/reservations + X-Admission-Token─> 관문 → 선점(13) → 성공하면 정원 반납(토큰 키는 45초 유예)
 ```
 
 ### 진입과 재진입
@@ -107,14 +108,14 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 
 ### 관문 — 선점만 막는다
 
-`QueueGateFilter`(23)는 **`POST /api/reservations` 에만** 걸린다(ADR 0004).
+`QueueGateFilter`(23)는 **`POST /api/performances/{id}/reservations` 에만** 걸린다(ADR 0004).
 
 | 검사 | 실패 시 |
 |---|---|
 | 헤더가 있다 | 429 `admission-required`, 본문에 `rank`·`eta` |
 | `admit:{token}` 이 있다(만료 안 됨) | 429 `admission-required` |
-| 토큰의 `account_id` = 세션의 계정 | 403 `forbidden` |
-| 토큰의 `performance_id` = 요청의 회차 | 403 `admission-mismatch` |
+| 토큰의 `account_id` = 세션의 계정 | 403 `admission-mismatch` |
+| 토큰의 `performance_id` = 요청의 회차 | 403 `admission-mismatch` — 위와 안 가른다 |
 
 **판매 중이 아닌 회차는 관문을 안 지난다**(23). 줄이 없어 토큰을 받을 길이 없는데 429 로 막으면 「나중엔 된다」가 거짓말이 된다 —
 그 회차의 사정은 선점 서비스가 409 `performance-not-open`·410 으로 말한다. 회차 상태를 보는 것은 **토큰이 없을 때뿐**이고,
@@ -153,6 +154,7 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 | 사전 등록(오픈 전 줄서기) | 진입 시각 = 오픈 시각이면 결과가 같다 |
 | 서명 토큰 | 반납이 안 된다. 위 「토큰」 |
 | SSE | ADR 0003. 폴링 2초가 하트비트를 겸해서 오히려 단순하다 |
+| Kafka 대기열 · 토큰 버킷 단독 | ADR 0009. 둘 다 「내 순번」을 못 답한다 — Kafka 는 순번 저장소가 하나 더 들고, 토큰 버킷은 이미 예산 창으로 있다 |
 
 ## 이 문서를 고칠 때
 
