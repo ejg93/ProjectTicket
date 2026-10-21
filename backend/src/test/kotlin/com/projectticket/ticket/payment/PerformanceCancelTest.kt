@@ -7,6 +7,7 @@ import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
+import com.projectticket.ticket.notification.NotificationStore
 import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.reservation.PerformanceCloser
 import com.projectticket.ticket.reservation.SeatHoldService
@@ -29,7 +30,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     @Autowired lateinit var refundSweeper: RefundSweeper
     @Autowired lateinit var jdbcForEvents: JdbcClient
     @Autowired lateinit var jsonForEvents: ObjectMapper
-    @Autowired lateinit var notifications: com.projectticket.ticket.notification.NotificationStore
+    @Autowired lateinit var notifications: NotificationStore
     @Autowired lateinit var closer: PerformanceCloser
     @Autowired lateinit var seatHold: SeatHoldService
     @Autowired lateinit var payments: PaymentTransitionService

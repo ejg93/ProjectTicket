@@ -143,9 +143,10 @@ class SharedSessionTest {
             builder.header("Cookie", cookies.entries.joinToString("; ") { "${it.key}=${it.value}" })
         }
         cookies["XSRF-TOKEN"]?.let { builder.header("X-XSRF-TOKEN", it) }
-        val request = when (method) {
-            "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(body.orEmpty()))
-            else -> builder.GET()
+        val request = if (method == "POST") {
+            builder.POST(HttpRequest.BodyPublishers.ofString(body.orEmpty()))
+        } else {
+            builder.GET()
         }.build()
         return client.send(request, HttpResponse.BodyHandlers.ofString())
     }

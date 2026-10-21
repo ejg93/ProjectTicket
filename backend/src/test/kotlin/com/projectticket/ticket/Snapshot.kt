@@ -35,11 +35,12 @@ class Snapshot(private val json: ObjectMapper, private val testClass: Class<*>) 
     }
 
     private fun masked(node: JsonNode, volatileFields: Set<String>): JsonNode {
-        when (node) {
-            is ObjectNode -> node.properties().forEach { (key, value) ->
+        if (node is ObjectNode) {
+            node.properties().forEach { (key, value) ->
                 if (key in volatileFields) node.put(key, "<$key>") else masked(value, volatileFields)
             }
-            else -> node.forEach { masked(it, volatileFields) }
+        } else {
+            node.forEach { masked(it, volatileFields) }
         }
         return node
     }

@@ -41,6 +41,9 @@ abstract class ConcurrencyTestBase {
 
     @Autowired private lateinit var txManager: PlatformTransactionManager
 
+    /** 이 시험이 들어오기 전의 파기 흉내 계정 수. [purgeAfter] 가 이것과 대조한다. */
+    private var ghostsBefore = 0L
+
     /**
      * 정리를 **앞뒤로 한 번씩** 한다. 뒤에서만 지우면 앞선 실행이 죽었을 때 재사용 컨테이너에 남은 행이 이번 실행을 깨뜨리고,
      * 앞에서만 지우면 이 클래스 뒤에 도는 [PostgresTestBase] 계열이 남은 행을 본다.
@@ -88,9 +91,6 @@ abstract class ConcurrencyTestBase {
             jdbc.sql("delete from account where email like :prefix").param("prefix", "$PREFIX%").update()
         }
     }
-
-    /** 이 시험이 들어오기 전의 파기 흉내 계정 수. [purgeAfter] 가 이것과 대조한다. */
-    private var ghostsBefore = 0L
 
     @BeforeEach
     fun purgeBefore() {

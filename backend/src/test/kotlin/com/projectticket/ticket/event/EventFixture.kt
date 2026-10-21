@@ -1,6 +1,7 @@
 package com.projectticket.ticket.event
 
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 공연·회차 테스트가 쓰는 밑자리.
@@ -141,6 +142,6 @@ class EventFixture(private val jdbc: JdbcClient) {
 
     companion object {
         /** 회차마다 다른 `starts_at` 을 주는 초. 클래스가 아니라 여기 있는 것은 **한 테스트가 픽스처를 둘 만들어도 안 겹치게** 하기 위해서다 */
-        private val slotNudge = java.util.concurrent.atomic.AtomicInteger(0)
+        private val slotNudge = AtomicInteger(0)
     }
 }

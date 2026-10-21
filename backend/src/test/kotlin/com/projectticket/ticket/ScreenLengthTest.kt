@@ -101,7 +101,9 @@ class ScreenLengthTest {
         val code = LINE_COMMENT.replace(BLOCK_COMMENT.replace(source, ""), "")
         return FIELD.findAll(code).mapNotNull { match ->
             val attributes = match.groupValues[1]
-            NAME.find(attributes)?.groupValues?.get(1)?.let { it to attribute.find(attributes)?.groupValues?.get(1) }
+            val name = NAME.find(attributes)?.run { groupValues[1] }
+            val bound = attribute.find(attributes)?.run { groupValues[1] }
+            name?.let { it to bound }
         }.toMap()
     }
 

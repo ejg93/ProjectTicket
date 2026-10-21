@@ -52,7 +52,7 @@ class K8sManifestTest {
                 .doesNotContain("replicas:")
         }
 
-        val grace = Regex("""terminationGracePeriodSeconds:\s*(\d+)""").find(app)?.groupValues?.get(1)?.toInt()
+        val grace = Regex("""terminationGracePeriodSeconds:\s*(\d+)""").find(app)?.run { groupValues[1].toInt() }
         assertThat(grace).describedAs("terminationGracePeriodSeconds 를 못 읽었다").isNotNull()
         assertThat(grace).describedAs("앱의 graceful 상한 20초보다 넉넉해야 한다").isGreaterThanOrEqualTo(MIN_GRACE_SECONDS)
     }
@@ -67,7 +67,7 @@ class K8sManifestTest {
     fun the_image_is_the_one_the_script_loads() {
         assertThat(app).contains("imagePullPolicy: Never")
 
-        val built = Regex("""IMAGE=(\S+)""").find(up)?.groupValues?.get(1)
+        val built = Regex("""IMAGE=(\S+)""").find(up)?.run { groupValues[1] }
         assertThat(built).describedAs("scripts/k8s-up.sh 에서 IMAGE= 를 못 읽었다").isNotNull()
         val image = checkNotNull(built) { "바로 위 단언이 null 을 막는다" }
         assertThat(app).describedAs("매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $image")

@@ -2,6 +2,7 @@ package com.projectticket.ticket.consent
 
 import com.projectticket.ticket.PostgresTestBase
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
@@ -40,7 +41,7 @@ class ConsentSignupTest : PostgresTestBase() {
         mvc.get("/api/consent-items/terms_of_service").andExpect {
             status { isOk() }
             jsonPath("$.title") { value("이용약관") }
-            jsonPath("$.body") { value(org.hamcrest.Matchers.containsString("## 제1조")) }
+            jsonPath("$.body") { value(Matchers.containsString("## 제1조")) }
             jsonPath("$.purpose") { value(null as Any?) }
         }
         mvc.get("/api/consent-items/privacy_collect").andExpect {
@@ -63,9 +64,9 @@ class ConsentSignupTest : PostgresTestBase() {
         mvc.get("/api/consent-items/privacy_collect").andExpect {
             status { isOk() }
             jsonPath("$.version") { value(2) }
-            jsonPath("$.collected_items") { value(org.hamcrest.Matchers.containsString("로그인")) }
-            jsonPath("$.collected_items") { value(org.hamcrest.Matchers.containsString("탈퇴")) }
-            jsonPath("$.retention_period") { value(org.hamcrest.Matchers.containsString("3년")) }
+            jsonPath("$.collected_items") { value(Matchers.containsString("로그인")) }
+            jsonPath("$.collected_items") { value(Matchers.containsString("탈퇴")) }
+            jsonPath("$.retention_period") { value(Matchers.containsString("3년")) }
         }
 
         signUp(mapOf("terms_of_service" to true, "privacy_collect" to true)).andExpect { status { isCreated() } }

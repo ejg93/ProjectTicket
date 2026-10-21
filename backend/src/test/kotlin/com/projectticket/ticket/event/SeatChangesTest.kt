@@ -87,9 +87,9 @@ class SeatChangesTest : ConcurrencyTestBase() {
 
         // 로그 밖을 물으면 410 이다. 조용히 빈 목록을 주면 **화면이 영영 틀린 그림을 든다**.
         assertThatThrownBy { seatQuery.changes(performanceId, since = 0) }
-            .isInstanceOfSatisfying(TicketException::class.java) {
-                assertThat(it.code.slug).isEqualTo("seat-changes-expired")
-                assertThat(it.properties["version"]).isEqualTo(seatQuery.version(performanceId))
+            .isInstanceOfSatisfying(TicketException::class.java) { thrown ->
+                assertThat(thrown.code.slug).isEqualTo("seat-changes-expired")
+                assertThat(thrown.properties["version"]).isEqualTo(seatQuery.version(performanceId))
             }
     }
 

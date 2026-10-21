@@ -39,7 +39,7 @@ class CsrfCookieTest : PostgresTestBase() {
      * **클래스 순서에 기대지 않는다.** 여기서 되돌리면 이 테스트가 무엇을 재는지가 순서와 무관해진다.
      */
     @BeforeEach
-    fun restoreOurCsrfRepository() = csrfFilters().forEach { repositoryField().set(it, csrfTokenRepository) }
+    fun restoreOurCsrfRepository() { csrfFilters().forEach { repositoryField().set(it, csrfTokenRepository) } }
 
     @Test
     fun get_issues_cookie_and_header_from_it_passes() {

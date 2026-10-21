@@ -10,26 +10,6 @@ config:
   validation: true
 
 style:
-  BracesOnIfStatements:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  BracesOnWhenStatements:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  ClassOrdering:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  UnnecessaryLet:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  UseIfInsteadOfWhen:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  UnnecessaryParentheses:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  UnnecessaryFullyQualifiedName:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  MaxChainedCallsOnSameLine:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  MultilineLambdaItParameter:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  StringShouldBeRawString:
-    excludes: ['**/test/**']  # G15-1 가 지운다
   MaxLineLength:
     # 기본 120 은 이 저장소에서 **코드가 아니라 주석을 자른다** — 한 줄에 「무엇을·왜」를 담는 문체(`CLAUDE.md` 「글 작성 규칙」)다.
     # detekt 가 120 으로 잡은 것이 222건이었다(첫 측정 262건 중). 파일을 그냥 세면 120 초과가 1,200줄 남짓인데
@@ -91,14 +71,6 @@ exceptions:
       - DataIntegrityViolationException
 
 complexity:
-  NestedScopeFunctions:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  CognitiveComplexMethod:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  LabeledExpression:
-    excludes: ['**/test/**']  # G15-1 가 지운다
-  ReplaceSafeCallChainWithRun:
-    excludes: ['**/test/**']  # G15-1 가 지운다
   LongMethod:
     # SQL 문자열이 줄 수를 먹는다. 우리 서비스는 한 트랜잭션을 한 함수에 담고 그 안에 SQL 이 통째로 들어간다 —
     # 60 줄 기준은 SQL 을 쪼개게 만들고, 쪼갠 SQL 은 읽기가 더 어렵다.
@@ -111,7 +83,6 @@ complexity:
     # 식별자 꼴 문자열은 일부러 되풀인다 — SQL 바인딩 이름(`:account` 와 짝)·감사 대상 종류·JSON 키. 상수로 빼면 짝인 SQL·계약과 갈라진다(`G15`).
     # 문장(메시지·SQL 본문)의 중복은 그대로 잡는다
     ignoreStringsRegex: '^[a-z][a-zA-Z_.]*$'
-    excludes: ['**/test/**']  # G15-1 가 지운다
   # ── G17 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
   NamedArguments:  # G17 가 켠다
     active: false
@@ -131,8 +102,6 @@ naming:
     excludes: ["**/test/**"]
 
 potential-bugs:
-  ImplicitUnitReturnType:
-    excludes: ['**/test/**']  # G15-1 가 지운다
   ElseCaseInsteadOfExhaustiveWhen:
     # `coding-rules.md` 「`when` 에 `else` 를 안 둔다」를 문서에서 여기로 내렸다(`G7a`). 열거·sealed·Boolean 주어만 본다 —
     # 주어 없는 `when {}` 와 문자열 주어의 `else` 는 「나머지 전부」라는 뜻이라 안 걸린다. 타입 해석 규칙이라 `detektMain`·`detektTest` 에서만 돈다.
@@ -142,16 +111,12 @@ potential-bugs:
     active: false
 
 performance:
-  CouldBeSequence:
-    excludes: ['**/test/**']  # G15-1 가 지운다
   SpreadOperator:
     # 펼침이 나는 자리가 넷이고 전부 Java·Spring 의 vararg 다(`runApplication(*args)`·`requestMatchers(*…)`·`redis.execute(…, *args)`) —
     # 다른 호출 꼴이 없고 배열이 10개를 안 넘어 복사 값이 없다(`G8`).
     active: false
 
 comments:
-  OutdatedDocumentation:
-    excludes: ['**/test/**']  # G15-1 가 지운다
   # 셋은 공개 요소마다 KDoc 을 강제한다 — 규약은 「주석은 왜만, 코드가 답하는 것은 안 적는다」(`coding-rules.md` 「주석」)
   UndocumentedPublicClass:
     active: false

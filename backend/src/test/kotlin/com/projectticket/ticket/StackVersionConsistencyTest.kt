@@ -18,11 +18,11 @@ class StackVersionConsistencyTest {
 
     @Test
     fun spring_boot_and_kotlin_match_the_build_file() {
-        assertThat(gradle).contains("id(\"org.springframework.boot\") version \"${tableVersion("Spring Boot")}\"")
-        assertThat(gradle).contains("kotlin(\"jvm\") version \"${tableVersion("Kotlin")}\"")
+        assertThat(gradle).contains("""id("org.springframework.boot") version "${tableVersion("Spring Boot")}"""")
+        assertThat(gradle).contains("""kotlin("jvm") version "${tableVersion("Kotlin")}"""")
         // 플러그인 둘은 같은 판이어야 한다 — `jvm` 만 보면 `plugin.spring` 이 혼자 남는다(점검 9차).
-        assertThat(gradle).contains("kotlin(\"plugin.spring\") version \"${tableVersion("Kotlin")}\"")
-        assertThat(gradle).contains("id(\"io.spring.dependency-management\") version \"${tableVersion("dependency-management")}\"")
+        assertThat(gradle).contains("""kotlin("plugin.spring") version "${tableVersion("Kotlin")}"""")
+        assertThat(gradle).contains("""id("io.spring.dependency-management") version "${tableVersion("dependency-management")}"""")
         assertThat(gradle).contains("JavaLanguageVersion.of(${tableVersion("Java")})")
     }
 
@@ -30,7 +30,7 @@ class StackVersionConsistencyTest {
     fun test_libraries_match_the_build_file() {
         assertThat(gradle).contains("org.testcontainers:testcontainers-bom:${tableVersion("Testcontainers")}")
         assertThat(gradle).contains("com.tngtech.archunit:archunit-junit6:${tableVersion("ArchUnit")}")
-        assertThat(gradle).contains("id(\"dev.detekt\") version \"${tableVersion("detekt")}\"")
+        assertThat(gradle).contains("""id("dev.detekt") version "${tableVersion("detekt")}"""")
         assertThat(gradle).contains("org.pitest:pitest-command-line:${tableVersion("pitest")}")
         assertThat(gradle).contains("org.pitest:pitest-junit5-plugin:${tableVersion("pitest-junit5-plugin")}")
     }
@@ -82,7 +82,7 @@ class StackVersionConsistencyTest {
         val ci = Files.readString(root.resolve(".github/workflows/ci.yml"))
         assertThat(ci).containsPattern("""uses: azure/setup-helm@\S+\s+with:\s+version: v${Regex.escape(tableVersion("Helm"))}\s""")
         assertThat(Files.readString(root.resolve("frontend/package.json")))
-            .contains("\"@playwright/test\": \"^${tableVersion("Playwright")}\"")
+            .contains(""""@playwright/test": "^${tableVersion("Playwright")}"""")
     }
 
     /** 셸 검사기도 판을 박는다(`G13`) — 로컬 winget 과 CI 가 같은 판이어야 같은 지적을 본다 */
@@ -116,7 +116,7 @@ class StackVersionConsistencyTest {
         listOf("Next" to "next", "React" to "react").forEach { (subject, dependency) ->
             assertThat(pkg)
                 .describedAs("`stack.md` 의 「$subject」 행과 `frontend/package.json` 이 갈렸다")
-                .contains("\"$dependency\": \"${tableVersion(subject)}\"")
+                .contains(""""$dependency": "${tableVersion(subject)}"""")
         }
     }
 

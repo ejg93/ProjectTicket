@@ -9,6 +9,7 @@ import com.projectticket.ticket.queue.AdmissionService
 import com.projectticket.ticket.queue.QueueGateFilter
 import com.projectticket.ticket.queue.QueueService
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -64,7 +65,7 @@ class ReservationHoldTest : PostgresTestBase() {
         val body = hold(seatIds.take(2))
             .andExpect {
                 status { isCreated() }
-                header { string("Location", org.hamcrest.Matchers.startsWith("/api/reservations/")) }
+                header { string("Location", Matchers.startsWith("/api/reservations/")) }
                 jsonPath("$.reservation_id") { isNumber() }
                 jsonPath("$.performance_id") { value(performanceId) }
                 jsonPath("$.status") { value("held") }

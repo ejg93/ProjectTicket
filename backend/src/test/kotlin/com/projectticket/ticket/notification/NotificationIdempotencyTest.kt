@@ -178,7 +178,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
             }.single()
 
         @Suppress("UNCHECKED_CAST")
-        val payload = tools.jackson.databind.ObjectMapper().readValue(row.third, Map::class.java) as Map<String, Any?>
+        val payload = ObjectMapper().readValue(row.third, Map::class.java) as Map<String, Any?>
         return OutboxRelay.Envelope(row.first, type, 1, row.second, AggregateType.RESERVATION, reservationId, payload)
     }
 

@@ -50,7 +50,9 @@ class MyReservationsTest : PostgresTestBase() {
         val second = hold(me, startsInDays = 5)
 
         val body = json.readTree(
-            mvc.get("/api/me/reservations") { with(user(me)) }.andExpect { status { isOk() } }.andReturn().response.contentAsString,
+            mvc.get("/api/me/reservations") { with(user(me)) }
+                .andExpect { status { isOk() } }
+                .andReturn().response.contentAsString,
         )
 
         // 남의 것은 없는 것이다 — 조건이 SQL 에 있다.

@@ -85,7 +85,7 @@ class TestConventionTest {
             .toList()
         val build = Files.readString(root.resolve("backend/build.gradle.kts"))
 
-        val docTasks = lanes.mapNotNull { GRADLEW.find(it[2])?.groupValues?.get(1) }.toSet()
+        val docTasks = lanes.mapNotNull { GRADLEW.find(it[2])?.run { groupValues[1] } }.toSet()
         val docTags = lanes.flatMap { row -> BACKTICKED.findAll(row[4]).map { it.groupValues[1] } }.toSet()
         assertThat(docTasks).describedAs("testing-strategy.md 「| 레인 |」 표에서 명령을 못 읽었다").isNotEmpty()
 

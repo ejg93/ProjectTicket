@@ -53,8 +53,8 @@ class ComposeContractTest {
     @Test
     fun the_gateway_has_more_than_one_worker() {
         // 워커 1 × 1,024 연결에서 공개 GET 이 약 4,000 rps 에서 끊겼다(`35k`). `auto` 는 컨테이너에서 VM 의 CPU 수(22)를 읽는다 — 박는다.
-        val workers = Regex("""worker_processes\s+(\d+)\s*;""").find(nginx)?.groupValues?.get(1)?.toInt()
-        val connections = Regex("""worker_connections\s+(\d+)\s*;""").find(nginx)?.groupValues?.get(1)?.toInt()
+        val workers = Regex("""worker_processes\s+(\d+)\s*;""").find(nginx)?.run { groupValues[1].toInt() }
+        val connections = Regex("""worker_connections\s+(\d+)\s*;""").find(nginx)?.run { groupValues[1].toInt() }
         assertThat(workers).describedAs("worker_processes 를 숫자로 박는다(`35k`)").isNotNull().isGreaterThanOrEqualTo(2)
         assertThat(connections).describedAs("worker_connections").isNotNull().isGreaterThanOrEqualTo(4096)
     }
@@ -100,7 +100,7 @@ class ComposeContractTest {
     fun grafana_gauges_do_not_sum_instances() {
         // 게이지 둘은 대마다 **같은** Redis 합을 보고한다 — 대가 여럿이면 시계열이 대수만큼 생겨 겹치거나, 더하면 대수배가 된다.
         assertThat(dashboard).contains("\"max(queue_length)\"").contains("\"max(queue_active)\"")
-        assertThat(dashboard).doesNotContain("\"expr\": \"queue_length\"").doesNotContain("\"expr\": \"queue_active\"")
+        assertThat(dashboard).doesNotContain(""""expr": "queue_length"""").doesNotContain(""""expr": "queue_active"""")
     }
 
     /** compose 의 그 서비스 블록. 두 칸 들여쓴 다음 서비스 머리 줄 전까지다 */

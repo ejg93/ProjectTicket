@@ -54,7 +54,7 @@ class AuditImmutabilityTest : PostgresTestBase() {
      * 실패를 보는 문장은 **저장점 안에서** 던진다. 한 번 실패한 트랜잭션은 그 뒤 문장을 전부 거절해서
      * (`current transaction is aborted`) 같은 테스트의 다음 단언이 무엇을 재는지 알 수 없게 된다.
      *
-     * @param asOwner 권한 뒤에 있는 트리거를 재려면 권한을 통과해야 한다. `set local` 이라 저장점이 풀리면 역할도 되돌아간다
+     * `asOwner` 는 권한 뒤에 있는 트리거를 잴 때 켠다 — 권한을 통과해야 한다. `set local` 이라 저장점이 풀리면 역할도 되돌아간다.
      */
     private fun attempt(asOwner: Boolean = false, work: () -> Unit) {
         TransactionTemplate(transactionManager)

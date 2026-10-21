@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestMethod
+import org.springframework.web.bind.annotation.RestController
 
 /**
  * `coding-rules.md`(D14)가 글로만 적어 둔 계층 규칙을 기계가 지킨다.
@@ -116,8 +117,8 @@ class ArchitectureTest {
      */
     @ArchTest
     val onlyControllersCarryWebAnnotations: ArchRule = classes()
-        .that().areAnnotatedWith(org.springframework.web.bind.annotation.RestController::class.java)
-        .or().areAnnotatedWith(org.springframework.web.bind.annotation.RequestMapping::class.java)
+        .that().areAnnotatedWith(RestController::class.java)
+        .or().areAnnotatedWith(RequestMapping::class.java)
         .should().haveSimpleNameEndingWith("Controller")
 
     /**
@@ -162,11 +163,6 @@ class ArchitectureTest {
         )
 
     private companion object {
-        fun readsAppClock(target: AccessTarget.MethodCallTarget): Boolean =
-            (target.owner.packageName == "java.time" && target.name == "now" && target.rawParameterTypes.isEmpty()) ||
-                (target.owner.name == "java.time.Clock" && target.name.startsWith("system")) ||
-                (target.owner.name == "java.lang.System" && target.name == "currentTimeMillis")
-
         /** 앱 시계를 읽어도 되는 클래스. 늘리려면 `time-rules.md` 의 예외 표에 사유를 먼저 적는다 */
         val APP_CLOCK_ALLOWED = setOf(
             "com.projectticket.ticket.demo.DemoSeeder",
@@ -174,5 +170,10 @@ class ArchitectureTest {
             "com.projectticket.ticket.auth.AbsoluteSessionTimeoutFilter",
             "com.projectticket.ticket.payment.MockPaymentGateway",
         )
+
+        fun readsAppClock(target: AccessTarget.MethodCallTarget): Boolean =
+            target.owner.packageName == "java.time" && target.name == "now" && target.rawParameterTypes.isEmpty() ||
+                target.owner.name == "java.time.Clock" && target.name.startsWith("system") ||
+                target.owner.name == "java.lang.System" && target.name == "currentTimeMillis"
     }
 }

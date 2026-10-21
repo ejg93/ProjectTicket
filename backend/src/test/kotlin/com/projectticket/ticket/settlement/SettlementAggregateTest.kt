@@ -8,6 +8,7 @@ import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.PerformanceCancelService
 import com.projectticket.ticket.payment.RefundQuote
 import com.projectticket.ticket.payment.RefundTransitionService
 import com.projectticket.ticket.payment.expectedRefundOf
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.math.BigDecimal
 
 /**
  * 둘째 소비자가 `D21` 대로 도는가 — 회차가 닫히면 예약되고, `settle_at` 뒤에 **항목의 합**으로 정산서가 선다.
@@ -39,7 +41,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     @Autowired lateinit var refunds: RefundTransitionService
     @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var openService: PerformanceOpenService
-    @Autowired lateinit var cancelService: com.projectticket.ticket.payment.PerformanceCancelService
+    @Autowired lateinit var cancelService: PerformanceCancelService
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     private lateinit var fixture: EventFixture
@@ -62,7 +64,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         // 요율을 나중에 고쳐도 이미 열린 회차의 정산이 안 흔들린다(`D21`·`D7`).
         assertThat(
             jdbc.sql("select sp.commission_rate from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id where p.performance_id = :id")
-                .param("id", performanceId).query(java.math.BigDecimal::class.java).single(),
+                .param("id", performanceId).query(BigDecimal::class.java).single(),
         ).isEqualByComparingTo("0.10")
     }
 

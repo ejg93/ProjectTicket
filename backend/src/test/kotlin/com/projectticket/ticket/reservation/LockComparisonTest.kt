@@ -79,9 +79,12 @@ class LockComparisonTest : ConcurrencyTestBase() {
         TransactionTemplate(transactionManager).execute {
             val status = jdbc.sql("select status from lock_measure_seat where seat_id = :id for update")
                 .param("id", SEAT).query(String::class.java).single()
-            if (status != "available") return@execute false
-            jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id").param("id", SEAT).update()
-            true
+            if (status != "available") {
+                false
+            } else {
+                jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id").param("id", SEAT).update()
+                true
+            }
         }
 
     private fun optimistic(): Boolean {
@@ -131,7 +134,7 @@ class LockComparisonTest : ConcurrencyTestBase() {
         )
     }
 
-    private fun List<Long>.percentile(p: Int): Long = if (isEmpty()) 0 else this[((size - 1) * p) / 100]
+    private fun List<Long>.percentile(p: Int): Long = if (isEmpty()) 0 else this[(size - 1) * p / 100]
 
     private fun sqlStateOf(e: Throwable): String? =
         generateSequence(e) { it.cause }.filterIsInstance<SQLException>().firstOrNull()?.sqlState
@@ -139,9 +142,9 @@ class LockComparisonTest : ConcurrencyTestBase() {
     private fun render(rows: List<Row>): String = buildString {
         appendLine("| 방식 | 스레드 | 승자 | 패자 | 오류(SQLSTATE) | 전체 ms | p50 ms | p95 ms | max ms |")
         appendLine("|---|---|---|---|---|---|---|---|---|")
-        rows.forEach {
-            val errors = if (it.errors == 0) "0" else "${it.errors}(${it.errorStates.entries.joinToString { (s, n) -> "$s×$n" }})"
-            appendLine("| ${it.strategy} | ${it.threads} | ${it.winners} | ${it.losers} | $errors | ${it.wallMs} | ${it.p50Ms} | ${it.p95Ms} | ${it.maxMs} |")
+        rows.forEach { row ->
+            val errors = if (row.errors == 0) "0" else "${row.errors}(${row.errorStates.entries.joinToString { (s, n) -> "$s×$n" }})"
+            appendLine("| ${row.strategy} | ${row.threads} | ${row.winners} | ${row.losers} | $errors | ${row.wallMs} | ${row.p50Ms} | ${row.p95Ms} | ${row.maxMs} |")
         }
     }
 
