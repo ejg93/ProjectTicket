@@ -80,7 +80,7 @@ class AuthController(
             throw TicketException(ErrorCode.LOGIN_FAILED)
         }
 
-        val user = authentication.principal as TicketUser
+        val user = checkNotNull(authentication.principal) { "인증을 마친 토큰은 principal 을 든다" } as TicketUser
         // 정지된 계정도 같은 문구다. 비밀번호 대조 뒤에 보는 이유는 TicketUser.isEnabled 에 있다 — 앞에서 보면 시간 차가 샌다.
         if (!user.active) {
             // **여기는 계정이 밝혀졌다.** 아래 「이메일을 안 담는다」는 누구인지 모르는 실패에 걸리는 말이고,

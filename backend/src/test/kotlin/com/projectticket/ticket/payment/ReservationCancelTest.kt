@@ -64,7 +64,7 @@ class ReservationCancelTest : PostgresTestBase() {
 
         assertThat(reservation(reservationId)).isEqualTo("cancelled" to true)
         assertThat(seatStatuses(reservationId)).containsOnly("available")
-        assertThat(refundRow(reservationId)).isEqualTo(RefundRow("audience", 8, BigDecimal("0.10"), 30_800, 277_200, "done", true))
+        assertThat(refundRow(reservationId)).isEqualTo(RefundRow("audience", 8, "0.10".toBigDecimal(), 30_800, 277_200, "done", true))
         assertThat(auditCount("reservation.cancelled", reservationId)).isOne()
     }
 

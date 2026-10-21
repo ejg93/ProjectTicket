@@ -57,7 +57,7 @@ class MyReservationsTest : PostgresTestBase() {
         assertThat(body["total"].asInt()).isEqualTo(2)
         val items = body["items"]
         assertThat((0 until items.size()).map { items[it]["reservation_id"].asLong() }).containsExactly(second, first)
-        assertThat(body["items"][0]["event_title"].asText()).isEqualTo("목록 공연")
+        assertThat(body["items"][0]["event_title"].asString()).isEqualTo("목록 공연")
         assertThat(body["items"][0]["seat_count"].asInt()).isEqualTo(1)
         assertThat(body["page"].asInt()).isZero()
     }

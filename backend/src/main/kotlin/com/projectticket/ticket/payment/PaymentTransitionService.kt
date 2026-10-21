@@ -97,6 +97,8 @@ class PaymentTransitionService(
      * 거절·실패는 예외가 아니라 결과다. 예외로 던지면 결제 행이 롤백돼 `declined`·`failed` 가 코드에서 안 쓰이고, 재전송이 PG 를 또 부른다.
      */
     @Transactional
+    // 결제사 무응답(시간 초과)이 `verdict == null` 이다 — 아래 분기가 FAILED 로 받는다. detekt 는 기본값의 `requireNotNull(verdict)` 를 보고 늘 non-null 로 읽는다
+    @Suppress("CanBeNonNullable")
     fun settle(
         accountId: Long,
         paying: Paying,

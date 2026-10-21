@@ -119,7 +119,7 @@ class SecurityConfig {
      */
     private class CsrfCookieFilter : OncePerRequestFilter() {
         override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
-            (request.getAttribute(CsrfToken::class.java.name) as CsrfToken?)?.token
+            (request.getAttribute(CsrfToken::class.java.name) as? CsrfToken)?.token
             chain.doFilter(request, response)
         }
     }

@@ -14,6 +14,7 @@ import kotlin.streams.asSequence
  * [AppDbConstraintTest]·[EnumConstraintTest] 가 같이 쓴다.
  */
 object MigrationSql {
+    private val VERSION = Regex("""^V(\d+)""")
 
     /** `V2` 가 `V10` 보다 먼저다. 이름순으로 읽으면 `V10` 이 앞에 와서 `drop` 반영이 뒤집힌다 */
     fun inOrder(root: Path): List<String> =
@@ -62,6 +63,4 @@ object MigrationSql {
             }
         }
     }
-
-    private val VERSION = Regex("""^V(\d+)""")
 }

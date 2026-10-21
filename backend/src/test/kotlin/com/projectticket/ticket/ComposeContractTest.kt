@@ -66,9 +66,10 @@ class ComposeContractTest {
         // JRE 이미지에는 `wget` 도 `curl` 도 없다. 쓰려면 Dockerfile 이 깔아야 한다.
         val tool = TOOLS.firstOrNull { check.contains("$it ") }
         assertThat(tool).describedAs("app healthcheck 가 아는 도구를 안 쓴다: $check").isNotNull()
+        val used = checkNotNull(tool) { "바로 위 단언이 null 을 막는다" }
         assertThat(dockerfile)
-            .describedAs("healthcheck 가 `$tool` 을 쓰는데 Dockerfile 이 안 깐다")
-            .contains("$tool ")
+            .describedAs("healthcheck 가 `$used` 을 쓰는데 Dockerfile 이 안 깐다")
+            .contains("$used ")
     }
 
     @Test

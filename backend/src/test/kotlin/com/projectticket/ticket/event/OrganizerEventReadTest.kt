@@ -55,7 +55,7 @@ class OrganizerEventReadTest : PostgresTestBase() {
 
         // 공개 목록(`/api/events`)은 판매 중 회차가 있는 공연만 낸다. 기획사는 오픈 전 것도 봐야 한다.
         assertThat(body["total"].asInt()).isEqualTo(1)
-        assertThat(body["items"][0]["title"].asText()).isEqualTo("기획사 읽기 공연")
+        assertThat(body["items"][0]["title"].asString()).isEqualTo("기획사 읽기 공연")
         assertThat(body["items"][0]["performance_count"].asInt()).isEqualTo(1)
         mvc.get("/api/organizer/events") { with(user(stranger)) }.andExpect { jsonPath("$.total") { value(0) } }
     }
@@ -77,7 +77,7 @@ class OrganizerEventReadTest : PostgresTestBase() {
         }
 
         assertThat(byId.keys).containsExactlyInAnyOrder(draft, open)
-        assertThat(byId.getValue(draft)["status"].asText()).isEqualTo("draft")
+        assertThat(byId.getValue(draft)["status"].asString()).isEqualTo("draft")
         assertThat(byId.getValue(open)["seat_count"].asInt()).isEqualTo(3)
         assertThat(byId.getValue(open)["sold_count"].asInt()).isEqualTo(1)
     }

@@ -64,7 +64,7 @@ class NotificationStore(private val jdbc: JdbcClient) {
         val (subject, body) = NotificationTemplates.reserved(
             performance,
             seats.joinToString(", "),
-            (envelope.payload["total_amount"] as Number).toInt(),
+            number(envelope, "total_amount").toInt(),
             tickets,
         )
         insert(envelope, accountId(envelope), subject, body)
@@ -75,8 +75,8 @@ class NotificationStore(private val jdbc: JdbcClient) {
         val (subject, body) = NotificationTemplates.cancelled(
             performance,
             daysBeforeOf(envelope),
-            (envelope.payload["fee_amount"] as Number).toInt(),
-            (envelope.payload["refund_amount"] as Number).toInt(),
+            number(envelope, "fee_amount").toInt(),
+            number(envelope, "refund_amount").toInt(),
         )
         insert(envelope, accountId(envelope), subject, body)
     }
@@ -85,7 +85,7 @@ class NotificationStore(private val jdbc: JdbcClient) {
     private
     fun daysBeforeOf(envelope: OutboxRelay.Envelope): Int =
         jdbc.sql("select days_before from refund where refund_id = :id")
-            .param("id", (envelope.payload["refund_id"] as Number).toLong())
+            .param("id", number(envelope, "refund_id").toLong())
             .query(Int::class.java)
             .single()
 
@@ -130,7 +130,11 @@ class NotificationStore(private val jdbc: JdbcClient) {
 
     data class CancelledLine(val accountId: Long, val refundAmount: Int)
 
-    private fun accountId(envelope: OutboxRelay.Envelope): Long = (envelope.payload["account_id"] as Number).toLong()
+    private fun accountId(envelope: OutboxRelay.Envelope): Long = number(envelope, "account_id").toLong()
+
+    /** 사건의 숫자 필드. 카탈로그(`D11`)가 정한 필드라 없으면 생산자가 계약을 어긴 것이다 — 그 자리에서 선다 */
+    private fun number(envelope: OutboxRelay.Envelope, field: String): Number =
+        checkNotNull(envelope.payload[field]) { "사건 ${envelope.type} 에 $field 가 없다(D11 카탈로그)" } as Number
 
     private fun performanceOf(reservationId: Long): NotificationTemplates.PerformanceLine =
         jdbc.sql(

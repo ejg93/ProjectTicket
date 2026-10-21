@@ -111,6 +111,8 @@ abstract class PostgresTestBase {
             }
     }
 
+    // 컨테이너는 빈이다 — Spring 컨텍스트가 닫힐 때 같이 닫히고, 그 사이 시험 클래스들이 나눠 쓴다(재사용)
+    @Suppress("MissingUseCall")
     @TestConfiguration(proxyBeanMethods = false)
     class Containers {
 

@@ -32,10 +32,10 @@ class RefundPolicyTest {
 
     @Test
     fun fee_is_rounded_once_on_the_total_half_up() {
-        assertThat(RefundPolicy.fee(154_000, BigDecimal("0.10"))).isEqualTo(15_400)
-        assertThat(RefundPolicy.fee(616_000, BigDecimal("0.30"))).isEqualTo(184_800)
+        assertThat(RefundPolicy.fee(154_000, "0.10".toBigDecimal())).isEqualTo(15_400)
+        assertThat(RefundPolicy.fee(616_000, "0.30".toBigDecimal())).isEqualTo(184_800)
         // 0.5 는 올린다(half-up). 5 × 0.10 = 0.5 → 1
-        assertThat(RefundPolicy.fee(5, BigDecimal("0.10"))).isEqualTo(1)
+        assertThat(RefundPolicy.fee(5, "0.10".toBigDecimal())).isEqualTo(1)
         assertThat(RefundPolicy.fee(154_000, BigDecimal.ZERO)).isZero()
     }
 

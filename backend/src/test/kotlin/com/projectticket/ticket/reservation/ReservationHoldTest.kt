@@ -101,7 +101,7 @@ class ReservationHoldTest : PostgresTestBase() {
         hold(seatIds.take(1), key = key).andExpect { status { isCreated() } }
 
         hold(seatIds.drop(1).take(1), key = key).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:idempotency-key-reused") }
         }
     }
@@ -120,7 +120,7 @@ class ReservationHoldTest : PostgresTestBase() {
     @Test
     fun more_than_four_seats_is_over_limit() {
         hold(seatIds.take(5)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:over-limit") }
             jsonPath("$.limit") { value(4) }
             jsonPath("$.requested") { value(5) }
@@ -130,7 +130,7 @@ class ReservationHoldTest : PostgresTestBase() {
     @Test
     fun seat_of_another_performance_is_rejected() {
         hold(listOf(seatIds[0], -1)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:seat-not-in-performance") }
             jsonPath("$.seat_ids[0]") { value(-1) }
         }

@@ -69,7 +69,8 @@ class K8sManifestTest {
 
         val built = Regex("""IMAGE=(\S+)""").find(up)?.groupValues?.get(1)
         assertThat(built).describedAs("scripts/k8s-up.sh 에서 IMAGE= 를 못 읽었다").isNotNull()
-        assertThat(app).describedAs("매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $built")
+        val image = checkNotNull(built) { "바로 위 단언이 null 을 막는다" }
+        assertThat(app).describedAs("매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $image")
     }
 
     @Test

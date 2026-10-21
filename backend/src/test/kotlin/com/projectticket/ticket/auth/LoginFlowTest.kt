@@ -108,7 +108,7 @@ class LoginFlowTest : PostgresTestBase() {
         val context = checkNotNull(
             storedSession(after).getAttribute<SecurityContext>(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY),
         )
-        val principal = checkNotNull(context.authentication).principal as TicketUser
+        val principal = checkNotNull(checkNotNull(context.authentication).principal) { "로그인한 세션은 principal 을 든다" } as TicketUser
         // 세션이 사는 내내 해시가 메모리에 남으면 안 된다. Redis 에 직렬화된 것을 다시 읽은 값이라 저장소까지 포함해서 본 것이다.
         assertThat(principal.password).isNull()
         // 계정으로 세션을 찾는다. 정지·탈퇴(`5a`·`5b`)가 여기서 세션을 골라 만료시킨다 — `getAllPrincipals()` 는 이 구현이 못 한다.

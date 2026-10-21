@@ -7,6 +7,8 @@ import com.projectticket.ticket.error.TicketException
 object IdempotencyKeys {
 
     const val HEADER = "Idempotency-Key"
+    /** RFC 9562 — 셋째 마디가 `4` 로 시작하고 넷째 마디가 `8`·`9`·`a`·`b` 로 시작한다 */
+    private val UUID_V4 = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
     /**
      * 없거나 UUIDv4 형식이 아니면 400 `validation-failed`(`D4`). 프레임워크에 맡기면(`required = true`) `malformed-request` 로 나가서 화면이 다른 가지를 탄다.
@@ -19,7 +21,4 @@ object IdempotencyKeys {
                 "$HEADER 헤더가 필요하다(UUIDv4)",
                 mapOf("errors" to listOf(mapOf("field" to HEADER, "message" to "필수 헤더다. UUIDv4 형식이어야 한다"))),
             )
-
-    /** RFC 9562 — 셋째 마디가 `4` 로 시작하고 넷째 마디가 `8`·`9`·`a`·`b` 로 시작한다 */
-    private val UUID_V4 = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 }

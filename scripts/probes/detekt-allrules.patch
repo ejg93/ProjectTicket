@@ -1,0 +1,13 @@
+# 게이트: detekt allRules — 기본 꺼진 규칙도 main 을 세우나(G14)
+# 명령: cd backend && ./gradlew check -x test -x integrationTest --no-daemon --build-cache -q
+# 문구: ForbiddenMethodCall
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/ProbeAllRules.kt b/backend/src/main/kotlin/com/projectticket/ticket/ProbeAllRules.kt
+new file mode 100644
+index 0000000..eb39f1e
+--- /dev/null
++++ b/backend/src/main/kotlin/com/projectticket/ticket/ProbeAllRules.kt
+@@ -0,0 +1,4 @@
++package com.projectticket.ticket
++
++/** 탐침 — 기본 꺼진 규칙(ForbiddenMethodCall)이 켜졌나(G14) */
++internal fun probeAllRules() = println("탐침")

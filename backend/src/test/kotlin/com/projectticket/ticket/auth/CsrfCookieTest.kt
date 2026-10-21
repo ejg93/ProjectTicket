@@ -101,5 +101,5 @@ class CsrfCookieTest : PostgresTestBase() {
     /** 실패했을 때 무엇이 물려 있었는지 말해 준다. 이 값이 위 `@BeforeEach` 를 세운 근거였다 */
     private fun repositoriesInUse(): String = runCatching {
         csrfFilters().joinToString { repositoryField().get(it)!!::class.java.simpleName }
-    }.getOrElse { "못 읽음: ${it.message}" }
+    }.getOrElse { "못 읽음: ${it.message ?: it::class.java.simpleName}" }
 }

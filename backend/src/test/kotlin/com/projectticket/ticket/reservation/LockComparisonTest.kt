@@ -48,6 +48,8 @@ class LockComparisonTest : ConcurrencyTestBase() {
         jdbc.sql("drop table if exists lock_measure_seat").update()
     }
 
+    // 측정 표를 표준 출력으로 낸다 — measure 레인이 그것을 doc/notes 로 옮긴다(로거면 로그 꼴이 섞인다)
+    @Suppress("ForbiddenMethodCall")
     @Test
     fun compare_three_strategies() {
         val rows = mutableListOf<Row>()
@@ -98,7 +100,7 @@ class LockComparisonTest : ConcurrencyTestBase() {
         schedulerLock.runExclusively("seat-$SEAT", Duration.ofSeconds(5)) {
             jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id and status = 'available'")
                 .param("id", SEAT).update() == 1
-        } ?: false
+        } == true
 
     private fun measure(strategy: String, threads: Int, attempt: () -> Boolean): Row {
         jdbc.sql("delete from lock_measure_seat").update()

@@ -14,6 +14,8 @@ import java.util.Locale
  * 관람 일시는 KST 로 적는다(`D7` — 저장은 UTC, 사람이 읽는 자리는 KST).
  */
 object NotificationTemplates {
+    private val KST: ZoneId = ZoneId.of("Asia/Seoul")
+    private val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일 HH:mm")
 
     fun reserved(performance: PerformanceLine, seats: String, totalAmount: Int, ticketNumbers: List<String>): Pair<String, String> =
         "[예매 확정] ${performance.title}" to
@@ -62,7 +64,4 @@ object NotificationTemplates {
 
     // 원 표기는 한국 관례로 고정한다 — 기본 로캘을 따르면 서버가 뜬 나라에 따라 구분자가 바뀐다(`G8`).
     private fun money(amount: Int): String = "%,d원".format(Locale.KOREA, amount)
-
-    private val KST: ZoneId = ZoneId.of("Asia/Seoul")
-    private val FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일 HH:mm")
 }

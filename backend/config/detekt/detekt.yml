@@ -2,6 +2,9 @@
 #
 # 문턱은 「새 검출 0건」이다(`D18`). 기준선 파일은 안 만든다 — 눌러 둔 목록은 아무도 다시 안 본다.
 # 규칙을 끄거나 문턱을 올릴 때는 **근거를 여기 같이 적는다.** 근거 없이 끈 규칙은 다음 사람이 되돌릴 수가 없다.
+#
+# `allRules = true`(`G14`) — 기본 꺼진 규칙까지 켠다. 여기의 `active: false` 가 그것을 이긴다(2026-10-21 실측).
+# 「`Gxx` 가 켠다」·「`Gxx` 가 지운다」 표시는 번들 11 이 아직 안 고친 몫이다 — 번들이 끝나면 0줄이어야 한다.
 
 config:
   validation: true
@@ -34,6 +37,36 @@ style:
     ignoreCompanionObjectPropertyDeclaration: true
     ignoreNamedArgument: true
     ignoreAnnotation: true
+  TrimMultilineRawString:
+    # `"""…""".trimIndent()` 는 `SqlTextTest` 의 「`sql(` 인자는 리터럴 하나」(`G10`)를 깬다 — SQL 공백은 DB 가 무시해 얻는 것이 없다
+    active: false
+  # ── G15 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  BracesOnIfStatements:  # G15 가 켠다
+    active: false
+  BracesOnWhenStatements:  # G15 가 켠다
+    active: false
+  ClassOrdering:  # G15 가 켠다
+    active: false
+  UnnecessaryLet:  # G15 가 켠다
+    active: false
+  UseIfInsteadOfWhen:  # G15 가 켠다
+    active: false
+  UnnecessaryParentheses:  # G15 가 켠다
+    active: false
+  UnnecessaryFullyQualifiedName:  # G15 가 켠다
+    active: false
+  MaxChainedCallsOnSameLine:  # G15 가 켠다
+    active: false
+  MultilineLambdaItParameter:  # G15 가 켠다
+    active: false
+  StringShouldBeRawString:  # G15 가 켠다
+    active: false
+  # ── G16 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  MultilineRawStringIndentation:  # G16 가 켠다
+    active: false
+  # ── G18 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  CascadingCallWrapping:  # G18 가 켠다
+    active: false
 
 exceptions:
   TooGenericExceptionCaught:
@@ -67,10 +100,33 @@ complexity:
     # 표 하나를 만지는 서비스가 그 표의 일을 다 든다(`NotificationStore`). 억지로 가르면 트랜잭션 경계가 흩어진다.
     allowedFunctionsPerClass: 20
     allowedFunctionsPerFile: 20
+  # ── G15 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  NestedScopeFunctions:  # G15 가 켠다
+    active: false
+  CognitiveComplexMethod:  # G15 가 켠다
+    active: false
+  LabeledExpression:  # G15 가 켠다
+    active: false
+  ReplaceSafeCallChainWithRun:  # G15 가 켠다
+    active: false
+  StringLiteralDuplication:  # G15 가 켠다
+    active: false
+  # ── G17 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  NamedArguments:  # G17 가 켠다
+    active: false
 
 naming:
   FunctionParameterNaming:
     # 테스트가 한글 이름을 쓰는 자리가 있다 — 읽는 사람이 한국어 화자다(`CLAUDE.md`).
+    excludes: ["**/test/**"]
+  BooleanPropertyNaming:
+    # `naming-rules.md` 「불리언의 `is_` 는 Kotlin 에서 뗀다」와 정반대다. `RefundQuote.cancellable` 은 응답 계약이다(`api-guidelines.md`)
+    active: false
+  FunctionNameMinLength:
+    # `of`·`on`·`me` 같은 두 글자 관용 이름을 쓴다(팩토리·리스너·`/api/me`). 한 글자만 막는다
+    minimumFunctionNameLength: 2
+  FunctionNameMaxLength:
+    # 시험 이름은 무엇을 증명하는지 적은 문장이다(snake_case, `coding-rules.md` 「테스트」)
     excludes: ["**/test/**"]
 
 potential-bugs:
@@ -78,9 +134,38 @@ potential-bugs:
     # `coding-rules.md` 「`when` 에 `else` 를 안 둔다」를 문서에서 여기로 내렸다(`G7a`). 열거·sealed·Boolean 주어만 본다 —
     # 주어 없는 `when {}` 와 문자열 주어의 `else` 는 「나머지 전부」라는 뜻이라 안 걸린다. 타입 해석 규칙이라 `detektMain`·`detektTest` 에서만 돈다.
     active: true
+  # ── G15 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  ImplicitUnitReturnType:  # G15 가 켠다
+    active: false
+  # ── G17 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  UnnamedParameterUse:  # G17 가 켠다
+    active: false
 
 performance:
   SpreadOperator:
     # 펼침이 나는 자리가 넷이고 전부 Java·Spring 의 vararg 다(`runApplication(*args)`·`requestMatchers(*…)`·`redis.execute(…, *args)`) —
     # 다른 호출 꼴이 없고 배열이 10개를 안 넘어 복사 값이 없다(`G8`).
+    active: false
+  # ── G15 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  CouldBeSequence:  # G15 가 켠다
+    active: false
+
+comments:
+  # 셋은 공개 요소마다 KDoc 을 강제한다 — 규약은 「주석은 왜만, 코드가 답하는 것은 안 적는다」(`coding-rules.md` 「주석」)
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false
+  # 둘은 private 의 KDoc 을 막는다 — private 에도 왜를 KDoc 으로 적는다(IDE 가 보여 준다)
+  DocumentationOverPrivateFunction:
+    active: false
+  DocumentationOverPrivateProperty:
+    active: false
+  EndOfSentenceFormat:
+    # 주석은 한국어 평서형이고 마침표로 안 끝낸다(`CLAUDE.md` 「글 작성 규칙」)
+    active: false
+  # ── G15 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
+  OutdatedDocumentation:  # G15 가 켠다
     active: false

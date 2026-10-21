@@ -55,8 +55,8 @@ class OrganizerCatalogTest : PostgresTestBase() {
         val body = json.readTree(mvc.get("/api/organizer/halls") { with(user(mine)) }.andReturn().response.contentAsString)
         val hall = (0 until body.size()).map { body[it] }.single { it["hall_id"].asLong() == hallId }
 
-        assertThat(hall["venue_name"].asText()).isEqualTo("카탈로그홀")
-        assertThat((0 until hall["sections"].size()).map { hall["sections"][it]["code"].asText() to hall["sections"][it]["seat_count"].asInt() })
+        assertThat(hall["venue_name"].asString()).isEqualTo("카탈로그홀")
+        assertThat((0 until hall["sections"].size()).map { hall["sections"][it]["code"].asString() to hall["sections"][it]["seat_count"].asInt() })
             .containsExactly("F1-A" to 3, "F2-B" to 2)
     }
 

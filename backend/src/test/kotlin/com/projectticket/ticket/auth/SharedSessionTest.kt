@@ -40,6 +40,8 @@ class SharedSessionTest {
     private var portA = 0
     private var portB = 0
 
+    // 두 인스턴스는 클래스 수명이다 — `stopTwoInstances`(@AfterAll)가 닫는다
+    @Suppress("MissingUseCall")
     @BeforeAll
     fun startTwoInstances() {
         postgres.start()
@@ -107,6 +109,8 @@ class SharedSessionTest {
      * 설정을 **명령행 인자로** 넘긴다. `properties()` 는 기본값이라 `application.yml` 이 이기고,
      * 그러면 컨테이너가 아니라 로컬 5432 를 찾다가 인증에서 죽는다.
      */
+    // 만든 컨텍스트를 돌려준다 — 닫는 것은 부른 쪽(@AfterAll)이다
+    @Suppress("MissingUseCall")
     private fun boot(): ConfigurableApplicationContext =
         SpringApplicationBuilder(TicketApplication::class.java).run(
             "--server.port=0",
