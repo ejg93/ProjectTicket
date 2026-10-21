@@ -125,6 +125,8 @@ select count(*) from p a join p b on a.s = b.s and b.n = a.n + 1 where b.c < a.h
 
 다시 돌리려면 「다시 돌릴 때」의 좌석 SQL 과 Redis 두 줄 — 선점이 남긴 예매와 토큰을 같이 지운다.
 
+k8s 에서 같은 판을 HPA 와 같이 재려면 `bash scripts/k8s-hpa-test.sh`(52) — 세션은 Job 의 initContainer 가 만들고, 본판은 HPA 가 최소 대수로 돌아온 뒤 놓는다(`load-5`).
+
 ## 좌석 폴링(35d)
 
 공개 GET 을 계단으로 치는 `seat-poll.js` 와, 그동안 판을 바꾸는 `seat-rush.js`(`ROTATE=1`)를 같이 돌린다.
