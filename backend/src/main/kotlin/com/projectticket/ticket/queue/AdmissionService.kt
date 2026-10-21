@@ -170,61 +170,61 @@ class AdmissionService(
          */
         private val ADMIT = DefaultRedisScript<String>(
             """
-            local t = redis.call('TIME')
-            local now = t[1] * 1000 + math.floor(t[2] / 1000)
-            local capacity = tonumber(ARGV[1])
-            local ttl = tonumber(ARGV[2])
-            local tokenPrefix = ARGV[3]
-            local accountPrefix = ARGV[4]
-            local performanceId = ARGV[5]
-            local interval = tonumber(ARGV[6])
-            local budget = tonumber(ARGV[7])
+                local t = redis.call('TIME')
+                local now = t[1] * 1000 + math.floor(t[2] / 1000)
+                local capacity = tonumber(ARGV[1])
+                local ttl = tonumber(ARGV[2])
+                local tokenPrefix = ARGV[3]
+                local accountPrefix = ARGV[4]
+                local performanceId = ARGV[5]
+                local interval = tonumber(ARGV[6])
+                local budget = tonumber(ARGV[7])
 
-            local w = redis.call('HMGET', KEYS[3], 'start', 'used')
-            local start = tonumber(w[1])
-            local used = tonumber(w[2]) or 0
-            if (not start) or now - start >= interval then
-                start = now
-                used = 0
-            end
-            local left = budget - used
-            if left <= 0 then return '0|' end
+                local w = redis.call('HMGET', KEYS[3], 'start', 'used')
+                local start = tonumber(w[1])
+                local used = tonumber(w[2]) or 0
+                if (not start) or now - start >= interval then
+                    start = now
+                    used = 0
+                end
+                local left = budget - used
+                if left <= 0 then return '0|' end
 
-            redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
-            local free = capacity - redis.call('ZCARD', KEYS[2])
-            local wanted = #ARGV - 7
-            if free < wanted then wanted = free end
-            if left < wanted then wanted = left end
-            if wanted <= 0 then return '0|' end
+                redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
+                local free = capacity - redis.call('ZCARD', KEYS[2])
+                local wanted = #ARGV - 7
+                if free < wanted then wanted = free end
+                if left < wanted then wanted = left end
+                if wanted <= 0 then return '0|' end
 
-            local popped = redis.call('ZPOPMIN', KEYS[1], wanted)
-            local count = 0
-            local waits = {}
-            for i = 1, #popped, 2 do
-                local account = popped[i]
-                count = count + 1
-                local token = ARGV[7 + count]
-                redis.call('ZADD', KEYS[2], now + ttl, token)
-                redis.call(
-                    'SET',
-                    tokenPrefix .. token,
-                    cjson.encode({
-                        account_id = tonumber(account),
-                        performance_id = tonumber(performanceId),
-                        issued_at = now
-                    }),
-                    'PX',
-                    ttl
-                )
-                redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
-                -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
-                waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
-            end
-            if count > 0 then
-                redis.call('HSET', KEYS[3], 'start', string.format('%d', start), 'used', string.format('%d', used + count))
-                redis.call('PEXPIRE', KEYS[3], interval * 2)
-            end
-            return count .. '|' .. table.concat(waits, ',')
+                local popped = redis.call('ZPOPMIN', KEYS[1], wanted)
+                local count = 0
+                local waits = {}
+                for i = 1, #popped, 2 do
+                    local account = popped[i]
+                    count = count + 1
+                    local token = ARGV[7 + count]
+                    redis.call('ZADD', KEYS[2], now + ttl, token)
+                    redis.call(
+                        'SET',
+                        tokenPrefix .. token,
+                        cjson.encode({
+                            account_id = tonumber(account),
+                            performance_id = tonumber(performanceId),
+                            issued_at = now
+                        }),
+                        'PX',
+                        ttl
+                    )
+                    redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
+                    -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
+                    waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
+                end
+                if count > 0 then
+                    redis.call('HSET', KEYS[3], 'start', string.format('%d', start), 'used', string.format('%d', used + count))
+                    redis.call('PEXPIRE', KEYS[3], interval * 2)
+                end
+                return count .. '|' .. table.concat(waits, ',')
             """.trimIndent(),
             String::class.java,
         )
@@ -238,14 +238,14 @@ class AdmissionService(
          */
         private val RELEASE_AFTER_HOLD = DefaultRedisScript<Long>(
             """
-            redis.call('ZREM', KEYS[1], ARGV[1])
-            redis.call('DEL', KEYS[3])
-            local grace = tonumber(ARGV[2])
-            local ttl = redis.call('PTTL', KEYS[2])
-            if ttl > grace then
-                redis.call('PEXPIRE', KEYS[2], grace)
-            end
-            return ttl
+                redis.call('ZREM', KEYS[1], ARGV[1])
+                redis.call('DEL', KEYS[3])
+                local grace = tonumber(ARGV[2])
+                local ttl = redis.call('PTTL', KEYS[2])
+                if ttl > grace then
+                    redis.call('PEXPIRE', KEYS[2], grace)
+                end
+                return ttl
             """.trimIndent(),
             Long::class.java,
         )

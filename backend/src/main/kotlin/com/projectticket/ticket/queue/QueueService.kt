@@ -176,13 +176,13 @@ class QueueService(
          */
         private val ENTER = DefaultRedisScript<String>(
             """
-            local token = redis.call('GET', KEYS[1])
-            if token then return 'A|' .. token end
-            local t = redis.call('TIME')
-            local now = t[1] * 1000 + math.floor(t[2] / 1000)
-            redis.call('ZADD', KEYS[2], 'NX', now, ARGV[1])
-            redis.call('HSET', KEYS[3], ARGV[1], now)
-            return 'W|' .. redis.call('ZRANK', KEYS[2], ARGV[1])
+                local token = redis.call('GET', KEYS[1])
+                if token then return 'A|' .. token end
+                local t = redis.call('TIME')
+                local now = t[1] * 1000 + math.floor(t[2] / 1000)
+                redis.call('ZADD', KEYS[2], 'NX', now, ARGV[1])
+                redis.call('HSET', KEYS[3], ARGV[1], now)
+                return 'W|' .. redis.call('ZRANK', KEYS[2], ARGV[1])
             """.trimIndent(),
             String::class.java,
         )
@@ -193,13 +193,13 @@ class QueueService(
          */
         private val POSITION = DefaultRedisScript<String>(
             """
-            local token = redis.call('GET', KEYS[1])
-            if token then return 'A|' .. token end
-            local rank = redis.call('ZRANK', KEYS[2], ARGV[1])
-            if not rank then return 'N|' end
-            local t = redis.call('TIME')
-            redis.call('HSET', KEYS[3], ARGV[1], t[1] * 1000 + math.floor(t[2] / 1000))
-            return 'W|' .. rank
+                local token = redis.call('GET', KEYS[1])
+                if token then return 'A|' .. token end
+                local rank = redis.call('ZRANK', KEYS[2], ARGV[1])
+                if not rank then return 'N|' end
+                local t = redis.call('TIME')
+                redis.call('HSET', KEYS[3], ARGV[1], t[1] * 1000 + math.floor(t[2] / 1000))
+                return 'W|' .. rank
             """.trimIndent(),
             String::class.java,
         )
@@ -210,18 +210,18 @@ class QueueService(
          */
         private val SWEEP = DefaultRedisScript<Long>(
             """
-            local t = redis.call('TIME')
-            local cutoff = t[1] * 1000 + math.floor(t[2] / 1000) - tonumber(ARGV[1])
-            local seen = redis.call('HGETALL', KEYS[2])
-            local removed = 0
-            for i = 1, #seen, 2 do
-                if tonumber(seen[i + 1]) < cutoff then
-                    redis.call('ZREM', KEYS[1], seen[i])
-                    redis.call('HDEL', KEYS[2], seen[i])
-                    removed = removed + 1
+                local t = redis.call('TIME')
+                local cutoff = t[1] * 1000 + math.floor(t[2] / 1000) - tonumber(ARGV[1])
+                local seen = redis.call('HGETALL', KEYS[2])
+                local removed = 0
+                for i = 1, #seen, 2 do
+                    if tonumber(seen[i + 1]) < cutoff then
+                        redis.call('ZREM', KEYS[1], seen[i])
+                        redis.call('HDEL', KEYS[2], seen[i])
+                        removed = removed + 1
+                    end
                 end
-            end
-            return removed
+                return removed
             """.trimIndent(),
             Long::class.java,
         )

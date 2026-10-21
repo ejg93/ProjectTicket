@@ -20,41 +20,41 @@ object NotificationTemplates {
     fun reserved(performance: PerformanceLine, seats: String, totalAmount: Int, ticketNumbers: List<String>): Pair<String, String> =
         "[예매 확정] ${performance.title}" to
             """
-            예매가 확정되었습니다.
+                예매가 확정되었습니다.
 
-            공연: ${performance.title}
-            일시: ${kst(performance.startsAt)}
-            좌석: $seats
-            결제 금액: ${money(totalAmount)}
-            티켓 번호: ${ticketNumbers.joinToString(", ")}
+                공연: ${performance.title}
+                일시: ${kst(performance.startsAt)}
+                좌석: $seats
+                결제 금액: ${money(totalAmount)}
+                티켓 번호: ${ticketNumbers.joinToString(", ")}
 
-            공연 당일 티켓 번호를 보여주시면 입장하실 수 있습니다.
+                공연 당일 티켓 번호를 보여주시면 입장하실 수 있습니다.
             """.trimIndent()
 
     fun cancelled(performance: PerformanceLine, daysBefore: Int, feeAmount: Int, refundAmount: Int): Pair<String, String> =
         "[예매 취소] ${performance.title}" to
             """
-            예매가 취소되었습니다.
+                예매가 취소되었습니다.
 
-            공연: ${performance.title}
-            일시: ${kst(performance.startsAt)}
-            취소 시점: 관람일 ${daysBefore}일 전
-            취소 수수료: ${money(feeAmount)}
-            환불 금액: ${money(refundAmount)}
+                공연: ${performance.title}
+                일시: ${kst(performance.startsAt)}
+                취소 시점: 관람일 ${daysBefore}일 전
+                취소 수수료: ${money(feeAmount)}
+                환불 금액: ${money(refundAmount)}
 
-            환불은 결제하신 카드로 처리됩니다.
+                환불은 결제하신 카드로 처리됩니다.
             """.trimIndent()
 
     fun performanceCancelled(performance: PerformanceLine, refundAmount: Int): Pair<String, String> =
         "[회차 취소] ${performance.title}" to
             """
-            공연이 취소되어 예매가 자동으로 취소되었습니다.
+                공연이 취소되어 예매가 자동으로 취소되었습니다.
 
-            공연: ${performance.title}
-            일시: ${kst(performance.startsAt)}
-            환불 금액: ${money(refundAmount)} (전액)
+                공연: ${performance.title}
+                일시: ${kst(performance.startsAt)}
+                환불 금액: ${money(refundAmount)} (전액)
 
-            취소 수수료는 없습니다. 환불은 결제하신 카드로 처리됩니다.
+                취소 수수료는 없습니다. 환불은 결제하신 카드로 처리됩니다.
             """.trimIndent()
 
     /** 본문에 드는 회차 정보. 소비자가 표에서 읽어 채운다(`D11` — 사건은 식별자만 나른다) */

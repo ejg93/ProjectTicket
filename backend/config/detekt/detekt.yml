@@ -40,9 +40,6 @@ style:
   TrimMultilineRawString:
     # `"""…""".trimIndent()` 는 `SqlTextTest` 의 「`sql(` 인자는 리터럴 하나」(`G10`)를 깬다 — SQL 공백은 DB 가 무시해 얻는 것이 없다
     active: false
-  # ── G16 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
-  MultilineRawStringIndentation:  # G16 가 켠다
-    active: false
   # ── G18 가 켠다 — 고치기 전까지 끈다(`G14` 가 `allRules` 를 켤 때 남은 몫)
   CascadingCallWrapping:  # G18 가 켠다
     active: false
