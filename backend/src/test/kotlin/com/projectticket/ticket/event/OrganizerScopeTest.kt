@@ -80,7 +80,9 @@ class OrganizerScopeTest : PostgresTestBase() {
         // 안 주면 트리거가 `starts_at - 1h` 를 채운다(`V14`) — 입구가 그 값을 다시 계산하지 않는다.
         assertThat(
             jdbc.sql("select starts_at - sales_close_at = interval '1 hour' from performance where performance_id = :id")
-                .param("id", performanceId).query(Boolean::class.java).single(),
+                .param("id", performanceId)
+                .query(Boolean::class.java)
+                .single(),
         ).isTrue()
     }
 
@@ -208,7 +210,9 @@ class OrganizerScopeTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values (:email, 'x', '담당자', 'organizer') returning account_id",
         ).param("email", email).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
         return TicketUser(id = accountId, email = email, role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 

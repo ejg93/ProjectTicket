@@ -47,7 +47,8 @@ class PerformanceCloseService(
             .param("id", performanceId)
             .query(OffsetDateTime::class.java)
             .optional()
-            .orElse(null) ?: return null
+            .orElse(null)
+            ?: return null
 
         val expired = jdbc.sql(
             """

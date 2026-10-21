@@ -44,7 +44,9 @@ class PerformanceDetailTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values ('detail@test.local', 'x', '담당자', 'organizer') returning account_id",
         ).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
         organizer = TicketUser(id = accountId, email = "detail@test.local", role = AccountRole.ORGANIZER, passwordHash = null, active = true)
         fixture.seats(hallId, "F1-A", 2)
     }

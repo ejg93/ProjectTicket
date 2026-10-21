@@ -55,7 +55,9 @@ class SeatQueryTest : PostgresTestBase() {
                 jsonPath("$.sections[0].rows[0].seats[1].s") { value("H") }
                 jsonPath("$.sections[1].rows[0].seats[0].s") { value("R") }
             }
-            .andReturn().response.contentAsString
+            .andReturn()
+            .response
+            .contentAsString
 
         Snapshot(json, javaClass).assertMatches(name = "full", actualJson = body)
     }

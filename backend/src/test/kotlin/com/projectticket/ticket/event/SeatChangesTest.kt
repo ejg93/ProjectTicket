@@ -139,7 +139,8 @@ class SeatChangesTest : ConcurrencyTestBase() {
     /** 90초를 기다릴 수 없다. 스윕이 집을 수 있게 만료 시각을 뒤로 민다 */
     private fun expire(reservationId: Long) =
         jdbc.sql("update reservation set held_until = now() - interval '1 minute' where reservation_id = :id")
-            .param("id", reservationId).update()
+            .param("id", reservationId)
+            .update()
 
     private fun built(): Double = meters.find("seat.snapshot.built").counter()?.count() ?: 0.0
 

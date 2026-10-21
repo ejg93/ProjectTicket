@@ -86,7 +86,8 @@ class PaymentTransitionService(
             .param("account", accountId)
             .query { rs, _ -> rs.getString("status") to rs.getBoolean("alive") }
             .optional()
-            .orElse(null) ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
+            .orElse(null)
+            ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
 
         val (status, alive) = row
         return if (status == ReservationStatus.HELD.code && !alive) {

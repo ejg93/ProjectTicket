@@ -77,12 +77,17 @@ class SecurityConfig {
         http
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers(HttpMethod.GET, *PUBLIC_GET_PATHS.toTypedArray()).permitAll()
-                    .requestMatchers(HttpMethod.POST, *PUBLIC_POST_PATHS.toTypedArray()).permitAll()
+                    .requestMatchers(HttpMethod.GET, *PUBLIC_GET_PATHS.toTypedArray())
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, *PUBLIC_POST_PATHS.toTypedArray())
+                    .permitAll()
                     // 경로 접두로 역할을 가른다(`D5`). **필터라 컨트롤러 밖이다** — 기획사 입구가 늘어도 빠뜨릴 자리가 없다.
-                    .requestMatchers(ORGANIZER_PREFIX).hasAuthority(AccountRole.ORGANIZER.authority)
-                    .requestMatchers(ADMIN_PREFIX).hasAuthority(AccountRole.ADMIN.authority)
-                    .anyRequest().authenticated()
+                    .requestMatchers(ORGANIZER_PREFIX)
+                    .hasAuthority(AccountRole.ORGANIZER.authority)
+                    .requestMatchers(ADMIN_PREFIX)
+                    .hasAuthority(AccountRole.ADMIN.authority)
+                    .anyRequest()
+                    .authenticated()
             }
             .formLogin { it.disable() }
             .httpBasic { it.disable() }

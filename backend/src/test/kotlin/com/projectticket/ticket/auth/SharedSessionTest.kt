@@ -57,7 +57,9 @@ class SharedSessionTest {
     fun stopTwoInstances() {
         // 이 테스트는 롤백이 없다 — 진짜 포트로 HTTP 를 보내니 커밋된다. 남긴 계정을 손으로 지운다(동의는 cascade).
         instanceA.getBean(JdbcClient::class.java)
-            .sql("delete from account where email = :email").param("email", EMAIL).update()
+            .sql("delete from account where email = :email")
+            .param("email", EMAIL)
+            .update()
         instanceA.close()
         instanceB.close()
         // 컨테이너는 안 멈춘다. 재사용이 켜져 있으면 Spring 컨텍스트들이 붙어 쓰는 그 컨테이너라,

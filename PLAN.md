@@ -330,7 +330,7 @@ Opus 는 Fable 몫에 닿으면 멈추고 「Fable 차례」라고 적는다. �
 | G16 | detekt 원시 문자열 들여쓰기 | 완료(2026-10-21, Opus) — `MultilineRawStringIndentation` 101건. 걸린 것은 SQL 이 아니라 Lua 스크립트(입장·대기열·좌석 판·락)와 알림 메일 본문이었다(파일 5). 지적이 걸린 원시 문자열의 안쪽 줄을 **통째로** 4칸 밀었다 — 지적 줄만 밀면 `trimIndent` 결과(메일의 상대 들여쓰기)가 바뀐다. 강제 지점: detekt | 완료 |
 | G17 | detekt 인자 이름(main) | 완료(2026-10-21, Opus) — `NamedArguments` 56 · `UnnamedParameterUse` 33(34파일) + 고치며 새로 걸린 셋. 이름은 호출되는 쪽 선언 그대로, 순서는 그대로. `auditLog.record` 18곳이 이름 붙은 여러 줄 호출이 됐다 — 람다가 여러 줄이 되어 `it` 둘을 `reservationId ->` 로. 시험 몫은 `excludes` 로 `G17-1` 에. 강제 지점: detekt | 완료 |
 | G17-1 | detekt 인자 이름(test) | 완료(2026-10-21, Opus) — `NamedArguments` 41 · `UnnamedParameterUse` 124(47파일). 시험 도우미·`EventFixture`·main 서비스·표준 라이브러리·Spring Kotlin DSL 호출에 이름을 붙였다. 게이트 시험은 호출부만 바뀌었다. `G17` 의 임시 `excludes` 둘을 지웠다. 강제 지점: detekt | 완료 |
-| G18 | detekt 체인 줄바꿈(앞) | **번들 11 · 8/9.** `CascadingCallWrapping` 의 main + 시험 루트·`account`·`audit`·`auth`·`consent`·`event`(바뀔 줄 99). 나머지 시험 패키지 아홉은 `excludes` 로 G18-1 에. **축**: `D14`. **강제 지점**: detekt. **건드리는 자리**: `detekt.yml`, 위반 자리. **닫힘**: detekt 초록 | G17-1 |
+| G18 | detekt 체인 줄바꿈(앞) | 완료(2026-10-21, Opus) — `CascadingCallWrapping` 98건(35파일, main 전부 + 시험 루트·`account`·`audit`·`auth`·`consent`·`event`). 공백·줄바꿈만 — 공백을 걷은 내용이 HEAD 와 같다. 지적은 사슬의 첫 위반만 짚어서 뒤따르는 호출도 같이 내렸다. `?: return` 넷은 사슬과 같은 들여쓰기로. 나머지 시험 패키지 아홉은 `excludes` 로 `G18-1` 에. 강제 지점: detekt | 완료 |
 | G18-1 | detekt 체인 줄바꿈(뒤) | **번들 11 · 9/9.** 시험 `idempotency`·`notification`·`observability`·`outbox`·`payment`·`queue`·`reservation`·`settlement`·`venue`(바뀔 줄 77). **축**: `D14`. **강제 지점**: detekt. **건드리는 자리**: `detekt.yml`, 위반 자리. **닫힘**: `detekt.yml` 에 임시 표시(`가 켠다`·`가 지운다`) 0줄 · detekt 초록 | G18 |
 
 ### 9 — 실측 심화 **[설계됨 — 번들 10]**

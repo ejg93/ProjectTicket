@@ -113,8 +113,11 @@ class NotificationStore(private val jdbc: JdbcClient) {
              order by r.account_id
             """,
         ).param("id", performanceId).param("approved", PaymentStatus.APPROVED.code)
-            .param("cancelled", ReservationStatus.CANCELLED.code).param("by", CancelledBy.ORGANIZER.code)
-            .query(CancelledLine::class.java).list().filterNotNull()
+            .param("cancelled", ReservationStatus.CANCELLED.code)
+            .param("by", CancelledBy.ORGANIZER.code)
+            .query(CancelledLine::class.java)
+            .list()
+            .filterNotNull()
             .forEach { line ->
                 val (subject, body) = NotificationTemplates.performanceCancelled(performance, line.refundAmount)
                 insert(envelope = envelope, accountId = line.accountId, subject = subject, body = body)
@@ -190,17 +193,28 @@ class NotificationStore(private val jdbc: JdbcClient) {
     @Transactional
     fun markSent(notificationId: Long) =
         jdbc.sql("update notification set status = :sent, sent_at = now() where notification_id = :id and status = :pending")
-            .param("sent", NotificationStatus.SENT.code).param("pending", NotificationStatus.PENDING.code).param("id", notificationId).update()
+            .param("sent", NotificationStatus.SENT.code)
+            .param("pending", NotificationStatus.PENDING.code)
+            .param("id", notificationId)
+            .update()
 
     @Transactional
     fun markFailed(notificationId: Long, reason: String) =
         jdbc.sql("update notification set status = :failed, failure_reason = :reason where notification_id = :id and status = :pending")
-            .param("failed", NotificationStatus.FAILED.code).param("pending", NotificationStatus.PENDING.code).param("reason", reason).param("id", notificationId).update()
+            .param("failed", NotificationStatus.FAILED.code)
+            .param("pending", NotificationStatus.PENDING.code)
+            .param("reason", reason)
+            .param("id", notificationId)
+            .update()
 
     @Transactional
     fun markSkipped(notificationId: Long, reason: String) =
         jdbc.sql("update notification set status = :skipped, failure_reason = :reason where notification_id = :id and status = :pending")
-            .param("skipped", NotificationStatus.SKIPPED.code).param("pending", NotificationStatus.PENDING.code).param("reason", reason).param("id", notificationId).update()
+            .param("skipped", NotificationStatus.SKIPPED.code)
+            .param("pending", NotificationStatus.PENDING.code)
+            .param("reason", reason)
+            .param("id", notificationId)
+            .update()
 
     /** [email] 은 탈퇴한 계정이면 null 이다 — 파기가 컬럼을 비운다 */
     data class Pending(val notificationId: Long, val subject: String, val body: String, val email: String?)

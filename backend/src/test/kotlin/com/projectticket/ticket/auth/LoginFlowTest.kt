@@ -50,7 +50,8 @@ class LoginFlowTest : PostgresTestBase() {
                 jsonPath("$.email") { value(EMAIL) }
                 jsonPath("$.role") { value("audience") }
             }
-            .andReturn().sessionCookie()
+            .andReturn()
+            .sessionCookie()
 
         mvc.get("/api/me") { cookie(logged) }
             .andExpect {

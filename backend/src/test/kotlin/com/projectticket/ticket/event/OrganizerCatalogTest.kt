@@ -35,7 +35,9 @@ class OrganizerCatalogTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values ('catalog@test.local', 'x', '담당자', 'organizer') returning account_id",
         ).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", myOrganizer).param("account", accountId).update()
+            .param("organizer", myOrganizer)
+            .param("account", accountId)
+            .update()
         mine = TicketUser(id = accountId, email = "catalog@test.local", role = AccountRole.ORGANIZER, passwordHash = null, active = true)
         hallId = fixture.hall(name = "카탈로그관", venueName = "카탈로그홀")
         fixture.seats(hallId, "F1-A", 3)

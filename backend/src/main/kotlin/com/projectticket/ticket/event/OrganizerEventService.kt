@@ -121,7 +121,10 @@ class OrganizerEventService(
     private fun mapSection(eventId: Long, section: String, gradeId: Long, index: Int) =
         try {
             jdbc.sql("insert into seat_grade_map (event_id, section, seat_grade_id) values (:event, :section, :grade)")
-                .param("event", eventId).param("section", section).param("grade", gradeId).update()
+                .param("event", eventId)
+                .param("section", section)
+                .param("grade", gradeId)
+                .update()
         } catch (e: DuplicateKeyException) {
             // 구역 하나가 등급 둘을 가지면 그 구역의 가격이 안 정해진다(`V5` 기본키).
             throw fieldRejected(field = "grades[$index].sections", message = "같은 구역에 등급을 두 번 붙였다: $section")

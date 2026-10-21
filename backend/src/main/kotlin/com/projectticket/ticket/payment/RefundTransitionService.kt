@@ -147,7 +147,8 @@ class RefundTransitionService(
             .param("account", accountId)
             .query(String::class.java)
             .optional()
-            .orElse(null) ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
+            .orElse(null)
+            ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
         return TicketException(ErrorCode.INVALID_TRANSITION, "취소할 수 없는 상태다: $status", mapOf("from" to status, "action" to "cancel"))
     }
 

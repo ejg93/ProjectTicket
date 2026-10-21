@@ -99,7 +99,9 @@ class DemoSeeder(
 
     private fun insertOrganizer(): Long =
         jdbc.sql("insert into organizer (code, name) values (:code, '데모기획') returning organizer_id")
-            .param("code", ORGANIZER_CODE).query(Long::class.java).single()
+            .param("code", ORGANIZER_CODE)
+            .query(Long::class.java)
+            .single()
 
     /** 비밀번호가 하나인 것은 `local` 전용이라서다. 운영 경로로는 이 러너가 아예 안 뜬다(`@ConditionalOnProperty`) */
     private fun insertAccount(email: String, displayName: String, role: AccountRole): Long =
@@ -119,16 +121,22 @@ class DemoSeeder(
 
     private fun joinOrganizer(organizerId: Long, accountId: Long) =
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
 
     /** 홀 둘에 좌석 2천 — 구역마다 열 20 × 번호 25 */
     private fun insertVenueAndHalls(): List<Long> {
         val venueId = jdbc.sql("insert into venue (name, address) values ('데모아트홀', '서울') returning venue_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
         return HALL_SECTIONS.map { (hallName, sections) ->
             val hallId = jdbc.sql("insert into hall (venue_id, name) values (:venue, :name) returning hall_id")
-                .param("venue", venueId).param("name", hallName).query(Long::class.java).single()
+                .param("venue", venueId)
+                .param("name", hallName)
+                .query(Long::class.java)
+                .single()
 
             sections.forEach { section ->
                 jdbc.sql(
@@ -138,8 +146,10 @@ class DemoSeeder(
                       from generate_series(1, :rows) r, generate_series(1, :seats) n
                     """,
                 )
-                    .param("hall", hallId).param("section", section)
-                    .param("rows", ROWS_PER_SECTION).param("seats", SEATS_PER_ROW)
+                    .param("hall", hallId)
+                    .param("section", section)
+                    .param("rows", ROWS_PER_SECTION)
+                    .param("seats", SEATS_PER_ROW)
                     .update()
             }
             hallId

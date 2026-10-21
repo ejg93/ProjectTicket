@@ -25,12 +25,16 @@ class ComposeContractTest {
     private val compose = Files.readString(root.resolve("docker-compose.yml"))
     private val dockerfile = Files.readString(root.resolve("backend/Dockerfile"))
     private val prometheus = Files.readString(root.resolve("docker/prometheus/prometheus.yml"))
-        .lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+        .lines()
+        .filterNot { it.trimStart().startsWith("#") }
+        .joinToString("\n")
     private val dashboard = Files.readString(root.resolve("docker/grafana/dashboards/ticket.json"))
 
     /** 주석은 걷어낸다 — 무엇을 안 쓰기로 했는지 설명하는 줄이 검사에 걸리면 안 된다 */
     private val nginx = Files.readString(root.resolve("docker/nginx/nginx.conf"))
-        .lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+        .lines()
+        .filterNot { it.trimStart().startsWith("#") }
+        .joinToString("\n")
 
     @Test
     fun the_gateway_resolves_the_app_name_on_every_request() {

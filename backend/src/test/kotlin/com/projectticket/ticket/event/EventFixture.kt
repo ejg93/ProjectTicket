@@ -12,13 +12,20 @@ class EventFixture(private val jdbc: JdbcClient) {
 
     fun organizer(code: String = "test-org"): Long =
         jdbc.sql("insert into organizer (code, name) values (:code, '테스트기획') returning organizer_id")
-            .param("code", code).query(Long::class.java).single()
+            .param("code", code)
+            .query(Long::class.java)
+            .single()
 
     fun hall(name: String = "1관", venueName: String = "테스트홀"): Long {
         val venueId = jdbc.sql("insert into venue (name, address) values (:venue, '서울') returning venue_id")
-            .param("venue", venueName).query(Long::class.java).single()
+            .param("venue", venueName)
+            .query(Long::class.java)
+            .single()
         return jdbc.sql("insert into hall (venue_id, name) values (:venue, :name) returning hall_id")
-            .param("venue", venueId).param("name", name).query(Long::class.java).single()
+            .param("venue", venueId)
+            .param("name", name)
+            .query(Long::class.java)
+            .single()
     }
 
     /** 구역 하나에 좌석을 `count` 개. 열은 A 고 번호만 늘린다 */
@@ -35,7 +42,10 @@ class EventFixture(private val jdbc: JdbcClient) {
 
     fun event(organizerId: Long, title: String = "테스트 공연"): Long =
         jdbc.sql("insert into event (organizer_id, title) values (:org, :title) returning event_id")
-            .param("org", organizerId).param("title", title).query(Long::class.java).single()
+            .param("org", organizerId)
+            .param("title", title)
+            .query(Long::class.java)
+            .single()
 
     fun grade(eventId: Long, code: String, price: Int): Long =
         jdbc.sql(
@@ -44,7 +54,10 @@ class EventFixture(private val jdbc: JdbcClient) {
 
     fun mapSection(eventId: Long, section: String, gradeId: Long) =
         jdbc.sql("insert into seat_grade_map (event_id, section, seat_grade_id) values (:event, :section, :grade)")
-            .param("event", eventId).param("section", section).param("grade", gradeId).update()
+            .param("event", eventId)
+            .param("section", section)
+            .param("grade", gradeId)
+            .update()
 
     /**
      * 판매 시작은 하루 전, 관람은 내일이 기본이다. 마감(`sales_close_at`)은 트리거가 `starts_at - 1h` 로 채운다(`V14`).
@@ -65,7 +78,8 @@ class EventFixture(private val jdbc: JdbcClient) {
             """,
         ).param("event", eventId).param("hall", hallId).param("days", startsInDays.toInt())
             .param("nudge", slotNudge.getAndIncrement())
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
     /**
      * 회차를 연 것처럼 지금 시행 중인 기본 정책을 박제한다(`D21`). 정산서는 회차의 박제와 같은 정책이어야 들어간다(`V23`) —
@@ -85,7 +99,9 @@ class EventFixture(private val jdbc: JdbcClient) {
 
     fun account(email: String): Long =
         jdbc.sql("insert into account (email, password_hash, display_name, role) values (:email, 'x', '관객', 'audience') returning account_id")
-            .param("email", email).query(Long::class.java).single()
+            .param("email", email)
+            .query(Long::class.java)
+            .single()
 
     /** 열린 회차의 좌석 id 를 자리 순서대로 */
     fun performanceSeatIds(performanceId: Long): List<Long> =
@@ -126,18 +142,24 @@ class EventFixture(private val jdbc: JdbcClient) {
             returning r.reservation_id
             """,
         )
-            .param("account", accountId).param("performance", performanceId)
-            .param("section", section).param("number", seatNumber)
-            .query(Long::class.java).single()
+            .param("account", accountId)
+            .param("performance", performanceId)
+            .param("section", section)
+            .param("number", seatNumber)
+            .query(Long::class.java)
+            .single()
 
     /** `held` 예매를 전이표대로 `paying` 을 거쳐 `reserved` 로. 좌석도 `reserved` 로 */
     fun reserve(reservationId: Long) {
         jdbc.sql("update reservation set status = 'paying', paying_until = now() + interval '3 minutes' where reservation_id = :id")
-            .param("id", reservationId).update()
+            .param("id", reservationId)
+            .update()
         jdbc.sql("update reservation set status = 'reserved', reserved_at = now(), paying_until = null where reservation_id = :id")
-            .param("id", reservationId).update()
+            .param("id", reservationId)
+            .update()
         jdbc.sql("update performance_seat set status = 'reserved', held_until = null where reservation_id = :id")
-            .param("id", reservationId).update()
+            .param("id", reservationId)
+            .update()
     }
 
     companion object {

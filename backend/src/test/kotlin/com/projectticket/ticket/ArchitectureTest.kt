@@ -46,27 +46,38 @@ class ArchitectureTest {
      */
     @ArchTest
     val resourcePackagesDependDownward: ArchRule = layeredArchitecture().consideringOnlyDependenciesInLayers()
-        .layer("payment").definedBy("..ticket.payment..")
-        .layer("reservation").definedBy("..ticket.reservation..")
-        .layer("event").definedBy("..ticket.event..")
-        .layer("settlement").definedBy("..ticket.settlement..")
-        .whereLayer("payment").mayNotBeAccessedByAnyLayer()
-        .whereLayer("reservation").mayOnlyBeAccessedByLayers("payment")
-        .whereLayer("event").mayOnlyBeAccessedByLayers("payment", "reservation")
-        .whereLayer("settlement").mayOnlyBeAccessedByLayers("payment", "reservation", "event")
+        .layer("payment")
+        .definedBy("..ticket.payment..")
+        .layer("reservation")
+        .definedBy("..ticket.reservation..")
+        .layer("event")
+        .definedBy("..ticket.event..")
+        .layer("settlement")
+        .definedBy("..ticket.settlement..")
+        .whereLayer("payment")
+        .mayNotBeAccessedByAnyLayer()
+        .whereLayer("reservation")
+        .mayOnlyBeAccessedByLayers("payment")
+        .whereLayer("event")
+        .mayOnlyBeAccessedByLayers("payment", "reservation")
+        .whereLayer("settlement")
+        .mayOnlyBeAccessedByLayers("payment", "reservation", "event")
 
     /**
      * `PUT`·`PATCH` 를 안 쓴다(`D5` — 상태는 하위 경로에 `POST`). 고칠 자원이 생기면 `merge-patch+json` 을 먼저 정하고 이 규칙을 푼다(`G7a`).
      */
     @ArchTest
     val noPutOrPatchEndpoints: ArchRule = noMethods()
-        .should().beAnnotatedWith(PatchMapping::class.java)
-        .orShould().beAnnotatedWith(PutMapping::class.java)
+        .should()
+        .beAnnotatedWith(PatchMapping::class.java)
+        .orShould()
+        .beAnnotatedWith(PutMapping::class.java)
 
     /** 같은 것을 `@RequestMapping(method = [PUT])` 꼴로 적은 자리(마무리 12차 독립 리뷰). 지금 `@RequestMapping` 메서드가 없어 빈 규칙을 허용한다 */
     @ArchTest
     val noPutOrPatchViaRequestMapping: ArchRule = methods()
-        .that().areAnnotatedWith(RequestMapping::class.java)
+        .that()
+        .areAnnotatedWith(RequestMapping::class.java)
         .should(
             object : ArchCondition<JavaMethod>("not map PUT or PATCH") {
                 override fun check(method: JavaMethod, events: ConditionEvents) {
@@ -86,7 +97,8 @@ class ArchitectureTest {
      */
     @ArchTest
     val noAppClockReads: ArchRule = classes()
-        .that().resideInAPackage("com.projectticket.ticket..")
+        .that()
+        .resideInAPackage("com.projectticket.ticket..")
         .should(
             object : ArchCondition<JavaClass>("not read the app clock (java.time now(), Clock.system*, System.currentTimeMillis)") {
                 private val allowedSeen = mutableSetOf<String>()
@@ -117,9 +129,12 @@ class ArchitectureTest {
      */
     @ArchTest
     val onlyControllersCarryWebAnnotations: ArchRule = classes()
-        .that().areAnnotatedWith(RestController::class.java)
-        .or().areAnnotatedWith(RequestMapping::class.java)
-        .should().haveSimpleNameEndingWith("Controller")
+        .that()
+        .areAnnotatedWith(RestController::class.java)
+        .or()
+        .areAnnotatedWith(RequestMapping::class.java)
+        .should()
+        .haveSimpleNameEndingWith("Controller")
 
     /**
      * 오류 본문은 `error` 패키지만 만든다(D14 「예외」). 다른 자리에서 `ProblemDetail` 을 조립하면 같은 오류가 형태만 다르게 두 벌 나간다.
@@ -127,8 +142,11 @@ class ArchitectureTest {
      */
     @ArchTest
     val problemDetailsOnlyInErrorPackage: ArchRule = noClasses()
-        .that().resideOutsideOfPackage("..error..")
-        .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.http.ProblemDetail")
+        .that()
+        .resideOutsideOfPackage("..error..")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("org.springframework.http.ProblemDetail")
 
     /**
      * 오류 상태 코드는 `error` 패키지만 정한다. 필터·서비스가 `HttpStatus` 로 응답 상태를 박으면
@@ -137,21 +155,29 @@ class ArchitectureTest {
      */
     @ArchTest
     val statusCodesOnlyInErrorPackageOrControllers: ArchRule = noClasses()
-        .that().resideOutsideOfPackage("..error..")
-        .and().haveSimpleNameNotEndingWith("Controller")
-        .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.http.HttpStatus")
+        .that()
+        .resideOutsideOfPackage("..error..")
+        .and()
+        .haveSimpleNameNotEndingWith("Controller")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("org.springframework.http.HttpStatus")
 
     /** 시간대 없는 시각을 안 든다(`D7`). `LocalDateTime` 은 받는 쪽이 시간대를 짐작하게 만들고, 세 인스턴스가 다르게 짐작한다 */
     @ArchTest
     val noLocalDateTime: ArchRule = noClasses()
-        .should().dependOnClassesThat().haveFullyQualifiedName("java.time.LocalDateTime")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("java.time.LocalDateTime")
 
     /**
      * `@RequestBody` 에 `@Valid` 가 없으면 검증이 **조용히 안 돈다**(`D9`). 새 입구가 생길 때 빠뜨리는 자리라 문서(5위)에서 테스트(4위)로 내린다.
      */
     @ArchTest
     val requestBodiesAreValidated: ArchRule = methods()
-        .that().areDeclaredInClassesThat().haveSimpleNameEndingWith("Controller")
+        .that()
+        .areDeclaredInClassesThat()
+        .haveSimpleNameEndingWith("Controller")
         .should(
             object : ArchCondition<JavaMethod>("have @Valid on every @RequestBody parameter") {
                 override fun check(method: JavaMethod, events: ConditionEvents) {

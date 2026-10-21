@@ -156,5 +156,7 @@ class PerformanceStateTest : PostgresTestBase() {
 
     private fun statusOf(performanceId: Long): String =
         jdbc.sql("select status from performance where performance_id = :id")
-            .param("id", performanceId).query(String::class.java).single()
+            .param("id", performanceId)
+            .query(String::class.java)
+            .single()
 }

@@ -98,7 +98,8 @@ class AuditImmutabilityTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name) values ('c@test.local', 'x', '이름') returning account_id",
         ).query(Long::class.java).single()
         val itemId = jdbc.sql("select consent_item_id from consent_item where code = 'marketing_email'")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
         jdbc.sql(
             "insert into account_consent (account_id, consent_item_id, granted, source) values (:acc, :item, true, 'signup')",
         ).param("acc", accountId).param("item", itemId).update()

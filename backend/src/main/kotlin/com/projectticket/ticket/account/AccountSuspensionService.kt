@@ -67,7 +67,8 @@ class AccountSuspensionService(
             .param("id", accountId)
             .query(String::class.java)
             .optional()
-            .orElse(null) ?: return TicketException(ErrorCode.ACCOUNT_NOT_FOUND, "그런 계정이 없다: account_id=$accountId")
+            .orElse(null)
+            ?: return TicketException(ErrorCode.ACCOUNT_NOT_FOUND, "그런 계정이 없다: account_id=$accountId")
 
         return TicketException(
             ErrorCode.INVALID_TRANSITION,

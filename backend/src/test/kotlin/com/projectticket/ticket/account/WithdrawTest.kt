@@ -110,7 +110,8 @@ class WithdrawTest : PostgresTestBase() {
 
     private fun withdrawn(): Boolean =
         jdbc.sql("select deleted_at is not null from account where email = :email").param("email", EMAIL)
-            .query(Boolean::class.java).single()
+            .query(Boolean::class.java)
+            .single()
 
     private companion object {
         const val EMAIL = "withdraw-confirm@test.local"

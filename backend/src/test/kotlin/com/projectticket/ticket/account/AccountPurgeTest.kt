@@ -129,7 +129,8 @@ class AccountPurgeTest : PostgresTestBase() {
             content = """{"email":"$EMAIL","password":"$PASSWORD","display_name":"관객","consents":{"terms_of_service":true,"privacy_collect":true}}"""
         }.andExpect { status { isCreated() } }
         return jdbc.sql("select account_id from account where email = :email").param("email", EMAIL)
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
     }
 
     private fun logIn(): Cookie =

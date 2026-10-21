@@ -121,7 +121,10 @@ class PerformanceCancelService(
 
     private fun cannotCancel(performanceId: Long): TicketException {
         val status = jdbc.sql("select status from performance where performance_id = :id")
-            .param("id", performanceId).query(String::class.java).optional().orElse(null)
+            .param("id", performanceId)
+            .query(String::class.java)
+            .optional()
+            .orElse(null)
             ?: return TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
         return TicketException(
             ErrorCode.INVALID_TRANSITION,

@@ -72,7 +72,8 @@ class ConsentSignupTest : PostgresTestBase() {
         signUp(mapOf("terms_of_service" to true, "privacy_collect" to true)).andExpect { status { isCreated() } }
         assertThat(
             jdbc.sql("select item_version from current_consent where item_code = 'privacy_collect'")
-                .query(Int::class.java).single(),
+                .query(Int::class.java)
+                .single(),
         ).describedAs("새 가입은 지금 판에 동의한다").isEqualTo(2)
     }
 
@@ -117,7 +118,8 @@ class ConsentSignupTest : PostgresTestBase() {
         assertThat(consentCodes()).contains("marketing_email")
         assertThat(
             jdbc.sql("select granted from current_consent where item_code = 'marketing_email'")
-                .query(Boolean::class.java).single(),
+                .query(Boolean::class.java)
+                .single(),
         ).isFalse()
     }
 
@@ -137,7 +139,8 @@ class ConsentSignupTest : PostgresTestBase() {
 
         assertThat(
             jdbc.sql("select count(*) from audit_log where event_type = 'account.signed_up'")
-                .query(Long::class.java).single(),
+                .query(Long::class.java)
+                .single(),
         ).isEqualTo(1)
     }
 
