@@ -38,7 +38,7 @@ class SignupService(
     fun signUp(command: Command): Long {
         // **이메일에서 딴 비밀번호도 문맥 단어다**(NIST SHALL, `3b`). 형식 제약은 비밀번호만 보므로
         // 둘을 같이 아는 이 자리에서 본다. 문구는 형식 위반과 같은 `validation-failed` 다(`D5`).
-        if (blocklist.mentionsAccount(command.password, command.email)) {
+        if (blocklist.mentionsAccount(password = command.password, email = command.email)) {
             throw TicketException(
                 ErrorCode.VALIDATION_FAILED,
                 // **이유를 응답에 안 싣는다**(`D9`) — 형식 제약과 같은 태도다. 무엇이 걸렸는지는 로그에만 남는다.
@@ -51,14 +51,14 @@ class SignupService(
         consentService.verify(command.consents, items)
 
         val accountId = insertAccount(command)
-        consentService.record(accountId, command.consents, items, source = "signup", actorIp = command.actorIp)
+        consentService.record(accountId = accountId, given = command.consents, items = items, source = "signup", actorIp = command.actorIp)
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "account.signed_up",
-            accountId,
-            AuditLog.Target.of("account", accountId),
-            mapOf("consent_count" to command.consents.size),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "account.signed_up",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("account", accountId),
+            detail = mapOf("consent_count" to command.consents.size),
         )
         return accountId
     }

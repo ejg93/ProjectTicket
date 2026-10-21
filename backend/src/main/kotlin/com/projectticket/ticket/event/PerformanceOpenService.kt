@@ -57,11 +57,11 @@ class PerformanceOpenService(
             .update()
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "performance.opened",
-            actorAccountId,
-            AuditLog.Target.of("performance", performanceId),
-            mapOf("seat_count" to copied),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "performance.opened",
+            actorAccountId = actorAccountId,
+            target = AuditLog.Target.of("performance", performanceId),
+            detail = mapOf("seat_count" to copied),
         )
         return copied
     }

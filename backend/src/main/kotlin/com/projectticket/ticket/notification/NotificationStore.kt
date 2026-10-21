@@ -62,23 +62,23 @@ class NotificationStore(private val jdbc: JdbcClient) {
         ).param("id", reservationId).query(String::class.java).list().filterNotNull()
 
         val (subject, body) = NotificationTemplates.reserved(
-            performance,
-            seats.joinToString(", "),
-            number(envelope, "total_amount").toInt(),
-            tickets,
+            performance = performance,
+            seats = seats.joinToString(", "),
+            totalAmount = number(envelope, "total_amount").toInt(),
+            ticketNumbers = tickets,
         )
-        insert(envelope, accountId(envelope), subject, body)
+        insert(envelope = envelope, accountId = accountId(envelope), subject = subject, body = body)
     }
 
     private fun recordCancelled(envelope: OutboxRelay.Envelope) {
         val performance = performanceOf(envelope.aggregateId)
         val (subject, body) = NotificationTemplates.cancelled(
-            performance,
-            daysBeforeOf(envelope),
-            number(envelope, "fee_amount").toInt(),
-            number(envelope, "refund_amount").toInt(),
+            performance = performance,
+            daysBefore = daysBeforeOf(envelope),
+            feeAmount = number(envelope, "fee_amount").toInt(),
+            refundAmount = number(envelope, "refund_amount").toInt(),
         )
-        insert(envelope, accountId(envelope), subject, body)
+        insert(envelope = envelope, accountId = accountId(envelope), subject = subject, body = body)
     }
 
     /** 일수는 사건에 없다(`D11` 카탈로그) — 취소 시점에 박제된 환불 행이 든다(`D6`) */
@@ -117,7 +117,7 @@ class NotificationStore(private val jdbc: JdbcClient) {
             .query(CancelledLine::class.java).list().filterNotNull()
             .forEach { line ->
                 val (subject, body) = NotificationTemplates.performanceCancelled(performance, line.refundAmount)
-                insert(envelope, line.accountId, subject, body)
+                insert(envelope = envelope, accountId = line.accountId, subject = subject, body = body)
             }
     }
 

@@ -79,7 +79,12 @@ class OrganizerEventController(
         val performanceId = eventService.createPerformance(
             user.id,
             eventId,
-            OrganizerEventService.PerformanceCommand(request.hallId, request.startsAt, request.salesOpenAt, request.salesCloseAt),
+            OrganizerEventService.PerformanceCommand(
+                hallId = request.hallId,
+                startsAt = request.startsAt,
+                salesOpenAt = request.salesOpenAt,
+                salesCloseAt = request.salesCloseAt,
+            ),
         )
         return ResponseEntity.created(URI.create("/api/performances/$performanceId")).body(CreatedPerformance(performanceId))
     }

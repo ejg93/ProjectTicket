@@ -72,7 +72,7 @@ class RefundTransitionService(
             .orElseThrow { cannotCancel(accountId, reservationId) }
 
         val payment = approvedPaymentOf(reservationId)
-        val amounts = quote.amounts(cancelled.startsAt, cancelled.cancelledAt, payment.amount)
+        val amounts = quote.amounts(startsAt = cancelled.startsAt, at = cancelled.cancelledAt, paymentAmount = payment.amount)
             ?: throw TicketException(
                 ErrorCode.CANCEL_WINDOW_CLOSED,
                 "관람일 당일이라 취소할 수 없다: starts_at=${cancelled.startsAt}",
@@ -90,7 +90,7 @@ class RefundTransitionService(
         val rate = amounts.tierRate
         val fee = amounts.feeAmount
         val refundAmount = amounts.refundAmount
-        val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, refundAmount)
+        val refundId = insertRefund(paymentId = payment.paymentId, daysBefore = daysBefore, rate = rate, fee = fee, refund = refundAmount)
 
         val released = jdbc.sql(
             """
@@ -124,13 +124,21 @@ class RefundTransitionService(
         )
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "reservation.cancelled",
-            accountId,
-            AuditLog.Target.of("reservation", reservationId),
-            mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to refundAmount),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "reservation.cancelled",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("reservation", reservationId),
+            detail = mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to refundAmount),
         )
-        return Requested(refundId, reservationId, payment.paymentId, daysBefore, rate, fee, refundAmount)
+        return Requested(
+            refundId = refundId,
+            reservationId = reservationId,
+            paymentId = payment.paymentId,
+            daysBefore = daysBefore,
+            tierRate = rate,
+            feeAmount = fee,
+            refundAmount = refundAmount,
+        )
     }
 
     private fun cannotCancel(accountId: Long, reservationId: Long): TicketException {

@@ -46,7 +46,7 @@ class AdmissionService(
         if (waiting == 0L) return 0
 
         // 줄 길이보다 많은 토큰을 만들 이유가 없다. 토큰 생성은 앱이 한다 — Lua 에는 난수원이 없다.
-        val tokens = List(minOf(waiting, limit, BATCH_SIZE).toInt()) { newToken() }
+        val tokens = List(minOf(a = waiting, b = limit, c = BATCH_SIZE).toInt()) { newToken() }
         val args = listOf(
             CAPACITY.toString(),
             TOKEN_TTL.toMillis().toString(),

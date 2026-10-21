@@ -35,7 +35,7 @@ class OrganizerCatalogQuery(private val jdbc: JdbcClient) {
             "select hall_id, section as code, count(*) as seat_count from seat group by hall_id, section order by hall_id, section",
         ).query(SectionRow::class.java).list().filterNotNull().groupBy({ it.hallId }, { Section(it.code, it.seatCount) })
 
-        return halls.map { Hall(it.hallId, it.name, it.venueName, sections[it.hallId].orEmpty()) }
+        return halls.map { Hall(hallId = it.hallId, name = it.name, venueName = it.venueName, sections = sections[it.hallId].orEmpty()) }
     }
 
     data class Organizer(val organizerId: Long, val name: String)

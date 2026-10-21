@@ -48,13 +48,15 @@ class DemoSeeder(
         }
 
         val organizerId = insertOrganizer()
-        val organizerAccount = insertAccount("organizer@demo.local", "데모기획 담당", AccountRole.ORGANIZER)
+        val organizerAccount = insertAccount(email = "organizer@demo.local", displayName = "데모기획 담당", role = AccountRole.ORGANIZER)
         joinOrganizer(organizerId, organizerAccount)
-        insertAccount("admin@demo.local", "관리자", AccountRole.ADMIN)
-        repeat(AUDIENCE_COUNT) { insertAccount("audience${it + 1}@demo.local", "관객${it + 1}", AccountRole.AUDIENCE) }
+        insertAccount(email = "admin@demo.local", displayName = "관리자", role = AccountRole.ADMIN)
+        repeat(AUDIENCE_COUNT) { insertAccount(email = "audience${it + 1}@demo.local", displayName = "관객${it + 1}", role = AccountRole.AUDIENCE) }
 
         val hallIds = insertVenueAndHalls()
-        val performanceIds = HALL_SECTIONS.keys.flatMapIndexed { index, _ -> seedEvent(organizerAccount, organizerId, hallIds, index) }
+        val performanceIds = HALL_SECTIONS.keys.flatMapIndexed { index, _ ->
+            seedEvent(accountId = organizerAccount, organizerId = organizerId, hallIds = hallIds, index = index)
+        }
 
         log.info("데모 데이터 — 계정={} 홀={} 회차={}", AUDIENCE_COUNT + 2, hallIds.size, performanceIds.size)
     }

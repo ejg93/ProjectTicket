@@ -56,7 +56,7 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
         val problem = problems.create(ErrorCode.VALIDATION_FAILED, null, servletRequestOf(request))
         problem.setProperty(
             "errors",
-            e.bindingResult.fieldErrors.map { FieldError(toSnakeCase(it.field), it.defaultMessage) },
+            e.bindingResult.fieldErrors.map { FieldError(field = toSnakeCase(it.field), message = it.defaultMessage) },
         )
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status).body(problem)
     }

@@ -17,13 +17,13 @@ class AuditLogWriter(private val jdbc: JdbcClient, private val objectMapper: Obj
     /** 부르는 쪽 트랜잭션이 롤백돼도 남는다 */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun detached(eventType: String, actorAccountId: Long?, target: Target, detail: Map<String, Any?>) {
-        insert(eventType, actorAccountId, target, detail)
+        insert(eventType = eventType, actorAccountId = actorAccountId, target = target, detail = detail)
     }
 
     /** 부르는 쪽 트랜잭션에 얹는다. 없으면 이 문장 하나가 트랜잭션이다 */
     @Transactional
     fun joined(eventType: String, actorAccountId: Long?, target: Target, detail: Map<String, Any?>) {
-        insert(eventType, actorAccountId, target, detail)
+        insert(eventType = eventType, actorAccountId = actorAccountId, target = target, detail = detail)
     }
 
     private fun insert(eventType: String, actorAccountId: Long?, target: Target, detail: Map<String, Any?>) {

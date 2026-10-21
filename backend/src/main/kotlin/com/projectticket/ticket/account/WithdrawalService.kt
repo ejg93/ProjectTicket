@@ -46,10 +46,10 @@ class WithdrawalService(
             ?: throw TicketException(ErrorCode.ACCOUNT_NOT_FOUND, "이미 탈퇴했거나 없는 계정이다: account_id=$accountId")
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "account.withdrawn",
-            accountId,
-            AuditLog.Target.of("account", accountId),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "account.withdrawn",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("account", accountId),
         )
         return email
     }
@@ -80,8 +80,8 @@ class WithdrawalService(
      */
     private fun recordFailure(accountId: Long, ip: String, reason: String) =
         auditLog.record(
-            AuditLog.Kind.ATTEMPT,
-            "account.login_failed",
+            kind = AuditLog.Kind.ATTEMPT,
+            eventType = "account.login_failed",
             actorAccountId = accountId,
             detail = mapOf("ip" to ip, "reason" to reason),
         )

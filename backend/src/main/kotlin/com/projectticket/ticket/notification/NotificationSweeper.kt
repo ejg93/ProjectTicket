@@ -42,7 +42,7 @@ class NotificationSweeper(private val store: NotificationStore, private val send
                 continue
             }
 
-            val result = sender.send(email, row.subject, row.body)
+            val result = sender.send(address = email, subject = row.subject, body = row.body)
             if (result.succeeded) {
                 store.markSent(row.notificationId)
                 sent++

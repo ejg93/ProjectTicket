@@ -39,7 +39,14 @@ class SettlementQuery(private val jdbc: JdbcClient) {
             .list()
             .filterNotNull()
 
-        return Settlement(head.performanceId, head.status, head.amount, head.settleAt, head.settledAt, lines)
+        return Settlement(
+            performanceId = head.performanceId,
+            status = head.status,
+            amount = head.amount,
+            settleAt = head.settleAt,
+            settledAt = head.settledAt,
+            lines = lines,
+        )
     }
 
     data class Settlement(

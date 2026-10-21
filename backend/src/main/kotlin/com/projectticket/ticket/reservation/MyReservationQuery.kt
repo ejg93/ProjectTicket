@@ -38,7 +38,7 @@ class MyReservationQuery(private val jdbc: JdbcClient) {
             .list()
             .filterNotNull()
 
-        return MyReservationPage(items, paging.page, paging.size, total)
+        return MyReservationPage(items = items, page = paging.page, size = paging.size, total = total)
     }
 
     data class MyReservationPage(val items: List<MyReservation>, val page: Int, val size: Int, val total: Int)

@@ -36,7 +36,7 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
         val hash = sha256(json.writeValueAsString(request))
 
         if (!claim(accountId, key, hash)) {
-            return replay(accountId, key, hash, responseType)
+            return replay(accountId = accountId, key = key, hash = hash, responseType = responseType)
         }
 
         val result = work()

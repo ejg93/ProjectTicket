@@ -130,11 +130,11 @@ class SeatHoldService(
         seatVersions.publishAfterCommit(heldSeats, PerformanceSeatStatus.HELD)
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "reservation.held",
-            accountId,
-            AuditLog.Target.of("reservation", reservationId),
-            mapOf("performance_id" to command.performanceId, "seat_count" to seatIds.size),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "reservation.held",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("reservation", reservationId),
+            detail = mapOf("performance_id" to command.performanceId, "seat_count" to seatIds.size),
         )
         return reservationId
     }

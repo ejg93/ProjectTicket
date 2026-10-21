@@ -33,8 +33,8 @@ class AuditLog(private val writer: AuditLogWriter) {
         detail: Map<String, Any?> = emptyMap(),
     ) {
         when (kind) {
-            Kind.ATTEMPT -> writer.detached(eventType, actorAccountId, target, detail)
-            Kind.OUTCOME -> writer.joined(eventType, actorAccountId, target, detail)
+            Kind.ATTEMPT -> writer.detached(eventType = eventType, actorAccountId = actorAccountId, target = target, detail = detail)
+            Kind.OUTCOME -> writer.joined(eventType = eventType, actorAccountId = actorAccountId, target = target, detail = detail)
         }
     }
 

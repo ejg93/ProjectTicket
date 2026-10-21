@@ -41,7 +41,7 @@ class OrganizerEventQuery(private val jdbc: JdbcClient, private val membership: 
             .list()
             .filterNotNull()
 
-        return OrganizerEventPage(items, paging.page, paging.size, total)
+        return OrganizerEventPage(items = items, page = paging.page, size = paging.size, total = total)
     }
 
     /**
@@ -81,7 +81,14 @@ class OrganizerEventQuery(private val jdbc: JdbcClient, private val membership: 
             .list()
             .filterNotNull()
 
-        return OrganizerEventDetail(head.eventId, head.title, head.organizerId, head.organizerName, grades, performances)
+        return OrganizerEventDetail(
+            eventId = head.eventId,
+            title = head.title,
+            organizerId = head.organizerId,
+            organizerName = head.organizerName,
+            grades = grades,
+            performances = performances,
+        )
     }
 
     data class OrganizerEventPage(val items: List<OrganizerEventSummary>, val page: Int, val size: Int, val total: Int)

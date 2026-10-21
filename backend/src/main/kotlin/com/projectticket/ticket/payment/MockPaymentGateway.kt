@@ -62,7 +62,7 @@ class MockPaymentGateway {
         val last4 = digits.takeLast(4)
         return when (last4) {
             DECLINE_LAST4 -> {
-                Result(null, last4, DECLINE_REASON).also { byKey[request.idempotencyKey] = it }
+                Result(approvalNumber = null, cardLast4 = last4, declineReason = DECLINE_REASON).also { byKey[request.idempotencyKey] = it }
             }
             SILENT_LAST4 -> {
                 throw TimedOut("결제사가 응답하지 않는다")
@@ -94,7 +94,7 @@ class MockPaymentGateway {
         return refundsByKey.computeIfAbsent(refundKey) { RefundResult("MR%d%04d".format(Locale.ROOT, System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))) }
     }
 
-    private fun approved(last4: String) = Result(issueApprovalNumber(), last4, null)
+    private fun approved(last4: String) = Result(approvalNumber = issueApprovalNumber(), cardLast4 = last4, declineReason = null)
 
     /** 시각을 앞에 둬서 재기동해도 안 겹친다 — 일련번호만 쓰면 다시 뜬 뒤 1번부터라 `payment_approval_number_key` 에 걸린다 */
     private fun issueApprovalNumber(): String = "M%d%04d".format(Locale.ROOT, System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))

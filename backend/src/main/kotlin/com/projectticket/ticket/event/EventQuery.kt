@@ -58,7 +58,7 @@ class EventQuery(private val jdbc: JdbcClient) {
             .list()
             .filterNotNull()
 
-        return EventPage(items, paging.page, paging.size, total)
+        return EventPage(items = items, page = paging.page, size = paging.size, total = total)
     }
 
     /**
@@ -95,7 +95,13 @@ class EventQuery(private val jdbc: JdbcClient) {
             """,
         ).param("id", eventId).param("open", PerformanceStatus.OPEN.code).query(PerformanceLine::class.java).list().filterNotNull()
 
-        return EventDetail(event.eventId, event.title, event.organizerName, grades, performances)
+        return EventDetail(
+            eventId = event.eventId,
+            title = event.title,
+            organizerName = event.organizerName,
+            grades = grades,
+            performances = performances,
+        )
     }
 
     data class EventPage(val items: List<EventSummary>, val page: Int, val size: Int, val total: Int)

@@ -24,7 +24,7 @@ class RefundQuote(private val jdbc: JdbcClient) {
         val daysBefore = RefundPolicy.daysBefore(startsAt, at)
         val rate = tierRateFor(daysBefore) ?: return null
         val fee = RefundPolicy.fee(paymentAmount, rate)
-        return Amounts(daysBefore, rate, fee, paymentAmount - fee)
+        return Amounts(daysBefore = daysBefore, tierRate = rate, feeAmount = fee, refundAmount = paymentAmount - fee)
     }
 
     /**
@@ -50,12 +50,26 @@ class RefundQuote(private val jdbc: JdbcClient) {
             .orElseThrow { TicketException(ErrorCode.RESERVATION_NOT_FOUND) }
 
         val status = ReservationStatus.of(row.status)
-        val daysBefore = RefundPolicy.daysBefore(row.startsAt, row.at)
+        val daysBefore = RefundPolicy.daysBefore(startsAt = row.startsAt, cancelledAt = row.at)
         if (status != ReservationStatus.RESERVED || row.paymentAmount == null) {
-            return Preview(reservationId, status.code, row.paymentAmount, daysBefore, cancellable = false, reason = ErrorCode.INVALID_TRANSITION.slug)
+            return Preview(
+                reservationId = reservationId,
+                status = status.code,
+                paymentAmount = row.paymentAmount,
+                daysBefore = daysBefore,
+                cancellable = false,
+                reason = ErrorCode.INVALID_TRANSITION.slug,
+            )
         }
-        val amounts = amounts(row.startsAt, row.at, row.paymentAmount)
-            ?: return Preview(reservationId, status.code, row.paymentAmount, daysBefore, cancellable = false, reason = ErrorCode.CANCEL_WINDOW_CLOSED.slug)
+        val amounts = amounts(startsAt = row.startsAt, at = row.at, paymentAmount = row.paymentAmount)
+            ?: return Preview(
+                reservationId = reservationId,
+                status = status.code,
+                paymentAmount = row.paymentAmount,
+                daysBefore = daysBefore,
+                cancellable = false,
+                reason = ErrorCode.CANCEL_WINDOW_CLOSED.slug,
+            )
         return Preview(
             reservationId = reservationId,
             status = status.code,

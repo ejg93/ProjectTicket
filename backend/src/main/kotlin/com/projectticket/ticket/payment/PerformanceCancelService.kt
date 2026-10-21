@@ -92,8 +92,13 @@ class PerformanceCancelService(
             // 회차 취소(좌석 수)가 같은 카운터에서 단위가 달라진다.
             metrics.reservationCancelled(CancelledBy.ORGANIZER.code, affected.size)
             refundInFull(affected)
-            affected.forEach {
-                auditLog.record(AuditLog.Kind.OUTCOME, "reservation.cancelled", actorAccountId, AuditLog.Target.of("reservation", it))
+            affected.forEach { reservationId ->
+                auditLog.record(
+                    kind = AuditLog.Kind.OUTCOME,
+                    eventType = "reservation.cancelled",
+                    actorAccountId = actorAccountId,
+                    target = AuditLog.Target.of("reservation", reservationId),
+                )
             }
         }
 
@@ -104,11 +109,11 @@ class PerformanceCancelService(
             mapOf("performance_id" to performanceId, "cancelled_reservation_count" to affected.size),
         )
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "performance.cancelled",
-            actorAccountId,
-            AuditLog.Target.of("performance", performanceId),
-            mapOf("cancelled_reservation_count" to affected.size),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "performance.cancelled",
+            actorAccountId = actorAccountId,
+            target = AuditLog.Target.of("performance", performanceId),
+            detail = mapOf("cancelled_reservation_count" to affected.size),
         )
         log.info("회차 취소 performance_id={} 예매={}건", performanceId, affected.size)
         return affected.size

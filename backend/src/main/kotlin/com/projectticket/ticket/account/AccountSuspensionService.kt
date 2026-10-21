@@ -25,11 +25,11 @@ class AccountSuspensionService(
     /** @return 그 계정의 이메일. 세션을 끊을 때 쓴다 — 세션 색인이 이름(이메일)이다 */
     @Transactional
     fun suspend(actorAccountId: Long, accountId: Long): String =
-        move(actorAccountId, accountId, to = AccountStatus.SUSPENDED, from = AccountStatus.ACTIVE, event = "account.suspended")
+        move(actorAccountId = actorAccountId, accountId = accountId, to = AccountStatus.SUSPENDED, from = AccountStatus.ACTIVE, event = "account.suspended")
 
     @Transactional
     fun resume(actorAccountId: Long, accountId: Long): String =
-        move(actorAccountId, accountId, to = AccountStatus.ACTIVE, from = AccountStatus.SUSPENDED, event = "account.resumed")
+        move(actorAccountId = actorAccountId, accountId = accountId, to = AccountStatus.ACTIVE, from = AccountStatus.SUSPENDED, event = "account.resumed")
 
     /**
      * 조건부 UPDATE 다. 두 관리자가 같이 눌러도 둘째는 0행이고, 그때는 **이미 그 상태**라 409 가 아니라 실패다 —
@@ -53,11 +53,11 @@ class AccountSuspensionService(
             ?: throw cannotMove(accountId, to)
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            event,
-            actorAccountId,
-            AuditLog.Target.of("account", accountId),
-            mapOf("status" to to.code),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = event,
+            actorAccountId = actorAccountId,
+            target = AuditLog.Target.of("account", accountId),
+            detail = mapOf("status" to to.code),
         )
         return email
     }
