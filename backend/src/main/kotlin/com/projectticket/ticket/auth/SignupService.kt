@@ -25,7 +25,7 @@ class SignupService(
     private val auditLog: AuditLog,
 ) {
 
-    /** @param consents 항목 코드 → 동의 여부. **담긴 것만** 기록한다 */
+    /** [consents] 는 항목 코드 → 동의 여부다. **담긴 것만** 기록한다 */
     data class Command(
         val email: String,
         val password: String,

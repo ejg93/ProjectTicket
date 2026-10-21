@@ -20,8 +20,8 @@ class ProblemWriter(
 ) {
 
     /**
-     * @param properties 그 오류에만 붙는 값(`D5` 「type 목록」) — 관문의 `rank`·`eta_seconds` 같은 것
-     * @param headers 상태 코드가 요구하는 헤더 — 503 의 `Retry-After` 같은 것
+     * [properties] 는 그 오류에만 붙는 값이다(`D5` 「type 목록」) — 관문의 `rank`·`eta_seconds` 같은 것.
+     * [headers] 는 상태 코드가 요구하는 헤더다 — 503 의 `Retry-After` 같은 것.
      */
     fun write(
         request: HttpServletRequest,

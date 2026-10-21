@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
 @Component
 class ProblemFactory(private val tracer: Tracer) {
 
-    /** @param detail 이 자리에서만 쓰는 설명. null 이면 [ErrorCode] 의 기본 문구를 쓴다 */
+    /** [detail] 은 이 자리에서만 쓰는 설명이다. null 이면 [ErrorCode] 의 기본 문구를 쓴다 */
     fun create(code: ErrorCode, detail: String?, request: HttpServletRequest): ProblemDetail =
         ProblemDetail.forStatusAndDetail(code.status, detail ?: code.title).apply {
             type = URI.create(code.type)
@@ -33,5 +33,5 @@ class ProblemFactory(private val tracer: Tracer) {
      *
      * 추적 문맥이 없는 자리(기동·배치)에서 난 오류는 비운다. 지어내 봐야 어느 로그와도 안 이어진다.
      */
-    private fun currentTraceId(): String? = tracer.currentSpan()?.context()?.traceId()
+    private fun currentTraceId(): String? = tracer.currentSpan()?.run { context().traceId() }
 }

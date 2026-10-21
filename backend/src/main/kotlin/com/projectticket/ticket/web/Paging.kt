@@ -49,8 +49,8 @@ class OrderBy private constructor(val sql: String) {
         /**
          * `필드,방향` 을 푼다. 허용 목록 밖이면 400 이다(`D5`).
          *
-         * @param allowed 요청에 쓰는 이름 → `order by` 에 넣을 SQL 조각. 값이 우리 글자다
-         * @param default `sort` 가 없을 때 쓸 이름
+         * [allowed] 는 요청에 쓰는 이름 → `order by` 에 넣을 SQL 조각이다. 값이 우리 글자다.
+         * [default] 는 `sort` 가 없을 때 쓸 이름이다.
          */
         fun of(raw: String?, allowed: Map<String, String>, default: String): OrderBy {
             val (field, direction) = split(raw ?: default)
@@ -69,7 +69,7 @@ class OrderBy private constructor(val sql: String) {
 
         private fun split(raw: String): Pair<String, String> {
             val parts = raw.split(',', limit = 2)
-            val direction = when (parts.getOrNull(1)?.trim()?.lowercase()) {
+            val direction = when (parts.getOrNull(1)?.run { trim().lowercase() }) {
                 // 방향은 둘뿐이라 목록이 아니라 `when` 이다. 모르는 값은 기본값으로 안 떨어뜨린다 —
                 // `starts_at,decs` 같은 오타가 조용히 오름차순이 되면 화면이 거꾸로 그려진 줄 모른다.
                 "asc", null, "" -> "asc"

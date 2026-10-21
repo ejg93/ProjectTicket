@@ -31,9 +31,11 @@ class AuditLog(private val writer: AuditLogWriter) {
         actorAccountId: Long?,
         target: Target = Target.none(),
         detail: Map<String, Any?> = emptyMap(),
-    ) = when (kind) {
-        Kind.ATTEMPT -> writer.detached(eventType, actorAccountId, target, detail)
-        Kind.OUTCOME -> writer.joined(eventType, actorAccountId, target, detail)
+    ) {
+        when (kind) {
+            Kind.ATTEMPT -> writer.detached(eventType, actorAccountId, target, detail)
+            Kind.OUTCOME -> writer.joined(eventType, actorAccountId, target, detail)
+        }
     }
 
     /** 무엇에 대해 한 일인가. 자원이 없는 사건이면 [none] */

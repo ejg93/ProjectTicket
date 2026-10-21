@@ -16,7 +16,7 @@ class MockNotificationSender {
 
     private val log = LoggerFactory.getLogger(MockNotificationSender::class.java)
 
-    /** @param failureReason 못 나갔으면 종류. 나갔으면 null */
+    /** [failureReason] 은 못 나갔으면 종류, 나갔으면 null 이다 */
     data class Result(val succeeded: Boolean, val failureReason: String?) {
         companion object {
             fun sent() = Result(true, null)

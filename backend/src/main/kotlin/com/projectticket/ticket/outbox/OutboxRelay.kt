@@ -37,7 +37,7 @@ class OutboxRelay(
     /**
      * 발행되는 것. Kafka 로 나간다(28, ADR 0007) — 값은 이 봉투의 JSON 이고 키는 `aggregate_id` 다.
      *
-     * @param payload 카탈로그가 정한 필드(`D11`). 소비자는 이 안의 식별자로 표를 다시 읽는다 — 사건은 「무슨 일이 났나」고 지금 상태는 표가 안다
+     * [payload] 는 카탈로그가 정한 필드다(`D11`). 소비자는 이 안의 식별자로 표를 다시 읽는다 — 사건은 「무슨 일이 났나」고 지금 상태는 표가 안다
      */
     data class Envelope(
         val eventId: UUID,

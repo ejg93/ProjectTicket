@@ -33,7 +33,7 @@ class MockPaymentGateway {
         override fun toString(): String = "Request[idempotencyKey=$idempotencyKey, amount=$amount]"
     }
 
-    /** @param approvalNumber 승인번호. 거절이면 null. @param declineReason 거절 사유. 승인이면 null */
+    /** [approvalNumber] 는 승인번호다. 거절이면 null. [declineReason] 은 거절 사유다. 승인이면 null */
     data class Result(val approvalNumber: String?, val cardLast4: String, val declineReason: String?) {
         val approved: Boolean get() = approvalNumber != null
     }
@@ -45,6 +45,9 @@ class MockPaymentGateway {
 
     /** 같은 키에 같은 답을 주기 위한 기억. 지연 카드는 응답을 잃어도 여기엔 남는다 — 그것이 「승인은 났는데 응답만 못 받았다」다 */
     private val byKey = ConcurrentHashMap<String, Result>()
+
+    /** 이미 돌려준 환불. 키는 우리 환불 id 다 */
+    private val refundsByKey = ConcurrentHashMap<String, RefundResult>()
 
     /**
      * 승인을 요청한다.
@@ -58,24 +61,27 @@ class MockPaymentGateway {
         val digits = digitsOf(request.cardNumber)
         val last4 = digits.takeLast(4)
         return when (last4) {
-            DECLINE_LAST4 -> Result(null, last4, DECLINE_REASON).also { byKey[request.idempotencyKey] = it }
-            SILENT_LAST4 -> throw TimedOut("결제사가 응답하지 않는다")
+            DECLINE_LAST4 -> {
+                Result(null, last4, DECLINE_REASON).also { byKey[request.idempotencyKey] = it }
+            }
+            SILENT_LAST4 -> {
+                throw TimedOut("결제사가 응답하지 않는다")
+            }
             DELAYED_LAST4 -> {
                 byKey[request.idempotencyKey] = approved(last4)
                 throw TimedOut("승인은 났는데 응답이 늦었다")
             }
-            else -> approved(last4).also { byKey[request.idempotencyKey] = it }
+            else -> {
+                approved(last4).also { byKey[request.idempotencyKey] = it }
+            }
         }
     }
 
     /** 상태 조회. 무응답 뒤에 **재시도 대신** 부른다 — 재시도는 이중 결제다(`D4`). PG 가 모르면 null */
     fun inquire(idempotencyKey: String): Result? = byKey[idempotencyKey]
 
-    /** @param refundNumber PG 가 채번한 환불 거래번호 */
+    /** @property refundNumber PG 가 채번한 환불 거래번호 */
     data class RefundResult(val refundNumber: String)
-
-    /** 이미 돌려준 환불. 키는 우리 환불 id 다 */
-    private val refundsByKey = ConcurrentHashMap<String, RefundResult>()
 
     /**
      * 승인된 결제의 전부 또는 일부를 돌려준다. **거절이 없다** — 승인은 카드 한도 판정이라 거절이 정상 결과지만, 환불은 이미 받은 돈을

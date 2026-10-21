@@ -151,14 +151,15 @@ class SecurityConfig {
      * 값은 `application.yml` 의 `server.servlet.session.cookie` 한 곳에서 읽는다 — 두 벌로 적지 않는다.
      */
     @Bean
-    fun cookieSerializer(server: ServerProperties): CookieSerializer =
-        DefaultCookieSerializer().apply {
-            val cookie = server.servlet.session.cookie
-            cookie.name?.let { setCookieName(it) }
-            cookie.httpOnly?.let { setUseHttpOnlyCookie(it) }
-            cookie.secure?.let { setUseSecureCookie(it) }
-            cookie.sameSite?.let { setSameSite(it.attributeValue()) }
-        }
+    fun cookieSerializer(server: ServerProperties): CookieSerializer {
+        val cookie = server.servlet.session.cookie
+        val serializer = DefaultCookieSerializer()
+        cookie.name?.let { serializer.setCookieName(it) }
+        cookie.httpOnly?.let { serializer.setUseHttpOnlyCookie(it) }
+        cookie.secure?.let { serializer.setUseSecureCookie(it) }
+        cookie.sameSite?.let { serializer.setSameSite(it.attributeValue()) }
+        return serializer
+    }
 
     /** 빈으로 두는 이유는 로그인(토큰 회전)·로그아웃(쿠키 삭제)도 같은 저장소를 봐야 해서다 */
     @Bean

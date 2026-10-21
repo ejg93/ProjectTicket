@@ -28,8 +28,8 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
      * 이 키로 처리한 적이 없으면 [work] 를 돌리고, 있으면 그때 응답을 그대로 돌려준다.
      * [work] 안의 서비스가 `@Transactional` 이면 새 트랜잭션을 안 열고 이 트랜잭션에 참여한다(`REQUIRED`).
      *
-     * @param request 본문 비교용. 같은 키로 다른 본문이 오면 422
-     * @param responseType 재생할 때 되돌릴 타입. 저장이 JSON 이라 필요하다
+     * [request] 는 본문 비교용이다. 같은 키로 다른 본문이 오면 422.
+     * [responseType] 은 재생할 때 되돌릴 타입이다. 저장이 JSON 이라 필요하다.
      */
     @Transactional
     fun <T : Any> run(accountId: Long, key: String, request: Any, responseType: Class<T>, work: () -> T): T {

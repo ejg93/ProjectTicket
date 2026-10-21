@@ -100,7 +100,7 @@ class QueueGateFilter(
     /** 선점 경로에서만 회차 id 가 나온다. 다른 요청은 [shouldNotFilter] 가 걸러 낸다 */
     private fun performanceIdOf(request: HttpServletRequest): Long? {
         if (!HttpMethod.POST.matches(request.method)) return null
-        return HOLD_PATH.matchEntire(request.requestURI)?.groupValues?.get(1)?.toLongOrNull()
+        return HOLD_PATH.matchEntire(request.requestURI)?.run { groupValues[1].toLongOrNull() }
     }
 
     companion object {

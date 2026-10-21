@@ -115,9 +115,9 @@ class NotificationStore(private val jdbc: JdbcClient) {
         ).param("id", performanceId).param("approved", PaymentStatus.APPROVED.code)
             .param("cancelled", ReservationStatus.CANCELLED.code).param("by", CancelledBy.ORGANIZER.code)
             .query(CancelledLine::class.java).list().filterNotNull()
-            .forEach {
-                val (subject, body) = NotificationTemplates.performanceCancelled(performance, it.refundAmount)
-                insert(envelope, it.accountId, subject, body)
+            .forEach { line ->
+                val (subject, body) = NotificationTemplates.performanceCancelled(performance, line.refundAmount)
+                insert(envelope, line.accountId, subject, body)
             }
     }
 
@@ -202,7 +202,7 @@ class NotificationStore(private val jdbc: JdbcClient) {
         jdbc.sql("update notification set status = :skipped, failure_reason = :reason where notification_id = :id and status = :pending")
             .param("skipped", NotificationStatus.SKIPPED.code).param("pending", NotificationStatus.PENDING.code).param("reason", reason).param("id", notificationId).update()
 
-    /** @param email 탈퇴한 계정이면 null — 파기가 컬럼을 비운다 */
+    /** [email] 은 탈퇴한 계정이면 null 이다 — 파기가 컬럼을 비운다 */
     data class Pending(val notificationId: Long, val subject: String, val body: String, val email: String?)
 
     data class Line(val title: String, val startsAt: OffsetDateTime)

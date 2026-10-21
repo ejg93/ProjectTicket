@@ -29,7 +29,7 @@ class RefundService(private val gateway: MockPaymentGateway, private val transit
         val status: String,
     )
 
-    /** @param expectedRefund 화면이 본 환불액. 지금 계산과 다르면 ① 이 409 `quote-changed` 로 되돌린다(`44a-1a`) */
+    /** [expectedRefund] 는 화면이 본 환불액이다. 지금 계산과 다르면 ① 이 409 `quote-changed` 로 되돌린다(`44a-1a`) */
     fun cancel(accountId: Long, reservationId: Long, expectedRefund: Int): Result {
         val requested = transitions.request(accountId, reservationId, expectedRefund)
 

@@ -26,7 +26,7 @@ class OrganizerEventService(
     private val membership: OrganizerMembership,
 ) {
 
-    /** @param sections 이 등급이 붙는 구역들. 같은 구역을 두 등급이 가리키면 `seat_grade_map` 의 기본키가 막는다 */
+    /** [sections] 는 이 등급이 붙는 구역들이다. 같은 구역을 두 등급이 가리키면 `seat_grade_map` 의 기본키가 막는다 */
     data class GradeCommand(val code: String, val price: Int, val sections: List<String>)
 
     data class EventCommand(val organizerId: Long, val title: String, val grades: List<GradeCommand>)

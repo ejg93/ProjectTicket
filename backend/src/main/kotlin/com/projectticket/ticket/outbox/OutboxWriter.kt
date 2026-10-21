@@ -18,8 +18,9 @@ import java.util.UUID
 class OutboxWriter(private val jdbc: JdbcClient, private val json: ObjectMapper) {
 
     /**
-     * @param aggregateId 그 사건이 일어난 집합체. 파티션 키의 뒷자리(28)
-     * @param payload 식별자와 **그때의 값**. 개인정보를 안 담는다(`D11` 「페이로드 규칙」) — 사건은 브로커·DLQ·로그에 남는다
+     * [aggregateId] 는 그 사건이 일어난 집합체다. 파티션 키의 뒷자리(28).
+     * [payload] 는 식별자와 **그때의 값**이다. 개인정보를 안 담는다(`D11` 「페이로드 규칙」) — 사건은 브로커·DLQ·로그에 남는다.
+     *
      * @return 만든 `event_id`. 소비자 멱등의 키고, 테스트가 이 값으로 행을 찾는다
      */
     @Transactional(propagation = Propagation.MANDATORY)

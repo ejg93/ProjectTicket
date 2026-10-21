@@ -36,7 +36,8 @@ class AdmissionService(
      * 창 안에서 [BATCH_SIZE] 를 다 썼으면 아무도 안 들인다. **줄이 비었을 때의 즉시 입장**([QueueService.enter], `D12` 「항상 켠다」)도
      * 같은 예산을 쓴다 — 한가한 시간에는 예산이 남아 바로 들어가고, 몰리면 예산이 바닥나 줄에 선다. 그래서 어느 길로 들어오든 R 은 상한이다.
      *
-     * @param limit 이번에 들일 상한. 스케줄러는 [BATCH_SIZE], 즉시 입장은 1
+     * [limit] 은 이번에 들일 상한이다. 스케줄러는 [BATCH_SIZE], 즉시 입장은 1.
+     *
      * @return 이번에 들인 사람 수. 줄이 비었거나 정원이 찼거나 예산이 없으면 0
      */
     fun admit(performanceId: Long, limit: Long = BATCH_SIZE): Long {
@@ -118,7 +119,7 @@ class AdmissionService(
 
     /** 무작위 32바이트. 추측으로 남의 자리를 못 쓴다(`D9`) */
     private fun newToken(): String =
-        ByteArray(TOKEN_BYTES).also(random::nextBytes).let(Base64.getUrlEncoder().withoutPadding()::encodeToString)
+        Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(TOKEN_BYTES).also(random::nextBytes))
 
     /** 토큰에 박힌 것(`D12`). 관문이 셋을 대조한다 — 토큰 하나로 남의 계정·다른 회차를 못 산다 */
     data class Admission(val accountId: Long, val performanceId: Long, val issuedAt: Long)

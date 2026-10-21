@@ -48,7 +48,7 @@ class RefundTransitionService(
      * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 그 밖의 상태 → 409 `invalid-transition`.
      * 당일이면 그 뒤에 던진다 — 예외가 이 트랜잭션을 통째로 되돌리므로 옮긴 상태도 사라진다. 본 금액이 다를 때(`44a-1a`)도 같은 자리다.
      *
-     * @param expectedRefund 화면이 본 환불액. **필수다**(`44a-1c`) — 널로 대조를 건너뛰게 두면 새 호출자가 빼는 순간 검사가 조용히 빠진다.
+     * [expectedRefund] 는 화면이 본 환불액이다. **필수다**(`44a-1c`) — 널로 대조를 건너뛰게 두면 새 호출자가 빼는 순간 검사가 조용히 빠진다.
      */
     @Transactional
     fun request(accountId: Long, reservationId: Long, expectedRefund: Int): Requested {

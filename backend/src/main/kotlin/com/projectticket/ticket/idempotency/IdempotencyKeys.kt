@@ -15,7 +15,7 @@ object IdempotencyKeys {
      * `errors[].field` 는 본문 필드가 아니라 헤더 이름이다 — 화면이 「어느 칸」이 아니라 「요청 자체」를 고쳐야 한다는 뜻이다.
      */
     fun require(header: String?): String =
-        header?.trim()?.lowercase()?.takeIf { UUID_V4.matches(it) }
+        header?.run { trim().lowercase().takeIf { UUID_V4.matches(it) } }
             ?: throw TicketException(
                 ErrorCode.VALIDATION_FAILED,
                 "$HEADER 헤더가 필요하다(UUIDv4)",
