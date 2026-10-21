@@ -1,0 +1,15 @@
+# 게이트: SeatHandoverTest — V24 트리거
+# 명령: cd backend && TESTCONTAINERS_REUSE_ENABLE=false ./gradlew integrationTest --tests '*SeatHandover*' --no-daemon -q; r=$?; cat build/test-results/integrationTest/*SeatHandover*.xml 2>/dev/null; exit $r
+# 문구: 트리거가 안 막았다
+diff --git a/backend/src/main/resources/db/migration/V24__performance_seat_no_handover.sql b/backend/src/main/resources/db/migration/V24__performance_seat_no_handover.sql
+--- a/backend/src/main/resources/db/migration/V24__performance_seat_no_handover.sql
++++ b/backend/src/main/resources/db/migration/V24__performance_seat_no_handover.sql
+@@ -16,8 +16,3 @@
+ end;
+ $$ language plpgsql;
+ 
+-create trigger performance_seat_no_handover
+-    before update on performance_seat
+-    for each row
+-    when (old.reservation_id is not null and new.reservation_id is not null and new.reservation_id <> old.reservation_id)
+-    execute function performance_seat_keeps_reservation();

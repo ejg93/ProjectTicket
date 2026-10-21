@@ -1,0 +1,14 @@
+# 게이트: OversellConcurrencyTest — 조건부 UPDATE 의 status 조건을 빼면 V24 가 막는다
+# 명령: cd backend && TESTCONTAINERS_REUSE_ENABLE=false ./gradlew integrationTest --tests '*OversellConcurrency*' --no-daemon -q; r=$?; cat build/test-results/integrationTest/*OversellConcurrency*.xml 2>/dev/null; exit $r
+# 문구: 좌석이 다른 예매로 넘어간다
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt b/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt
+--- a/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt
++++ b/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt
+@@ -235,7 +235,6 @@
+              where r.reservation_id = :reservation
+                and ps.performance_id = :performance
+                and ps.performance_seat_id in (:seatIds)
+-               and ps.status = :available
+                and exists (select 1 from performance p where p.performance_id = :performance and p.status = :open)
+             returning ps.performance_seat_id, ps.performance_id
+             """,

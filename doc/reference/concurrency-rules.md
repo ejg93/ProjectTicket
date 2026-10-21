@@ -91,6 +91,8 @@ select performance_seat_id
 **불변식**: 예매가 `held`·`paying`·`reserved` 면 그 예매의 `reservation_seat` 좌석 집합 = `performance_seat` 에서 `reservation_id` 가 그 예매인 집합.
 `ReservationSeatConsistencyTest`(13)가 매 전이 뒤에 대조한다. 트리거로 안 내리는 이유는 두 표를 잇는 조건이라 행 트리거가 볼 자리가 없어서다.
 
+**불변식**: 좌석은 예매를 바꿔 가리키지 않는다 — 포인터는 null→A·A→null 만 간다. 트리거 `performance_seat_no_handover`(`V24`, `51`)가 A→B 를 막는다. 초과 판매의 셋째 겹이다(앞의 둘은 조건부 UPDATE 의 `status` 조건과 갱신 행 수 대조).
+
 ## 합계 불변식
 
 `reservation.total_amount = Σ reservation_seat.price`. 합계는 원본과 어긋날 수 있는 유일한 종류의 값이다(`D14` 「불변식」).
