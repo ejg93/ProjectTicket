@@ -28,7 +28,7 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 | `queue:{performanceId}` | ZSET | 대기 줄. **member = accountId**, score = 진입 시각(ms) | 회차 종료 때 삭제 |
 | `queue:{performanceId}:seen` | HASH | accountId → 마지막 하트비트(ms) | 위와 같이 |
 | `queue:{performanceId}:active` | ZSET | 활성 토큰. member = token, score = 만료 시각(ms) | 위와 같이 |
-| `queue:{performanceId}:admit_window` | HASH | 입장 예산의 창 — `start`(창 시작, Redis `TIME` ms)·`used`(이 창에 들인 수). 토큰 버킷이다(`35f`, ADR 0009) | 주기 × 2(`PEXPIRE`) |
+| `queue:{performanceId}:admit_window` | HASH | 입장 예산의 창 — `start`(창 시작, Redis `TIME` ms)·`used`(이 창에 들인 수). 고정 창 카운터다 — 창 경계 앞뒤로 두 창의 예산이 붙을 수 있다(`35f`, ADR 0009) | 주기 × 2(`PEXPIRE`) |
 | `admit:{token}` | STRING(JSON) | `{account_id, performance_id, issued_at}` | 10분(ADR 0003) |
 | `admit:by-account:{performanceId}:{accountId}` | STRING | 그 계정의 현재 토큰 | 10분 |
 
@@ -43,7 +43,7 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 관객 ─POST /api/queue/{perf}─> ZADD NX  ──> waiting {rank, eta}   ① 진입·재진입 (순번 유지)
 관객 ─GET  /api/queue/{perf}─> ZRANK    ──> waiting | admitted     ② 폴링 2초 (43)
                                  + HSET seen                    ③ 하트비트는 폴링이 겸한다
-스케줄러 ─5초마다─> Lua: 만료 정리 → 빈자리 = C - 활성 → 앞에서 min(빈자리, 100) 을 ZPOPMIN → 토큰 발급
+스케줄러 ─5초마다─> Lua: 만료 정리 → 빈자리 = C - 활성 → 앞에서 min(빈자리, 창에 남은 예산) 을 ZPOPMIN → 토큰 발급
 관객 ─POST /api/performances/{perf}/reservations + X-Admission-Token─> 관문 → 선점(13) → 성공하면 정원 반납(토큰 키는 45초 유예)
 ```
 
@@ -73,7 +73,7 @@ Lua 스크립트 하나로 원자적으로 한다:
 ```
 1. ZREMRANGEBYSCORE active -inf now          -- 만료된 토큰을 정원에서 뺀다
 2. free = C - ZCARD active                   -- 빈자리
-3. n = min(free, 100)                        -- 이번에 들일 수
+3. n = min(free, 창에 남은 예산(≤ 100))      -- 이번에 들일 수. 예산은 admit_window(35f)
 4. members = ZPOPMIN queue n                 -- 줄 앞에서 뺀다
 5. 각 member 에 토큰 발급, active 에 ZADD(만료 시각), admit:{token}·by-account 저장
 ```
@@ -154,7 +154,7 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 | 사전 등록(오픈 전 줄서기) | 진입 시각 = 오픈 시각이면 결과가 같다 |
 | 서명 토큰 | 반납이 안 된다. 위 「토큰」 |
 | SSE | ADR 0003. 폴링 2초가 하트비트를 겸해서 오히려 단순하다 |
-| Kafka 대기열 · 토큰 버킷 단독 | ADR 0009. 둘 다 「내 순번」을 못 답한다 — Kafka 는 순번 저장소가 하나 더 들고, 토큰 버킷은 이미 예산 창으로 있다 |
+| Kafka 대기열 · 토큰 버킷 단독 | ADR 0009. 둘 다 「내 순번」을 못 답한다 — Kafka 는 순번 저장소가 하나 더 들고, 속도 층은 이미 예산 창으로 있다 |
 
 ## 이 문서를 고칠 때
 

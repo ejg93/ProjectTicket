@@ -55,12 +55,13 @@ export const options = {
     },
   },
   tags: { phase: "run" },
-  // 문턱은 `D13` 에 이미 있는 칸만이다. 이긴 선점(`hold_won_ms`)은 첫 측정이라 문턱이 없다 — 이 판이 칸을 세운다(49 ⑤).
+  // 문턱은 `D13` 칸이다. 이긴 선점은 이 판(`load-4`)이 세운 「오픈 순간」 칸(셋 ≤ 105ms). 초과 판매 0 은 k6 가 못 본다 — `README.md` 「오픈 순간」의 SQL.
   thresholds: {
     http_req_failed: ["rate==0"],
     "http_req_duration{phase:run}": ["p(95)>=0"],
     poll_latency_ms: ["p(95)<140"],
     wait_over_expected: ["p(95)<2"],
+    hold_won_ms: ["p(95)<105"],
   },
 };
 

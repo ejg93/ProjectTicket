@@ -92,7 +92,10 @@ for _ in $(seq 1 120); do
   [ "$(kubectl -n "$NS" get deployment app -o jsonpath='{.spec.replicas} {.status.readyReplicas}')" = "$min $min" ] && break
   sleep 10
 done
-echo "== 대수 $(kubectl -n "$NS" get deployment app -o jsonpath='{.spec.replicas}/{.status.readyReplicas}') 에서 놓는다"
+now=$(kubectl -n "$NS" get deployment app -o jsonpath='{.spec.replicas} {.status.readyReplicas}')
+# 안 돌아왔으면 놓지 않는다 — 「3 → N」을 재는 판이라 다른 대수에서 시작한 판은 결과가 아니다
+[ "$now" = "$min $min" ] || { echo "HPA 가 20분 안에 최소 대수($min)로 안 돌아왔다: $now — 판을 놓지 않는다" >&2; exit 1; }
+echo "== 대수 ${now% *}/${now#* } 에서 놓는다"
 pod=$(kubectl -n "$NS" get pods -l job-name=k6-hpa -o jsonpath='{.items[0].metadata.name}')
 # Git Bash 는 `/load/…` 인자를 윈도 경로로 바꾼다(stack.md) — 끈다
 MSYS_NO_PATHCONV=1 kubectl -n "$NS" exec "$pod" -c k6 -- touch /load/results/go
