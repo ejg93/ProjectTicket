@@ -105,7 +105,7 @@ class QueueRankTest : PostgresTestBase() {
         // 「있었는데 끝났다」라 410 이다. 없는 회차는 404 고, 화면이 그 둘을 다르게 말한다.
         assertThatThrownBy { queue.enter(performanceId, first) }
             .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
-        assertThatThrownBy { queue.enter(-1, first) }
+        assertThatThrownBy { queue.enter(performanceId = -1, accountId = first) }
             .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.PERFORMANCE_NOT_FOUND) }
     }
 
@@ -123,7 +123,7 @@ class QueueRankTest : PostgresTestBase() {
 
     @Test
     fun the_endpoint_answers_rank_and_eta() {
-        val principal = TicketUser(first, "${PREFIX}1@test.local", AccountRole.AUDIENCE, passwordHash = null, active = true)
+        val principal = TicketUser(id = first, email = "${PREFIX}1@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
         mvc.post("/api/queue/$performanceId") { with(user(principal)); with(csrf()) }
             .andExpect {

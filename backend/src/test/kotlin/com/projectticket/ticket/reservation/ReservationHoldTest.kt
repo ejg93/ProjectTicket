@@ -139,7 +139,7 @@ class ReservationHoldTest : PostgresTestBase() {
 
     @Test
     fun taken_seat_is_a_conflict_and_nothing_is_held() {
-        fixture.hold(fixture.account("other@test.local"), performanceId, "F1-A", 1)
+        fixture.hold(accountId = fixture.account("other@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
 
         hold(seatIds.take(2)).andExpect {
             status { isConflict() }
@@ -202,13 +202,13 @@ class ReservationHoldTest : PostgresTestBase() {
      */
     private fun admissionToken(performance: Long): String? =
         runCatching {
-            queue.enter(performance, buyer.id)
-            admission.tokenFor(performance, buyer.id)
+            queue.enter(performanceId = performance, accountId = buyer.id)
+            admission.tokenFor(performanceId = performance, accountId = buyer.id)
         }.getOrNull()
 
     /** DB 에 실제 계정이 있어야 한다 — 예매가 계정을 외래키로 잡는다 */
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql("select status from performance_seat where reservation_id = :id").param("id", reservationId)

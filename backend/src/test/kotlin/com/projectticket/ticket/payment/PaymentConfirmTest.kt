@@ -108,7 +108,7 @@ class PaymentConfirmTest : PostgresTestBase() {
     fun no_response_is_recorded_as_failed_and_returns_to_held() {
         val paying = transitions.startPaying(accountId, hold(1))
 
-        val settled = transitions.settle(accountId, paying, verdict = null, cardLast4 = "0001")
+        val settled = transitions.settle(accountId = accountId, paying = paying, verdict = null, cardLast4 = "0001")
 
         assertThat(paymentRow(settled.paymentId)).isEqualTo("failed" to 154_000)
         assertThat(settled.reservationStatus).isEqualTo("held")
@@ -200,9 +200,9 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     private fun hold(seats: Int): Long = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(seats)))
 
-    private fun approved() = MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null)
+    private fun approved() = MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null)
 
-    private fun declined() = MockPaymentGateway.Result(null, "0000", MockPaymentGateway.DECLINE_REASON)
+    private fun declined() = MockPaymentGateway.Result(approvalNumber = null, cardLast4 = "0000", declineReason = MockPaymentGateway.DECLINE_REASON)
 
     private fun reservation(reservationId: Long): String =
         jdbc.sql("select status from reservation where reservation_id = :id").param("id", reservationId).query(String::class.java).single()

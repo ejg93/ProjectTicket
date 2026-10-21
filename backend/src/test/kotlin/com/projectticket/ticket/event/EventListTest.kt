@@ -46,9 +46,9 @@ class EventListTest : PostgresTestBase() {
 
         // 식별자와 시각은 실행마다 다르다. 계약에서 고정할 것은 **이름과 구조**다.
         Snapshot(json, javaClass).assertMatches(
-            "detail",
-            body,
-            setOf("event_id", "performance_id", "starts_at", "sales_open_at", "sales_close_at"),
+            name = "detail",
+            actualJson = body,
+            volatileFields = setOf("event_id", "performance_id", "starts_at", "sales_open_at", "sales_close_at"),
         )
     }
 

@@ -96,7 +96,7 @@ class AppDbConstraintTest {
         assertThat(annotationOf<PositiveOrZero>(OrganizerEventController.GradeRequest::class.java, "price"))
             .describedAs("`price` 의 `@PositiveOrZero` 가 사라졌다. DB 만 남으면 음수 요청이 500 으로 나간다")
             .isNotNull()
-        assertThat(bodyOf(liveChecks(), "seat_grade_price_check").replace(" ", ""))
+        assertThat(bodyOf(liveChecks(), "seat_grade_price_check").replace(oldValue = " ", newValue = ""))
             .contains("price>=0")
     }
 
@@ -168,7 +168,7 @@ class AppDbConstraintTest {
         MigrationSql.inOrder(root).forEach { sql ->
             DROP.findAll(sql).forEach { remove(it.groupValues[1]) }
             CHECK.findAll(sql).forEach { match ->
-                put(match.groupValues[1], balanced(sql, match.range.last))
+                put(key = match.groupValues[1], value = balanced(sql, match.range.last))
             }
         }
     }
@@ -191,7 +191,7 @@ class AppDbConstraintTest {
                 }
                 c == ')' -> {
                     depth--
-                    if (depth == 0) return sql.substring(openIndex + 1, i)
+                    if (depth == 0) return sql.substring(startIndex = openIndex + 1, endIndex = i)
                 }
             }
         }

@@ -84,8 +84,8 @@ class QueuePositionRaceTest : ConcurrencyTestBase() {
         while (!done.get()) {
             // **다음 배치에 들 사람만 묻는다** — 줄 맨 앞 한 배치. 아무나 물으면 입장 순간에 걸릴 확률이 배치 ÷ 줄이라 경합이 안 난다
             val front = admitted.get()
-            val reach = minOf(AdmissionService.BATCH_SIZE.toInt(), LINE - front).coerceAtLeast(1)
-            val id = accounts[minOf(front + ThreadLocalRandom.current().nextInt(reach), LINE - 1)]
+            val reach = minOf(a = AdmissionService.BATCH_SIZE.toInt(), b = LINE - front).coerceAtLeast(1)
+            val id = accounts[minOf(a = front + ThreadLocalRandom.current().nextInt(reach), b = LINE - 1)]
             try {
                 queue.position(performanceId, id)
             } catch (e: TicketException) {

@@ -113,7 +113,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         val buyer = fixture.account("${PREFIX}buyer@test.local")
         val kept = reserve(buyer, seats = 1)
         val cancelled = reserve(fixture.account("${PREFIX}canceller@test.local"), seats = 1, from = 1)
-        refunds.request(accountOf(cancelled), cancelled, quote.expectedRefundOf(cancelled, accountOf(cancelled)))
+        refunds.request(accountId = accountOf(cancelled), reservationId = cancelled, expectedRefund = quote.expectedRefundOf(reservationId = cancelled, accountId = accountOf(cancelled)))
         closeWithEvent()
 
         settleNow()
@@ -200,7 +200,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     private fun reserve(accountId: Long, seats: Int, from: Int = 0): Long {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds().drop(from).take(seats)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 

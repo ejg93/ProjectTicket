@@ -42,14 +42,14 @@ class SeatQueryTest : PostgresTestBase() {
     fun full_response_matches_the_contract_snapshot() {
         val performanceId = openedPerformance()
         // 상태 셋이 다 보이게 한 자리씩 잡는다. 계정을 가른다 — 같은 계정은 살아있는 선점을 하나만 든다(`V8`).
-        fixture.hold(accountId, performanceId, "F1-A", 2)
-        fixture.reserve(fixture.hold(fixture.account("seat-query-2@test.local"), performanceId, "F1-B", 1))
+        fixture.hold(accountId = accountId, performanceId = performanceId, section = "F1-A", seatNumber = 2)
+        fixture.reserve(fixture.hold(accountId = fixture.account("seat-query-2@test.local"), performanceId = performanceId, section = "F1-B", seatNumber = 1))
 
         val body = mockMvc.get("/api/performances/$performanceId/seats")
             .andExpect {
                 status { isOk() }
                 header { exists("ETag") }
-                header { string("Cache-Control", "no-cache") }
+                header { string(name = "Cache-Control", value = "no-cache") }
                 jsonPath("$.version") { isNumber() }
                 jsonPath("$.sections[0].name") { value("1층 A구역") }
                 jsonPath("$.sections[0].rows[0].seats[1].s") { value("H") }
@@ -57,7 +57,7 @@ class SeatQueryTest : PostgresTestBase() {
             }
             .andReturn().response.contentAsString
 
-        Snapshot(json, javaClass).assertMatches("full", body)
+        Snapshot(json, javaClass).assertMatches(name = "full", actualJson = body)
     }
 
     @Test
@@ -68,7 +68,7 @@ class SeatQueryTest : PostgresTestBase() {
         mockMvc.get("/api/performances/$performanceId/seats") { header("If-None-Match", etag) }
             .andExpect {
                 status { isNotModified() }
-                header { string("ETag", etag) }
+                header { string(name = "ETag", value = etag) }
                 content { string("") }
             }
     }

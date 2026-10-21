@@ -79,7 +79,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         val paying = payments.startPaying(accountId, reservationId)
         assertThat(pointerSet(reservationId)).describedAs("paying").isEqualTo(expected)
 
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         assertThat(pointerSet(reservationId)).describedAs("reserved").isEqualTo(expected)
 
         refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId))
@@ -104,7 +104,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
      */
     @Test
     fun losing_hold_leaves_nothing_behind() {
-        fixture.hold(fixture.account("${PREFIX}other@test.local"), performanceId, "F1-A", 1)
+        fixture.hold(accountId = fixture.account("${PREFIX}other@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
 
         assertThatThrownBy { seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(2))) }
             .hasMessageContaining("이미 잡혔다")
@@ -148,7 +148,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         fixture.seats(otherHall, "F1-A", 1)
         val otherEvent = fixture.event(fixture.organizer("${PREFIX}org2"))
         fixture.mapSection(otherEvent, "F1-A", fixture.grade(otherEvent, "VIP", 154_000))
-        val otherPerformance = fixture.performance(otherEvent, otherHall).also { openService.open(it, actorAccountId = null) }
+        val otherPerformance = fixture.performance(eventId = otherEvent, hallId = otherHall).also { openService.open(it, actorAccountId = null) }
         val otherSeat = fixture.performanceSeatIds(otherPerformance).single()
 
         // 어긋나면 정산(27)이 남의 회차 매출을 센다. 앱(`lockInIdOrder`)이 이미 막지만 그것은 3위다.

@@ -86,7 +86,7 @@ class QueueGateTest : PostgresTestBase() {
 
     @Test
     fun an_admitted_buyer_passes_and_gives_the_token_back() {
-        val token = admit(buyer.id, performanceId)
+        val token = admit(accountId = buyer.id, performance = performanceId)
 
         hold(seatIds.take(1), token).andExpect { status { isCreated() } }
 
@@ -102,7 +102,7 @@ class QueueGateTest : PostgresTestBase() {
 
     @Test
     fun a_retry_with_the_same_key_replays() {
-        val token = admit(buyer.id, performanceId)
+        val token = admit(accountId = buyer.id, performance = performanceId)
         val key = UUID.randomUUID().toString()
 
         val first = hold(seatIds.take(1), token, key).andExpect { status { isCreated() } }
@@ -118,7 +118,7 @@ class QueueGateTest : PostgresTestBase() {
 
     @Test
     fun the_grace_window_does_not_hand_out_a_second_reservation() {
-        val token = admit(buyer.id, performanceId)
+        val token = admit(accountId = buyer.id, performance = performanceId)
         hold(seatIds.take(1), token).andExpect { status { isCreated() } }
 
         // 창 안에서는 관문을 지나지만 선점은 하나뿐이다 — `reservation_live_hold_idx`(V8)가 둘째 선점을 막는다.
@@ -128,8 +128,8 @@ class QueueGateTest : PostgresTestBase() {
     @Test
     fun a_failed_hold_keeps_the_token() {
         val taker = fixture.account("${PREFIX}taker@test.local")
-        fixture.hold(taker, performanceId, "F1-A", 1)
-        val token = admit(buyer.id, performanceId)
+        fixture.hold(accountId = taker, performanceId = performanceId, section = "F1-A", seatNumber = 1)
+        val token = admit(accountId = buyer.id, performance = performanceId)
 
         hold(seatIds.take(1), token).andExpect { status { isConflict() } }
 
@@ -140,7 +140,7 @@ class QueueGateTest : PostgresTestBase() {
     @Test
     fun someone_elses_token_is_forbidden() {
         val other = principal("${PREFIX}other@test.local")
-        val token = admit(other.id, performanceId)
+        val token = admit(accountId = other.id, performance = performanceId)
 
         hold(seatIds.take(1), token).andExpect {
             status { isForbidden() }
@@ -150,7 +150,7 @@ class QueueGateTest : PostgresTestBase() {
 
     @Test
     fun a_token_for_another_performance_is_forbidden() {
-        val token = admit(buyer.id, otherPerformanceId)
+        val token = admit(accountId = buyer.id, performance = otherPerformanceId)
 
         hold(seatIds.take(1), token).andExpect {
             status { isForbidden() }
@@ -182,7 +182,7 @@ class QueueGateTest : PostgresTestBase() {
         }
 
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
     private companion object {
         const val PREFIX = "gate-"

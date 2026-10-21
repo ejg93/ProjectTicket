@@ -35,7 +35,7 @@ class ScreenLengthTest {
     @Test
     fun every_form_is_classified() {
         val forms = Files.walk(app).use { paths ->
-            paths.filter { it.name.endsWith("-form.tsx") }.map { app.relativize(it).toString().replace('\\', '/') }.toList()
+            paths.filter { it.name.endsWith("-form.tsx") }.map { app.relativize(it).toString().replace(oldChar = '\\', newChar = '/') }.toList()
         }
         assertThat(forms).describedAs("못 읽었다 — `frontend/src/app` 에서 `*-form.tsx` 를 하나도 못 찾았다").isNotEmpty()
         assertThat(forms)
@@ -98,7 +98,7 @@ class ScreenLengthTest {
 
     /** `<Field … name="x" … maxLength={N} … />` 에서 이름 → [attribute] 의 글자(없으면 null). 주석 안의 칸은 뺀다 */
     private fun fields(source: String, attribute: Regex = MAX_LENGTH): Map<String, String?> {
-        val code = LINE_COMMENT.replace(BLOCK_COMMENT.replace(source, ""), "")
+        val code = LINE_COMMENT.replace(input = BLOCK_COMMENT.replace(input = source, replacement = ""), replacement = "")
         return FIELD.findAll(code).mapNotNull { match ->
             val attributes = match.groupValues[1]
             val name = NAME.find(attributes)?.run { groupValues[1] }

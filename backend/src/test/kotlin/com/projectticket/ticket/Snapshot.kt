@@ -21,7 +21,7 @@ class Snapshot(private val json: ObjectMapper, private val testClass: Class<*>) 
         val file = DIR.resolve("${testClass.simpleName}.$name.json")
         val actual = json.writerWithDefaultPrettyPrinter()
             .writeValueAsString(masked(json.readTree(actualJson), volatileFields))
-            .replace("\r\n", "\n") + "\n"
+            .replace(oldValue = "\r\n", newValue = "\n") + "\n"
 
         if (System.getProperty("snapshot.update") == "true") {
             Files.createDirectories(DIR)
@@ -31,7 +31,7 @@ class Snapshot(private val json: ObjectMapper, private val testClass: Class<*>) 
         assertThat(file).describedAs("스냅샷이 없다. -Psnapshot.update=true 로 만든다").exists()
         assertThat(actual)
             .describedAs("응답 계약이 스냅샷과 다르다. 계약을 바꾼 것이면 -Psnapshot.update=true 로 갱신하고 이력에 적는다")
-            .isEqualTo(Files.readString(file).replace("\r\n", "\n"))
+            .isEqualTo(Files.readString(file).replace(oldValue = "\r\n", newValue = "\n"))
     }
 
     private fun masked(node: JsonNode, volatileFields: Set<String>): JsonNode {

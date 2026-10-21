@@ -127,7 +127,7 @@ class QueueHeartbeatTest : PostgresTestBase() {
     }
 
     private fun principal(accountId: Long): TicketUser =
-        TicketUser(accountId, "${PREFIX}$accountId@test.local", AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = accountId, email = "${PREFIX}$accountId@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
     private companion object {
         const val PREFIX = "heartbeat-"

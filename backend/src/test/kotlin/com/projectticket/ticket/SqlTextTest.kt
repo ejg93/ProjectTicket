@@ -82,7 +82,7 @@ class SqlTextTest {
      */
     @Test
     fun status_literals_sit_only_where_an_index_needs_them() {
-        val found = statusLiterals.groupBy({ it.first }, { it.second }).mapValues { (_, values) -> values.sorted() }
+        val found = statusLiterals.groupBy(keySelector = { it.first }, valueTransform = { it.second }).mapValues { (_, values) -> values.sorted() }
         assertThat(found)
             .describedAs("상태 리터럴은 부분 인덱스 조건·`on conflict … where` 와 짝인 자리에만 둔다 — 나머지는 열거형 `code` 를 바인딩한다(coding-rules.md 「SQL」)")
             .isEqualTo(INDEXED_LITERALS)
@@ -121,7 +121,7 @@ class SqlTextTest {
             if (literal == null) {
                 emptyList()
             } else {
-                interpolations(literal).filterNot { fixedIn(it, source.getValue(call.path)) }.map { "${call.where} $it" }
+                interpolations(literal).filterNot { fixedIn(token = it, file = source.getValue(call.path)) }.map { "${call.where} $it" }
             }
         }
         assertThat(interpolated)
@@ -166,11 +166,11 @@ class SqlTextTest {
         val (body, end) = when {
             text.startsWith(RAW_QUOTE, start) -> {
                 val close = text.indexOf(RAW_QUOTE, start + RAW_QUOTE.length).takeIf { it >= 0 } ?: return null
-                Literal(text.substring(start + RAW_QUOTE.length, close), raw = true) to close + RAW_QUOTE.length
+                Literal(text.substring(startIndex = start + RAW_QUOTE.length, endIndex = close), raw = true) to close + RAW_QUOTE.length
             }
             text.getOrNull(start) == '"' -> {
                 val close = closingQuote(text, start + 1) ?: return null
-                Literal(text.substring(start + 1, close), raw = false) to close + 1
+                Literal(text.substring(startIndex = start + 1, endIndex = close), raw = false) to close + 1
             }
             else -> {
                 return null
@@ -200,7 +200,7 @@ class SqlTextTest {
         return i
     }
 
-    private fun lineOf(text: String, index: Int): Int = text.substring(0, index).count { it == '\n' } + 1
+    private fun lineOf(text: String, index: Int): Int = text.substring(startIndex = 0, endIndex = index).count { it == '\n' } + 1
 
     /**
      * `where` 뒤에 좌석 표(별칭 또는 맨 이름)의 `status = …`·`status in (…)` 이 있나.

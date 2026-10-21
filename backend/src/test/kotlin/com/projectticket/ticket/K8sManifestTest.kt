@@ -28,8 +28,8 @@ class K8sManifestTest {
     private val docs = Files.readString(root.resolve("k8s/chart/snapshot.yaml"))
         .split(Regex("""(?m)^---$"""))
         .map { doc -> doc.lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n") }
-    private val app = docOf("Deployment", "app")
-    private val hpa = docOf("HorizontalPodAutoscaler", "app")
+    private val app = docOf(kind = "Deployment", name = "app")
+    private val hpa = docOf(kind = "HorizontalPodAutoscaler", name = "app")
     private val up = Files.readString(root.resolve("scripts/k8s-up.sh"))
 
     @Test
@@ -75,7 +75,7 @@ class K8sManifestTest {
 
     @Test
     fun the_web_image_bakes_the_backend_origin_at_build_time() {
-        val web = docOf("Deployment", "web")
+        val web = docOf(kind = "Deployment", name = "web")
         assertThat(web).describedAs("k8s/chart/snapshot.yaml 에서 화면 Deployment 를 못 읽었다(36a)").contains("kind: Deployment")
         // 로그인 화면은 백엔드를 안 부른다 — 앱이 롤링 중이어도 화면 대가 엔드포인트에서 안 빠진다.
         assertThat(web).contains("path: /login")

@@ -64,7 +64,7 @@ class RefundSweeperTest : PostgresTestBase() {
     @Test
     fun a_live_reservation_is_left_alone() {
         // 예매가 살아 있으면 좌석을 받은 것이다. 여기에 환불 행을 만들면 산 사람에게 돈을 돌려준다.
-        val reservationId = fixture.hold(buyer, performanceId, "F1-A", 1)
+        val reservationId = fixture.hold(accountId = buyer, performanceId = performanceId, section = "F1-A", seatNumber = 1)
         approve(reservationId)
         fixture.reserve(reservationId)
 
@@ -74,7 +74,7 @@ class RefundSweeperTest : PostgresTestBase() {
 
     /** 선점이 만료된 뒤에 승인이 도착한 모양. 16 이 PG 취소만 보내고 행을 안 남긴 그 상태다 */
     private fun expiredHoldWithApprovedPayment(seatNumber: Int): Long {
-        val reservationId = fixture.hold(buyer, performanceId, "F1-A", seatNumber)
+        val reservationId = fixture.hold(accountId = buyer, performanceId = performanceId, section = "F1-A", seatNumber = seatNumber)
         approve(reservationId)
         jdbc.sql(
             "update reservation set status = 'expired', expired_at = now(), cancelled_by = 'expired' where reservation_id = :id",

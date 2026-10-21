@@ -25,7 +25,7 @@ class LoginAuditTest : PostgresTestBase() {
 
     @Test
     fun failed_login_survives_the_rollback() {
-        logIn("nobody@test.local", "wrong-but-long-enough")
+        logIn(email = "nobody@test.local", password = "wrong-but-long-enough")
 
         val rows = jdbc.sql("select detail::text from audit_log where event_type = 'account.login_failed'")
             .query(String::class.java).list()
@@ -45,7 +45,7 @@ class LoginAuditTest : PostgresTestBase() {
             """,
         ).param("hash", passwordEncoder.encode(PASSWORD)).query(Long::class.java).single()
 
-        logIn("audit@test.local", PASSWORD)
+        logIn(email = "audit@test.local", password = PASSWORD)
 
         assertThat(
             jdbc.sql("select actor_account_id from audit_log where event_type = 'account.logged_in'")

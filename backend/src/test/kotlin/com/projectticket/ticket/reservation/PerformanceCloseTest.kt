@@ -113,7 +113,7 @@ class PerformanceCloseTest : PostgresTestBase() {
         val accountId = fixture.account("reserved-close@test.local")
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId).take(1)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         passTheDeadline()
 
         closer.closeDue()

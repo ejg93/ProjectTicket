@@ -67,7 +67,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         val refund = refundOf(reservationId)
         // `days_before` 는 **무른 시점의 달력일 차**다(`D6` 「환불 행」). 구간을 안 타는 것과 「언제 물렀나」를 안 적는 것은 다른 얘기고,
         // 0 은 구간표에서 「당일 — 취소 불가」가 가진 값이라 거기에 섞으면 안 된다.
-        assertThat(refund).isEqualTo(Refund("performance_cancelled", 8, 0, 308_000, "requested"))
+        assertThat(refund).isEqualTo(Refund(reason = "performance_cancelled", daysBefore = 8, feeAmount = 0, refundAmount = 308_000, status = "requested"))
         assertThat(freeSeatCount()).isEqualTo(4)
     }
 
@@ -77,7 +77,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         val held = seatHold.hold(holder, SeatHoldService.Command(performanceId, seatIds().take(1)))
         val payer = fixture.account("${PREFIX}payer@test.local")
         val paying = seatHold.hold(payer, SeatHoldService.Command(performanceId, seatIds().drop(1).take(1)))
-        payments.startPaying(payer, paying)
+        payments.startPaying(accountId = payer, reservationId = paying)
 
         assertThat(cancelService.cancel(performanceId, actorAccountId = null)).isEqualTo(2)
 
@@ -92,7 +92,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     fun a_reservation_the_audience_already_cancelled_keeps_its_own_refund() {
         val early = fixture.account("${PREFIX}early@test.local")
         val alreadyCancelled = reserve(early, seats = 1)
-        refunds.request(early, alreadyCancelled, quote.expectedRefundOf(alreadyCancelled, early))
+        refunds.request(accountId = early, reservationId = alreadyCancelled, expectedRefund = quote.expectedRefundOf(reservationId = alreadyCancelled, accountId = early))
         val late = fixture.account("${PREFIX}late@test.local")
         reserve(late, seats = 1, from = 1)
 
@@ -108,7 +108,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     fun an_early_canceller_is_not_told_it_was_full() {
         val early = fixture.account("${PREFIX}quit@test.local")
         val quit = reserve(early, seats = 1)
-        refunds.request(early, quit, quote.expectedRefundOf(quit, early))
+        refunds.request(accountId = early, reservationId = quit, expectedRefund = quote.expectedRefundOf(reservationId = quit, accountId = early))
         val stayed = fixture.account("${PREFIX}stay@test.local")
         reserve(stayed, seats = 1, from = 1)
 
@@ -211,7 +211,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
     private fun reserve(accountId: Long, seats: Int, from: Int = 0): Long {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds().drop(from).take(seats)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 

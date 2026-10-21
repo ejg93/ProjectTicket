@@ -60,10 +60,10 @@ class StackVersionConsistencyTest {
     /** 이미지를 굽는 판이 CI 판과 갈리면 CI 가 초록이어도 이미지 안에서 깨진다. `FROM` 이 여럿이라 전부 본다 */
     @Test
     fun dockerfiles_match_the_table() {
-        assertThat(fromTags("frontend/Dockerfile", "node"))
+        assertThat(fromTags(dockerfile = "frontend/Dockerfile", image = "node"))
             .isNotEmpty
             .allSatisfy { assertThat(it).startsWith("${tableVersion("Node")}-") }
-        assertThat(fromTags("backend/Dockerfile", "eclipse-temurin"))
+        assertThat(fromTags(dockerfile = "backend/Dockerfile", image = "eclipse-temurin"))
             .isNotEmpty
             .allSatisfy { assertThat(it).startsWith("${tableVersion("Java")}-") }
     }

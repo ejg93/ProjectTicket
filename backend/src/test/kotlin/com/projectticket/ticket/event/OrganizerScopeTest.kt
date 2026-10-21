@@ -45,7 +45,7 @@ class OrganizerScopeTest : PostgresTestBase() {
         otherOrganizer = fixture.organizer("other")
         mine = organizerUser("mine@test.local", myOrganizer)
         stranger = organizerUser("stranger@test.local", otherOrganizer)
-        audience = TicketUser(fixture.account("audience@test.local"), "audience@test.local", AccountRole.AUDIENCE, null, true)
+        audience = TicketUser(id = fixture.account("audience@test.local"), email = "audience@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
         fixture.seats(hallId, "F1-A", 2)
     }
 
@@ -209,7 +209,7 @@ class OrganizerScopeTest : PostgresTestBase() {
         ).param("email", email).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
             .param("organizer", organizerId).param("account", accountId).update()
-        return TicketUser(accountId, email, AccountRole.ORGANIZER, null, true)
+        return TicketUser(id = accountId, email = email, role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 
     private fun gradeCount(eventId: Long): Long =

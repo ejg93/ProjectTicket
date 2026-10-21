@@ -164,7 +164,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
         val performanceId = fixture.performance(eventId, hallId, startsInDays).also { openService.open(it, actorAccountId = null) }
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 
@@ -179,7 +179,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
 
         @Suppress("UNCHECKED_CAST")
         val payload = ObjectMapper().readValue(row.third, Map::class.java) as Map<String, Any?>
-        return OutboxRelay.Envelope(row.first, type, 1, row.second, AggregateType.RESERVATION, reservationId, payload)
+        return OutboxRelay.Envelope(eventId = row.first, type = type, version = 1, occurredAt = row.second, aggregateType = AggregateType.RESERVATION, aggregateId = reservationId, payload = payload)
     }
 
     private fun insertPending(account: Long) =

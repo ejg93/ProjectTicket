@@ -72,10 +72,10 @@ class RefundPreviewTest : PostgresTestBase() {
               from refund r join payment p on p.payment_id = r.payment_id
              where p.reservation_id = :id
             """,
-        ).param("id", reservationId).query { rs, _ -> Triple(rs.getInt(1), rs.getInt(2), rs.getInt(3)) }.single()
+        ).param("id", reservationId).query { rs, _ -> Triple(first = rs.getInt(1), second = rs.getInt(2), third = rs.getInt(3)) }.single()
 
         // 화면이 보여 준 셋이 환불 행과 같다 — 같은 함수라서다.
-        assertThat(Triple(preview["days_before"].asInt(), preview["fee_amount"].asInt(), preview["refund_amount"].asInt())).isEqualTo(refund)
+        assertThat(Triple(first = preview["days_before"].asInt(), second = preview["fee_amount"].asInt(), third = preview["refund_amount"].asInt())).isEqualTo(refund)
     }
 
     @Test
@@ -123,10 +123,10 @@ class RefundPreviewTest : PostgresTestBase() {
     private fun reserved(startsInDays: Long): Long {
         val reservationId = hold(startsInDays)
         val paying = payments.startPaying(buyer.id, reservationId)
-        payments.settle(buyer.id, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(buyer.id, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 }

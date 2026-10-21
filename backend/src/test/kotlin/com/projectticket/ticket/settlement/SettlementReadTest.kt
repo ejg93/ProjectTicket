@@ -34,7 +34,7 @@ class SettlementReadTest : PostgresTestBase() {
         val myOrganizer = fixture.organizer("settle-mine")
         mine = organizerUser("settle-mine@test.local", myOrganizer)
         stranger = organizerUser("settle-other@test.local", fixture.organizer("settle-other"))
-        performanceId = fixture.performance(fixture.event(myOrganizer), fixture.hall())
+        performanceId = fixture.performance(eventId = fixture.event(myOrganizer), hallId = fixture.hall())
     }
 
     @Test
@@ -86,6 +86,6 @@ class SettlementReadTest : PostgresTestBase() {
         ).param("email", email).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
             .param("organizer", organizerId).param("account", accountId).update()
-        return TicketUser(accountId, email, AccountRole.ORGANIZER, null, true)
+        return TicketUser(id = accountId, email = email, role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 }

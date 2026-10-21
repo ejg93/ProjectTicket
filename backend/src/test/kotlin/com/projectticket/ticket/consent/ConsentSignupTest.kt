@@ -151,7 +151,7 @@ class ConsentSignupTest : PostgresTestBase() {
         contentType = MediaType.APPLICATION_JSON
         content = """
             {"email":"consent@test.local","password":"hunter2-and-then-some",
-             "display_name":"관객","consents":${consents.entries.joinToString(",", "{", "}") { """"${it.key}":${it.value}""" }}}
+             "display_name":"관객","consents":${consents.entries.joinToString(separator = ",", prefix = "{", postfix = "}") { """"${it.key}":${it.value}""" }}}
         """.trimIndent()
         with(csrf())
     }

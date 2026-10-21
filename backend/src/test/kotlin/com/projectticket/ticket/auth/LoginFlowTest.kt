@@ -42,9 +42,9 @@ class LoginFlowTest : PostgresTestBase() {
 
     @Test
     fun signup_login_me_logout() {
-        signUp(EMAIL, PASSWORD).andExpect { status { isCreated() }; jsonPath("$.account_id") { isNumber() } }
+        signUp(email = EMAIL, password = PASSWORD).andExpect { status { isCreated() }; jsonPath("$.account_id") { isNumber() } }
 
-        val logged = logIn(EMAIL, PASSWORD)
+        val logged = logIn(email = EMAIL, password = PASSWORD)
             .andExpect {
                 status { isOk() }
                 jsonPath("$.email") { value(EMAIL) }
@@ -68,7 +68,7 @@ class LoginFlowTest : PostgresTestBase() {
     fun unauthenticated_gets_problem_with_challenge() {
         mvc.get("/api/me").andExpect {
             status { isUnauthorized() }
-            header { string("WWW-Authenticate", "Session") }
+            header { string(name = "WWW-Authenticate", value = "Session") }
             content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
             jsonPath("$.type") { value("tag:projectticket.example,2026:unauthenticated") }
         }
@@ -76,21 +76,21 @@ class LoginFlowTest : PostgresTestBase() {
 
     @Test
     fun wrong_password_and_unknown_email_look_the_same() {
-        signUp(EMAIL, PASSWORD)
-        val wrongPassword = identityOf(logIn(EMAIL, "wrong-but-long-enough-1"))
-        val unknownEmail = identityOf(logIn("nobody@test.local", PASSWORD))
+        signUp(email = EMAIL, password = PASSWORD)
+        val wrongPassword = identityOf(logIn(email = EMAIL, password = "wrong-but-long-enough-1"))
+        val unknownEmail = identityOf(logIn(email = "nobody@test.local", password = PASSWORD))
         // 둘을 가르면 그 이메일이 가입돼 있다는 것을 알려 주는 것이다(`D9`).
         assertThat(wrongPassword).isEqualTo(unknownEmail)
         assertThat(wrongPassword).contains("login-failed")
         // 핸들러가 내는 401 도 챌린지를 단다(RFC 9110 §15.5.2) — 진입점만 달면 절반만 지키는 것이다.
-        logIn(EMAIL, "wrong-but-long-enough-1").andExpect { header { string("WWW-Authenticate", "Session") } }
+        logIn(email = EMAIL, password = "wrong-but-long-enough-1").andExpect { header { string(name = "WWW-Authenticate", value = "Session") } }
     }
 
     @Test
     fun login_changes_session_id_and_erases_password_hash() {
-        signUp(EMAIL, PASSWORD)
+        signUp(email = EMAIL, password = PASSWORD)
         // 공격자가 미리 쥔 세션 자리에 로그인 요청을 태운다. 한 번 로그인해 두고 그 쿠키를 다시 쓰는 것이 그 모양이다.
-        val planted = logIn(EMAIL, PASSWORD).andReturn().sessionCookie()
+        val planted = logIn(email = EMAIL, password = PASSWORD).andReturn().sessionCookie()
         val plantedId = sessionIdOf(planted)
 
         val after = mvc.post("/api/auth/login") {
@@ -117,28 +117,28 @@ class LoginFlowTest : PostgresTestBase() {
 
     @Test
     fun suspended_account_is_cut_on_next_request() {
-        signUp(EMAIL, PASSWORD)
-        val logged = logIn(EMAIL, PASSWORD).andReturn().sessionCookie()
+        signUp(email = EMAIL, password = PASSWORD)
+        val logged = logIn(email = EMAIL, password = PASSWORD).andReturn().sessionCookie()
         jdbc.sql("update account set status = 'suspended' where email = :email").param("email", EMAIL).update()
 
         // 로그인 때만 보면 이미 로그인한 기기가 안 막힌다. 요청마다 생존을 본다. 필터가 끊는 401 도 챌린지·본문을 단다.
         mvc.get("/api/me") { cookie(logged) }.andExpect {
             status { isUnauthorized() }
-            header { string("WWW-Authenticate", "Session") }
+            header { string(name = "WWW-Authenticate", value = "Session") }
             jsonPath("$.type") { value("tag:projectticket.example,2026:unauthenticated") }
         }
         // 정지된 계정의 새 로그인도 일반 실패와 같은 문구다.
-        logIn(EMAIL, PASSWORD).andExpect {
+        logIn(email = EMAIL, password = PASSWORD).andExpect {
             status { isUnauthorized() }
-            header { string("WWW-Authenticate", "Session") }
+            header { string(name = "WWW-Authenticate", value = "Session") }
             jsonPath("$.type") { value("tag:projectticket.example,2026:login-failed") }
         }
     }
 
     @Test
     fun login_resets_session_creation_time() {
-        signUp(EMAIL, PASSWORD)
-        val planted = logIn(EMAIL, PASSWORD).andReturn().sessionCookie()
+        signUp(email = EMAIL, password = PASSWORD)
+        val planted = logIn(email = EMAIL, password = PASSWORD).andReturn().sessionCookie()
         val plantedCreation = storedSession(planted).creationTime
         Thread.sleep(5)
 
@@ -155,8 +155,8 @@ class LoginFlowTest : PostgresTestBase() {
 
     @Test
     fun duplicate_email_is_conflict_case_insensitively() {
-        signUp(EMAIL, PASSWORD)
-        signUp(EMAIL.uppercase(), PASSWORD).andExpect {
+        signUp(email = EMAIL, password = PASSWORD)
+        signUp(email = EMAIL.uppercase(), password = PASSWORD).andExpect {
             status { isConflict() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:email-taken") }
         }
@@ -164,7 +164,7 @@ class LoginFlowTest : PostgresTestBase() {
 
     @Test
     fun short_password_is_rejected_with_field_errors() {
-        signUp(EMAIL, "short").andExpect {
+        signUp(email = EMAIL, password = "short").andExpect {
             status { isBadRequest() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:validation-failed") }
             jsonPath("$.errors[0].field") { value("password") }

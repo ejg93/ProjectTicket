@@ -129,7 +129,7 @@ class SuspendTest : PostgresTestBase() {
         val id = jdbc.sql(
             "insert into account (email, password_hash, display_name, role) values (:email, 'x', '관리자', :role) returning account_id",
         ).param("email", email).param("role", role.code).query(Long::class.java).single()
-        return TicketUser(id, email, role, passwordHash = null, active = true)
+        return TicketUser(id = id, email = email, role = role, passwordHash = null, active = true)
     }
 
     private companion object {

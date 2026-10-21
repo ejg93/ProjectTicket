@@ -60,7 +60,7 @@ class CsrfCookieTest : PostgresTestBase() {
             // CSRF 를 지났다는 증거는 403 이 아니라 로그인 판정(401)까지 갔다는 것이다.
             status { isUnauthorized() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:login-failed") }
-            header { string("WWW-Authenticate", "Session") }
+            header { string(name = "WWW-Authenticate", value = "Session") }
         }
     }
 

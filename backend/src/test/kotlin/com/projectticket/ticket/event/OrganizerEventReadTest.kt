@@ -68,7 +68,11 @@ class OrganizerEventReadTest : PostgresTestBase() {
         val buyer = fixture.account("read-buyer@test.local")
         // 하나는 결제까지(reserved), 하나는 선점만(held)
         val paid = seatHold.hold(buyer, SeatHoldService.Command(open, listOf(seats[0])))
-        payments.settle(buyer, payments.startPaying(buyer, paid), MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(
+            buyer,
+            payments.startPaying(accountId = buyer, reservationId = paid),
+            MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null),
+        )
         seatHold.hold(fixture.account("read-holder@test.local"), SeatHoldService.Command(open, listOf(seats[1])))
 
         val body = json.readTree(mvc.get("/api/organizer/events/$eventId") { with(user(mine)) }.andReturn().response.contentAsString)
@@ -97,6 +101,6 @@ class OrganizerEventReadTest : PostgresTestBase() {
         ).param("email", email).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
             .param("organizer", organizerId).param("account", accountId).update()
-        return TicketUser(accountId, email, AccountRole.ORGANIZER, null, true)
+        return TicketUser(id = accountId, email = email, role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 }

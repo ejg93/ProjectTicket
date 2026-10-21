@@ -119,7 +119,7 @@ class TicketIssueTest : PostgresTestBase() {
 
     private fun reserved(seats: Int): Long {
         val reservationId = hold(seats)
-        payments.settle(buyer.id, payments.startPaying(buyer.id, reservationId), MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(buyer.id, payments.startPaying(buyer.id, reservationId), MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 
@@ -129,5 +129,5 @@ class TicketIssueTest : PostgresTestBase() {
         ).param("id", reservationId).query(String::class.java).list().filterNotNull()
 
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 }

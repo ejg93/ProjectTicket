@@ -36,7 +36,7 @@ class SettlementKeyTest : PostgresTestBase() {
     @Test
     fun the_same_line_kind_cannot_appear_twice_in_one_settlement() {
         val fixture = EventFixture(jdbc)
-        val performanceId = fixture.performance(fixture.event(fixture.organizer("settle-key")), fixture.hall())
+        val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("settle-key")), hallId = fixture.hall())
         val policyId = fixture.stampDefaultPolicy(performanceId)
         val settlementId = jdbc.sql(
             """
@@ -84,7 +84,7 @@ class SettlementKeyTest : PostgresTestBase() {
 
     private fun draftPerformance(organizerCode: String): Long {
         val fixture = EventFixture(jdbc)
-        return fixture.performance(fixture.event(fixture.organizer(organizerCode)), fixture.hall())
+        return fixture.performance(eventId = fixture.event(fixture.organizer(organizerCode)), hallId = fixture.hall())
     }
 
     private fun insertSettlement(performanceId: Long, policyId: Long) =

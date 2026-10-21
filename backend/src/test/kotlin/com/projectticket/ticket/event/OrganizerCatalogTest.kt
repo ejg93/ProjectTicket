@@ -36,7 +36,7 @@ class OrganizerCatalogTest : PostgresTestBase() {
         ).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
             .param("organizer", myOrganizer).param("account", accountId).update()
-        mine = TicketUser(accountId, "catalog@test.local", AccountRole.ORGANIZER, null, true)
+        mine = TicketUser(id = accountId, email = "catalog@test.local", role = AccountRole.ORGANIZER, passwordHash = null, active = true)
         hallId = fixture.hall(name = "카탈로그관", venueName = "카탈로그홀")
         fixture.seats(hallId, "F1-A", 3)
         fixture.seats(hallId, "F2-B", 2)
@@ -62,7 +62,7 @@ class OrganizerCatalogTest : PostgresTestBase() {
 
     @Test
     fun an_audience_is_forbidden() {
-        val audience = TicketUser(fixture.account("catalog-audience@test.local"), "catalog-audience@test.local", AccountRole.AUDIENCE, null, true)
+        val audience = TicketUser(id = fixture.account("catalog-audience@test.local"), email = "catalog-audience@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
         mvc.get("/api/organizer/halls") { with(user(audience)) }.andExpect {
             status { isForbidden() }
