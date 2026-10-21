@@ -9,10 +9,10 @@
 # frontend 명령이면 `node_modules` 를 링크로 빌려 온다(윈도는 junction). 지울 때 링크만 끊고 원본을 안 건드린다.
 # 명령이 0 이 아니고 문구가 나오면 「막았다」. 0 이면 **게이트가 안 막은 것** — 그것이 발견이다(설계 실패 사다리).
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 root=$(pwd)
 [ $# -gt 0 ] || { echo "쓰는 법: bash scripts/gate-probe.sh <탐침>… | all  — 탐침: $(ls scripts/probes | sed 's/\.patch$//' | tr '\n' ' ')"; exit 2; }
-if [ "$1" = all ]; then set -- $(ls scripts/probes | sed 's/\.patch$//'); fi
+if [ "$1" = all ]; then mapfile -t all < <(ls scripts/probes | sed 's/\.patch$//'); set -- "${all[@]}"; fi
 
 win() { case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac; }
 # 이 환경의 기본 JDK 는 11 이라 Gradle 이 안 뜬다(CLAUDE.md). `verify.sh` 와 같은 자리.

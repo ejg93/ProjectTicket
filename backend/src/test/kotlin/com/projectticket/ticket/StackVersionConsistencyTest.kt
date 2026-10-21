@@ -85,6 +85,13 @@ class StackVersionConsistencyTest {
             .contains("\"@playwright/test\": \"^${tableVersion("Playwright")}\"")
     }
 
+    /** 셸 검사기도 판을 박는다(`G13`) — 로컬 winget 과 CI 가 같은 판이어야 같은 지적을 본다 */
+    @Test
+    fun shellcheck_matches_the_table() {
+        val ci = Files.readString(root.resolve(".github/workflows/ci.yml"))
+        assertThat(ci).contains("shellcheck/releases/download/v${tableVersion("ShellCheck")}/")
+    }
+
     /** 부하 도구도 판을 박는다 — 안 박으면 그날의 latest 로 재서 다른 판의 숫자를 견주게 된다(`35b`) */
     @Test
     fun k6_image_matches_the_table() {

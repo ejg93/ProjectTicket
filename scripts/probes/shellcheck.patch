@@ -1,0 +1,13 @@
+# 게이트: ShellCheck warning 이상(G13)
+# 명령: bash scripts/shell-lint.sh
+# 문구: SC2164
+diff --git a/scripts/probe-shellcheck.sh b/scripts/probe-shellcheck.sh
+new file mode 100644
+index 0000000..18adbc7
+--- /dev/null
++++ b/scripts/probe-shellcheck.sh
+@@ -0,0 +1,4 @@
++#!/usr/bin/env bash
++# 탐침 — cd 실패를 안 받는 스크립트를 ShellCheck 가 세우나(G13)
++cd /tmp
++rm -f probe.txt
