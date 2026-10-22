@@ -11,6 +11,10 @@ if [ -z "$sc" ] && [ -n "${LOCALAPPDATA:-}" ]; then
     [ -x "$w" ] && sc=$w
   done
 fi
-[ -n "$sc" ] || { echo "shellcheck 가 없다 — winget install --exact --id koalaman.shellcheck --version 0.11.0 (stack.md)" >&2; exit 1; }
+want=$(sed -n 's/^| ShellCheck | \([0-9.]*\) |.*/\1/p' doc/reference/stack.md)
+[ -n "$sc" ] || { echo "shellcheck 가 없다 — winget install --exact --id koalaman.shellcheck --version $want (stack.md)" >&2; exit 1; }
+# CI 판은 StackVersionConsistencyTest 가 stack.md 와 맞춘다 — 로컬 판은 여기서 맞춘다
+got=$("$sc" --version | sed -n 's/^version: //p' | tr -d '\r')
+[ "$got" = "$want" ] || { echo "shellcheck $got — stack.md 는 $want 다" >&2; exit 1; }
 
 "$sc" -S warning scripts/*.sh scripts/hooks/*.sh
