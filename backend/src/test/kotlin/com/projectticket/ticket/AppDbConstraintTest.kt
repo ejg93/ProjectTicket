@@ -96,7 +96,7 @@ class AppDbConstraintTest {
         assertThat(annotationOf<PositiveOrZero>(OrganizerEventController.GradeRequest::class.java, "price"))
             .describedAs("`price` 의 `@PositiveOrZero` 가 사라졌다. DB 만 남으면 음수 요청이 500 으로 나간다")
             .isNotNull()
-        assertThat(bodyOf(liveChecks(), "seat_grade_price_check").replace(" ", ""))
+        assertThat(bodyOf(liveChecks(), "seat_grade_price_check").replace(oldValue = " ", newValue = ""))
             .contains("price>=0")
     }
 
@@ -168,7 +168,7 @@ class AppDbConstraintTest {
         MigrationSql.inOrder(root).forEach { sql ->
             DROP.findAll(sql).forEach { remove(it.groupValues[1]) }
             CHECK.findAll(sql).forEach { match ->
-                put(match.groupValues[1], balanced(sql, match.range.last))
+                put(key = match.groupValues[1], value = balanced(sql, match.range.last))
             }
         }
     }
@@ -180,12 +180,18 @@ class AppDbConstraintTest {
         for (i in openIndex until sql.length) {
             val c = sql[i]
             when {
-                c == '\'' -> quoted = !quoted
-                quoted -> continue
-                c == '(' -> depth++
+                c == '\'' -> {
+                    quoted = !quoted
+                }
+                quoted -> {
+                    continue
+                }
+                c == '(' -> {
+                    depth++
+                }
                 c == ')' -> {
                     depth--
-                    if (depth == 0) return sql.substring(openIndex + 1, i)
+                    if (depth == 0) return sql.substring(startIndex = openIndex + 1, endIndex = i)
                 }
             }
         }
@@ -199,18 +205,6 @@ class AppDbConstraintTest {
         /** `length(x) <= 50` 과 `length(x) between 1 and 200` 둘 다. 옥텟으로 재는 것도 같은 꼴이다 */
         val LENGTH_BOUND = Regex("""(?:octet_)?length\([\w.]+\)\s*(?:<=\s*(\d+)|between\s+(\d+)\s+and\s+(\d+))""")
         val DB_REGEX = Regex("""~\s*'([^']*)'""")
-
-        inline fun <reified T : Annotation> annotationOf(owner: Class<*>, field: String): T? =
-            owner.getDeclaredField(field).getAnnotation(T::class.java)
-
-        /** 앱이 든 길이. `rejectsBlank` 는 DB 의 **하한**과 짝이다 — 상한만 맞추면 빈 값이 샌다 */
-        data class AppLength(val max: Int, val rejectsBlank: Boolean)
-
-        fun lengthOf(owner: Class<*>, field: String) = AppLength(
-            // `!!` 의 근거: 이 표가 든 칸은 `@Size` 를 든 칸이다. 떼면 여기서 서는 것이 맞다.
-            max = annotationOf<Size>(owner, field)!!.max,
-            rejectsBlank = annotationOf<NotBlank>(owner, field) != null,
-        )
 
         /**
          * 제약 이름 → 앱이 든 길이.
@@ -248,6 +242,18 @@ class AppDbConstraintTest {
             "seat_row_label_format_check" to "좌석은 `DemoSeeder` 가 넣는다 — 공연장 등록 입구가 생기면 위 표로",
             "idempotency_key_length_check" to "`IdempotencyKeys` 가 UUIDv4 만 받아 36자 고정이다. DB 의 1..255 가 더 넓다",
             "idempotency_key_hash_check" to "SHA-256 hex 를 서버가 잰다. 입구에 없다",
+        )
+
+        inline fun <reified T : Annotation> annotationOf(owner: Class<*>, field: String): T? =
+            owner.getDeclaredField(field).getAnnotation(T::class.java)
+
+        /** 앱이 든 길이. `rejectsBlank` 는 DB 의 **하한**과 짝이다 — 상한만 맞추면 빈 값이 샌다 */
+        data class AppLength(val max: Int, val rejectsBlank: Boolean)
+
+        fun lengthOf(owner: Class<*>, field: String) = AppLength(
+            // `!!` 의 근거: 이 표가 든 칸은 `@Size` 를 든 칸이다. 떼면 여기서 서는 것이 맞다.
+            max = annotationOf<Size>(owner, field)!!.max,
+            rejectsBlank = annotationOf<NotBlank>(owner, field) != null,
         )
     }
 }

@@ -45,7 +45,7 @@ class RefundInvariantTest : ConcurrencyTestBase() {
         val performanceId = fixture.performance(eventId, hallId, startsInDays).also { openService.open(it, actorAccountId = null) }
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
         val paying = payments.startPaying(accountId, reservationId)
-        return reservationId to payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null)).paymentId
+        return reservationId to payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null)).paymentId
     }
 
     /**

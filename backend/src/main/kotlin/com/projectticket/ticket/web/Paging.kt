@@ -20,10 +20,10 @@ class Paging(page: Int = 0, size: Int = DEFAULT_SIZE, val sort: String? = null) 
      * `OFFSET must not be negative` 로 선다 — 로그인 없이 부르는 목록에서 클라이언트가 고르는 값으로 500 이 난다.
      * 상한은 「`Int` 곱이 안 넘치는 값」이 아니라 **실물에 없는 쪽**으로 잡는다: 회차 수가 이 곱을 넘을 일이 없다.
      */
-    val page: Int = page.coerceIn(0, MAX_PAGE)
+    val page: Int = page.coerceIn(minimumValue = 0, maximumValue = MAX_PAGE)
 
     /** **최대 100**(`D5`). 넘겨 보내면 잘라서 준다 — 요청을 세우면 목록이 통째로 안 보인다 */
-    val size: Int = size.coerceIn(1, MAX_SIZE)
+    val size: Int = size.coerceIn(minimumValue = 1, maximumValue = MAX_SIZE)
 
     val offset: Int get() = page * size
 
@@ -49,8 +49,8 @@ class OrderBy private constructor(val sql: String) {
         /**
          * `필드,방향` 을 푼다. 허용 목록 밖이면 400 이다(`D5`).
          *
-         * @param allowed 요청에 쓰는 이름 → `order by` 에 넣을 SQL 조각. 값이 우리 글자다
-         * @param default `sort` 가 없을 때 쓸 이름
+         * [allowed] 는 요청에 쓰는 이름 → `order by` 에 넣을 SQL 조각이다. 값이 우리 글자다.
+         * [default] 는 `sort` 가 없을 때 쓸 이름이다.
          */
         fun of(raw: String?, allowed: Map<String, String>, default: String): OrderBy {
             val (field, direction) = split(raw ?: default)
@@ -69,7 +69,7 @@ class OrderBy private constructor(val sql: String) {
 
         private fun split(raw: String): Pair<String, String> {
             val parts = raw.split(',', limit = 2)
-            val direction = when (parts.getOrNull(1)?.trim()?.lowercase()) {
+            val direction = when (parts.getOrNull(1)?.run { trim().lowercase() }) {
                 // 방향은 둘뿐이라 목록이 아니라 `when` 이다. 모르는 값은 기본값으로 안 떨어뜨린다 —
                 // `starts_at,decs` 같은 오타가 조용히 오름차순이 되면 화면이 거꾸로 그려진 줄 모른다.
                 "asc", null, "" -> "asc"

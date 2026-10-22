@@ -57,15 +57,15 @@ class PaymentService(
 
     fun pay(accountId: Long, idempotencyKey: String, command: Command): Result {
         val fingerprint = Fingerprint(command.reservationId, command.cardNumber)
-        idempotency.replayIfPresent(accountId, idempotencyKey, fingerprint, Result::class.java)?.let { return it }
+        idempotency.replayIfPresent(accountId = accountId, key = idempotencyKey, request = fingerprint, responseType = Result::class.java)?.let { return it }
 
         val paying = transitions.startPaying(accountId, command.reservationId)
         val verdict = askGateway(idempotencyKey, paying, command.cardNumber)
         // 응답이 없어도 카드는 안다 — 요청이 들고 있다. 실패 행에도 뒷 4자리를 적는다.
         val cardLast4 = verdict?.cardLast4 ?: command.cardNumber.filter { it.isDigit() }.takeLast(4)
 
-        return idempotency.run(accountId, idempotencyKey, fingerprint, Result::class.java) {
-            val settled = transitions.settle(accountId, paying, verdict, cardLast4)
+        return idempotency.run(accountId = accountId, key = idempotencyKey, request = fingerprint, responseType = Result::class.java) {
+            val settled = transitions.settle(accountId = accountId, paying = paying, verdict = verdict, cardLast4 = cardLast4)
             Result(
                 paymentId = settled.paymentId,
                 reservationId = paying.reservationId,

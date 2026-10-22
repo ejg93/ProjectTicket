@@ -8,6 +8,7 @@ import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
 import com.projectticket.ticket.payment.PaymentTransitionService
+import com.projectticket.ticket.payment.PerformanceCancelService
 import com.projectticket.ticket.payment.RefundQuote
 import com.projectticket.ticket.payment.RefundTransitionService
 import com.projectticket.ticket.payment.expectedRefundOf
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.math.BigDecimal
 
 /**
  * 둘째 소비자가 `D21` 대로 도는가 — 회차가 닫히면 예약되고, `settle_at` 뒤에 **항목의 합**으로 정산서가 선다.
@@ -39,7 +41,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     @Autowired lateinit var refunds: RefundTransitionService
     @Autowired lateinit var quote: RefundQuote
     @Autowired lateinit var openService: PerformanceOpenService
-    @Autowired lateinit var cancelService: com.projectticket.ticket.payment.PerformanceCancelService
+    @Autowired lateinit var cancelService: PerformanceCancelService
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     private lateinit var fixture: EventFixture
@@ -62,7 +64,9 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         // 요율을 나중에 고쳐도 이미 열린 회차의 정산이 안 흔들린다(`D21`·`D7`).
         assertThat(
             jdbc.sql("select sp.commission_rate from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id where p.performance_id = :id")
-                .param("id", performanceId).query(java.math.BigDecimal::class.java).single(),
+                .param("id", performanceId)
+                .query(BigDecimal::class.java)
+                .single(),
         ).isEqualByComparingTo("0.10")
     }
 
@@ -111,7 +115,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         val buyer = fixture.account("${PREFIX}buyer@test.local")
         val kept = reserve(buyer, seats = 1)
         val cancelled = reserve(fixture.account("${PREFIX}canceller@test.local"), seats = 1, from = 1)
-        refunds.request(accountOf(cancelled), cancelled, quote.expectedRefundOf(cancelled, accountOf(cancelled)))
+        refunds.request(accountId = accountOf(cancelled), reservationId = cancelled, expectedRefund = quote.expectedRefundOf(reservationId = cancelled, accountId = accountOf(cancelled)))
         closeWithEvent()
 
         settleNow()
@@ -177,7 +181,8 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         assertThatThrownBy {
             TransactionTemplate(transactionManager).executeWithoutResult {
                 jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, 'adjustment', 1000)")
-                    .param("id", settlementRow().settlementId).update()
+                    .param("id", settlementRow().settlementId)
+                    .update()
             }
         }.hasStackTraceContaining("정산서 금액이 항목의 합과 다르다")
     }
@@ -198,7 +203,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     private fun reserve(accountId: Long, seats: Int, from: Int = 0): Long {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds().drop(from).take(seats)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 
@@ -209,22 +214,31 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
 
     private fun settlementRow(): Row =
         jdbc.sql("select settlement_id, amount, status from settlement where performance_id = :id")
-            .param("id", performanceId).query(Row::class.java).single()
+            .param("id", performanceId)
+            .query(Row::class.java)
+            .single()
 
     private fun settlementCount(): Long =
         jdbc.sql("select count(*) from settlement where performance_id = :id").param("id", performanceId).query(Long::class.java).single()
 
     private fun daysUntilSettle(): Int =
         jdbc.sql("select (settle_at::date - now()::date) from settlement where performance_id = :id")
-            .param("id", performanceId).query(Int::class.java).single()
+            .param("id", performanceId)
+            .query(Int::class.java)
+            .single()
 
     private fun lineOf(kind: String): Int =
         jdbc.sql("select l.amount from settlement_line l join settlement s on s.settlement_id = l.settlement_id where s.performance_id = :id and l.kind = :kind")
-            .param("id", performanceId).param("kind", kind).query(Int::class.java).single()
+            .param("id", performanceId)
+            .param("kind", kind)
+            .query(Int::class.java)
+            .single()
 
     private fun lineCount(): Long =
         jdbc.sql("select count(*) from settlement_line l join settlement s on s.settlement_id = l.settlement_id where s.performance_id = :id")
-            .param("id", performanceId).query(Long::class.java).single()
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     data class Row(val settlementId: Long, val amount: Int, val status: String)
 

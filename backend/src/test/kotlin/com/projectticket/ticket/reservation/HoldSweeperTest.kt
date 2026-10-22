@@ -59,7 +59,12 @@ class HoldSweeperTest : PostgresTestBase() {
         jdbc.sql("update reservation set status = 'paying', paying_until = now() + interval '3 minutes' where reservation_id = :id").param("id", paying).update()
         expire(paying)
         // 다른 계정이다 — 같은 계정은 살아있는 선점을 하나만 든다(`V8`).
-        val reserved = fixture.hold(fixture.account("sweep-2@test.local"), performanceId, "F1-A", 2).also { fixture.reserve(it); expire(it) }
+        val reserved = fixture.hold(
+            accountId = fixture.account("sweep-2@test.local"),
+            performanceId = performanceId,
+            section = "F1-A",
+            seatNumber = 2,
+        ).also { reservation -> fixture.reserve(reservation); expire(reservation) }
 
         // 스윕이 T 에 좌석을 풀고 승인이 T+ε 에 오면 돈은 받고 좌석은 없는 예매가 된다(ADR 0004). `paying` 은 스윕의 where 에 안 걸린다.
         assertThat(sweeper.sweep()).isZero()
@@ -107,5 +112,8 @@ class HoldSweeperTest : PostgresTestBase() {
 
     private fun auditCount(eventType: String, targetId: Long): Long =
         jdbc.sql("select count(*) from audit_log where event_type = :type and target_id = :id")
-            .param("type", eventType).param("id", targetId).query(Long::class.java).single()
+            .param("type", eventType)
+            .param("id", targetId)
+            .query(Long::class.java)
+            .single()
 }

@@ -4,6 +4,7 @@ import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.idempotency.IdempotencyKeys
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import java.net.URI
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PathVariable
@@ -34,10 +35,10 @@ class PaymentController(private val paymentService: PaymentService) {
     ): ResponseEntity<PaymentService.Result> {
         val key = IdempotencyKeys.require(idempotencyKey)
         val result = paymentService.pay(user.id, key, PaymentService.Command(reservationId, request.cardNumber))
-        return ResponseEntity.created(java.net.URI.create("/api/reservations/$reservationId")).body(result)
+        return ResponseEntity.created(URI.create("/api/reservations/$reservationId")).body(result)
     }
 
-    /** @param cardNumber 하이픈과 공백을 허용한다 — 사람이 화면에 입력한 모양 그대로 받는다. 자릿수는 [CardNumbers] 가 센다 */
+    /** @property cardNumber 하이픈과 공백을 허용한다 — 사람이 화면에 입력한 모양 그대로 받는다. 자릿수는 [CardNumbers] 가 센다 */
     data class PayRequest(@field:NotBlank @field:CardNumber val cardNumber: String) {
         /** 카드번호를 로그·디버거에 안 찍는다(`D10`) */
         override fun toString(): String = "PayRequest[cardNumber=****]"

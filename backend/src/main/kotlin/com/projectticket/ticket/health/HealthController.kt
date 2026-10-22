@@ -20,7 +20,7 @@ class HealthController(private val jdbcClient: JdbcClient) {
         val applied = jdbcClient.sql("select count(*) from flyway_schema_history where success")
             .query(Long::class.java)
             .single()
-        return HealthResponse("ticket-backend", database, applied, OffsetDateTime.now())
+        return HealthResponse(app = "ticket-backend", database = database, appliedMigrations = applied, checkedAt = OffsetDateTime.now())
     }
 
     data class HealthResponse(

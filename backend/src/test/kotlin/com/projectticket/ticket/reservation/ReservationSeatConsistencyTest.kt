@@ -56,9 +56,17 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(2)))
 
         val recorded = jdbc.sql("select performance_seat_id from reservation_seat where reservation_id = :id")
-            .param("id", reservationId).query(Long::class.java).list().filterNotNull().toSet()
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .list()
+            .filterNotNull()
+            .toSet()
         val pointed = jdbc.sql("select performance_seat_id from performance_seat where reservation_id = :id and status = 'held'")
-            .param("id", reservationId).query(Long::class.java).list().filterNotNull().toSet()
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .list()
+            .filterNotNull()
+            .toSet()
 
         // 기록과 포인터가 갈리면 만료된 예매가 무엇을 잡았었는지와 지금 누가 쥐고 있는지가 다른 답을 낸다.
         assertThat(recorded).isEqualTo(seatIds.take(2).toSet())
@@ -79,7 +87,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         val paying = payments.startPaying(accountId, reservationId)
         assertThat(pointerSet(reservationId)).describedAs("paying").isEqualTo(expected)
 
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         assertThat(pointerSet(reservationId)).describedAs("reserved").isEqualTo(expected)
 
         refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId))
@@ -104,15 +112,17 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
      */
     @Test
     fun losing_hold_leaves_nothing_behind() {
-        fixture.hold(fixture.account("${PREFIX}other@test.local"), performanceId, "F1-A", 1)
+        fixture.hold(accountId = fixture.account("${PREFIX}other@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
 
         assertThatThrownBy { seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(2))) }
             .hasMessageContaining("이미 잡혔다")
 
         assertThat(jdbc.sql("select count(*) from reservation where account_id = :id").param("id", accountId).query(Long::class.java).single())
-            .describedAs("진 쪽의 예매 행이 남으면 예매 행 삽입과 조건부 UPDATE 가 한 트랜잭션이 아닌 것이다").isZero()
+            .describedAs("진 쪽의 예매 행이 남으면 예매 행 삽입과 조건부 UPDATE 가 한 트랜잭션이 아닌 것이다")
+            .isZero()
         assertThat(jdbc.sql("select status from performance_seat where performance_seat_id = :id").param("id", seatIds[1]).query(String::class.java).single())
-            .describedAs("4석 중 3석만 잡히는 「가능한 것만」은 없다").isEqualTo("available")
+            .describedAs("4석 중 3석만 잡히는 「가능한 것만」은 없다")
+            .isEqualTo("available")
     }
 
     @Test
@@ -148,7 +158,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         fixture.seats(otherHall, "F1-A", 1)
         val otherEvent = fixture.event(fixture.organizer("${PREFIX}org2"))
         fixture.mapSection(otherEvent, "F1-A", fixture.grade(otherEvent, "VIP", 154_000))
-        val otherPerformance = fixture.performance(otherEvent, otherHall).also { openService.open(it, actorAccountId = null) }
+        val otherPerformance = fixture.performance(eventId = otherEvent, hallId = otherHall).also { openService.open(it, actorAccountId = null) }
         val otherSeat = fixture.performanceSeatIds(otherPerformance).single()
 
         // 어긋나면 정산(27)이 남의 회차 매출을 센다. 앱(`lockInIdOrder`)이 이미 막지만 그것은 3위다.
@@ -193,7 +203,8 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         assertThatThrownBy {
             inTransaction {
                 jdbc.sql("insert into idempotency_key (account_id, key_value, request_hash) values (:account, 'k', repeat('a', 64))")
-                    .param("account", accountId).update()
+                    .param("account", accountId)
+                    .update()
             }
         }.hasStackTraceContaining("멱등키에 응답이 안 붙었다")
     }
@@ -210,11 +221,17 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
 
     private fun pointerSet(reservationId: Long): Set<Long> =
         jdbc.sql("select performance_seat_id from performance_seat where reservation_id = :id").param("id", reservationId)
-            .query(Long::class.java).list().filterNotNull().toSet()
+            .query(Long::class.java)
+            .list()
+            .filterNotNull()
+            .toSet()
 
     private fun recordSet(reservationId: Long): Set<Long> =
         jdbc.sql("select performance_seat_id from reservation_seat where reservation_id = :id").param("id", reservationId)
-            .query(Long::class.java).list().filterNotNull().toSet()
+            .query(Long::class.java)
+            .list()
+            .filterNotNull()
+            .toSet()
 
     private fun inTransaction(work: () -> Unit) = TransactionTemplate(transactionManager).executeWithoutResult { work() }
 
@@ -226,11 +243,15 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
             returning reservation_id
             """,
         ).param("account", accountId).param("performance", performanceId).param("total", totalAmount)
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
     private fun insertSeatRecord(reservationId: Long, performanceSeatId: Long, price: Int) =
         jdbc.sql("insert into reservation_seat (reservation_id, performance_seat_id, price) values (:r, :s, :p)")
-            .param("r", reservationId).param("s", performanceSeatId).param("p", price).update()
+            .param("r", reservationId)
+            .param("s", performanceSeatId)
+            .param("p", price)
+            .update()
 
     private fun totalOf(reservationId: Long): Int =
         jdbc.sql("select total_amount from reservation where reservation_id = :id").param("id", reservationId).query(Int::class.java).single()

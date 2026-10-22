@@ -163,15 +163,6 @@ class QueueService(
         /** 입장 속도 R. 값은 [AdmissionService] 가 정한다 — 들이는 쪽과 예상 대기가 갈리면 화면이 거짓말을 한다 */
         const val ADMIT_PER_SECOND = AdmissionService.ADMIT_PER_SECOND
 
-        /**
-         * 순번 [rank](1부터) 인 사람이 얼마나 기다리나. 초당 [ADMIT_PER_SECOND] 명씩 들어가는 **올림** 초다 —
-         * 스무 번째까지는 1초, 스물한 번째는 2초다. R 이 설정값이라 근사고, 그 뜻은 `D12` 가 적었다.
-         *
-         * **인자로 받는 순수 계산이다**(`D8` 단위 층). 경계가 틀리는 자리라 컨테이너 없이 재는 것이 맞다 —
-         * Redis 위에서 재려면 앞줄을 스무 명 채워야 경계가 나온다.
-         */
-        fun etaSecondsFor(rank: Long): Long = (rank + ADMIT_PER_SECOND - 1) / ADMIT_PER_SECOND
-
         /** 스크립트 둘의 답 앞머리 — `A|토큰`(입장함) · `W|순번`(0부터) · `N|`(줄에 없음) */
         private const val ADMITTED = "A"
         private const val WAITING = "W"
@@ -185,13 +176,13 @@ class QueueService(
          */
         private val ENTER = DefaultRedisScript<String>(
             """
-            local token = redis.call('GET', KEYS[1])
-            if token then return 'A|' .. token end
-            local t = redis.call('TIME')
-            local now = t[1] * 1000 + math.floor(t[2] / 1000)
-            redis.call('ZADD', KEYS[2], 'NX', now, ARGV[1])
-            redis.call('HSET', KEYS[3], ARGV[1], now)
-            return 'W|' .. redis.call('ZRANK', KEYS[2], ARGV[1])
+                local token = redis.call('GET', KEYS[1])
+                if token then return 'A|' .. token end
+                local t = redis.call('TIME')
+                local now = t[1] * 1000 + math.floor(t[2] / 1000)
+                redis.call('ZADD', KEYS[2], 'NX', now, ARGV[1])
+                redis.call('HSET', KEYS[3], ARGV[1], now)
+                return 'W|' .. redis.call('ZRANK', KEYS[2], ARGV[1])
             """.trimIndent(),
             String::class.java,
         )
@@ -202,13 +193,13 @@ class QueueService(
          */
         private val POSITION = DefaultRedisScript<String>(
             """
-            local token = redis.call('GET', KEYS[1])
-            if token then return 'A|' .. token end
-            local rank = redis.call('ZRANK', KEYS[2], ARGV[1])
-            if not rank then return 'N|' end
-            local t = redis.call('TIME')
-            redis.call('HSET', KEYS[3], ARGV[1], t[1] * 1000 + math.floor(t[2] / 1000))
-            return 'W|' .. rank
+                local token = redis.call('GET', KEYS[1])
+                if token then return 'A|' .. token end
+                local rank = redis.call('ZRANK', KEYS[2], ARGV[1])
+                if not rank then return 'N|' end
+                local t = redis.call('TIME')
+                redis.call('HSET', KEYS[3], ARGV[1], t[1] * 1000 + math.floor(t[2] / 1000))
+                return 'W|' .. rank
             """.trimIndent(),
             String::class.java,
         )
@@ -219,20 +210,29 @@ class QueueService(
          */
         private val SWEEP = DefaultRedisScript<Long>(
             """
-            local t = redis.call('TIME')
-            local cutoff = t[1] * 1000 + math.floor(t[2] / 1000) - tonumber(ARGV[1])
-            local seen = redis.call('HGETALL', KEYS[2])
-            local removed = 0
-            for i = 1, #seen, 2 do
-                if tonumber(seen[i + 1]) < cutoff then
-                    redis.call('ZREM', KEYS[1], seen[i])
-                    redis.call('HDEL', KEYS[2], seen[i])
-                    removed = removed + 1
+                local t = redis.call('TIME')
+                local cutoff = t[1] * 1000 + math.floor(t[2] / 1000) - tonumber(ARGV[1])
+                local seen = redis.call('HGETALL', KEYS[2])
+                local removed = 0
+                for i = 1, #seen, 2 do
+                    if tonumber(seen[i + 1]) < cutoff then
+                        redis.call('ZREM', KEYS[1], seen[i])
+                        redis.call('HDEL', KEYS[2], seen[i])
+                        removed = removed + 1
+                    end
                 end
-            end
-            return removed
+                return removed
             """.trimIndent(),
             Long::class.java,
         )
+
+        /**
+         * 순번 [rank](1부터) 인 사람이 얼마나 기다리나. 초당 [ADMIT_PER_SECOND] 명씩 들어가는 **올림** 초다 —
+         * 스무 번째까지는 1초, 스물한 번째는 2초다. R 이 설정값이라 근사고, 그 뜻은 `D12` 가 적었다.
+         *
+         * **인자로 받는 순수 계산이다**(`D8` 단위 층). 경계가 틀리는 자리라 컨테이너 없이 재는 것이 맞다 —
+         * Redis 위에서 재려면 앞줄을 스무 명 채워야 경계가 나온다.
+         */
+        fun etaSecondsFor(rank: Long): Long = (rank + ADMIT_PER_SECOND - 1) / ADMIT_PER_SECOND
     }
 }

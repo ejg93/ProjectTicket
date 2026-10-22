@@ -62,14 +62,18 @@ class StateMachineDocTest {
 
         Files.readString(root.resolve("doc/reference/state-machines.md")).lines().forEach { line ->
             when {
-                line.trim() == "### 전이표" -> inTable = true
+                line.trim() == "### 전이표" -> {
+                    inTable = true
+                }
                 line.startsWith("#") -> {
                     if (line.startsWith("## ")) machine = MACHINES.firstOrNull { line.contains("`$it`") }
                     inTable = false
                 }
-                inTable && machine != null && line.startsWith("|") -> rowTransitions(line)?.let { pairs ->
-                    // `!!` 의 근거: 바로 위 조건이 null 이 아닌 것만 남긴다. 스마트 캐스트는 var 라 안 걸린다.
-                    merge(machine!!, pairs) { old, new -> old + new }
+                inTable && machine != null && line.startsWith("|") -> {
+                    rowTransitions(line)?.let { pairs ->
+                        // `!!` 의 근거: 바로 위 조건이 null 이 아닌 것만 남긴다. 스마트 캐스트는 var 라 안 걸린다.
+                        merge(machine!!, pairs) { old, new -> old + new }
+                    }
                 }
             }
         }
@@ -89,20 +93,23 @@ class StateMachineDocTest {
 
     /** `` `held`·`paying` `` → `[held, paying]`. 생성 행의 `—` 는 상태가 아니다 */
     private fun states(cell: String): List<String> =
-        cell.split("·").mapNotNull { STATE.find(it)?.groupValues?.get(1) }
+        cell.split("·").mapNotNull { STATE.find(it)?.run { groupValues[1] } }
 
     /** 트리거 함수가 허용하는 짝. 마지막 `create or replace` 만 본다 */
     private fun triggerTransitions(machine: String): Set<Pair<String, String>> {
         val body = migrationsInOrder()
             .mapNotNull { Regex("""create or replace function ${machine}_status_transition\(\)(.*?)language plpgsql""", RegexOption.DOT_MATCHES_ALL).find(it) }
             .lastOrNull()
-            ?.groupValues?.get(1)
+            ?.run { groupValues[1] }
             ?: return emptySet()
 
         return ALLOWED.findAll(body).flatMap { match ->
             val from = match.groupValues[1]
-            val to = if (match.groupValues[3].isNotEmpty()) listOf(match.groupValues[3])
-            else VALUE.findAll(match.groupValues[2]).map { it.groupValues[1] }.toList()
+            val to = if (match.groupValues[3].isNotEmpty()) {
+                listOf(match.groupValues[3])
+            } else {
+                VALUE.findAll(match.groupValues[2]).map { it.groupValues[1] }.toList()
+            }
             to.map { from to it }
         }.toSet()
     }

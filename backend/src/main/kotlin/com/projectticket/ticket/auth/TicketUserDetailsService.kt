@@ -62,6 +62,9 @@ class TicketUserDetailsService(private val jdbc: JdbcClient) : UserDetailsServic
         /** 인증이 끝나면 지워진다. 그 뒤로 이 값을 읽는 코드가 있으면 안 된다 */
         private var passwordHash: String? = passwordHash
 
+        /** 업무 상태가 활성인가. 로그인 컨트롤러가 인증 뒤에 본다 */
+        val active: Boolean get() = activeFlag
+
         override fun eraseCredentials() {
             passwordHash = null
         }
@@ -78,9 +81,6 @@ class TicketUserDetailsService(private val jdbc: JdbcClient) : UserDetailsServic
          * 정지 판정은 비밀번호 대조 뒤에 [AuthController] 가 [active] 로 하고, 문구는 같다.
          */
         override fun isEnabled(): Boolean = true
-
-        /** 업무 상태가 활성인가. 로그인 컨트롤러가 인증 뒤에 본다 */
-        val active: Boolean get() = activeFlag
 
         override fun equals(other: Any?): Boolean = other is TicketUser && other.id == id
 

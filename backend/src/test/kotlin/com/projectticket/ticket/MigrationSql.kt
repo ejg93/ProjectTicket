@@ -14,6 +14,7 @@ import kotlin.streams.asSequence
  * [AppDbConstraintTest]·[EnumConstraintTest] 가 같이 쓴다.
  */
 object MigrationSql {
+    private val VERSION = Regex("""^V(\d+)""")
 
     /** `V2` 가 `V10` 보다 먼저다. 이름순으로 읽으면 `V10` 이 앞에 와서 `drop` 반영이 뒤집힌다 */
     fun inOrder(root: Path): List<String> =
@@ -48,10 +49,11 @@ object MigrationSql {
                     quoted = true
                     i++
                 }
-                sql.startsWith("--", i) -> while (i < sql.length && sql[i] != '\n') i++
+                sql.startsWith("--", i) -> {
+                    i = lineCommentEnd(sql, i)
+                }
                 sql.startsWith("/*", i) -> {
-                    val end = sql.indexOf("*/", i + 2)
-                    i = if (end < 0) sql.length else end + 2
+                    i = blockCommentEnd(sql, i)
                     // 주석이 앞뒤 토큰을 붙여 놓지 않게 한 칸 남긴다.
                     append(' ')
                 }
@@ -63,5 +65,15 @@ object MigrationSql {
         }
     }
 
-    private val VERSION = Regex("""^V(\d+)""")
+    /** 줄 주석이 끝나는 자리. 줄바꿈은 걷지 않고 남긴다 */
+    private fun lineCommentEnd(sql: String, from: Int): Int {
+        val newline = sql.indexOf('\n', from)
+        return if (newline < 0) sql.length else newline
+    }
+
+    /** 블록 주석의 닫는 기호 바로 뒤. 닫는 기호가 없으면 끝까지 주석이다 */
+    private fun blockCommentEnd(sql: String, from: Int): Int {
+        val end = sql.indexOf("*/", from + 2)
+        return if (end < 0) sql.length else end + 2
+    }
 }

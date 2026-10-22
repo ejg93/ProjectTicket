@@ -215,6 +215,8 @@ detekt {
 	config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
 	// 기본 규칙 위에 우리 설정만 얹는다. 처음부터 다시 쓰면 새 규칙이 생겨도 안 켜진다.
 	buildUponDefaultConfig = true
+	// 기본 꺼진 규칙까지 전부 켠다(`G14`). 끌 것은 detekt.yml 의 `active: false` 와 근거 — 설정이 이긴다(2026-10-21 실측)
+	allRules = true
 	// 빌드를 세운다. 경고로 두면 그 줄은 아무도 안 읽는다(`D18` 「게이트가 만든 신호」).
 	ignoreFailures = false
 }

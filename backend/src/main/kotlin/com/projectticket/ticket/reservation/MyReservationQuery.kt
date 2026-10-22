@@ -16,7 +16,9 @@ class MyReservationQuery(private val jdbc: JdbcClient) {
 
     fun list(accountId: Long, paging: Paging): MyReservationPage {
         val total = jdbc.sql("select count(*) from reservation where account_id = :account")
-            .param("account", accountId).query(Int::class.java).single()
+            .param("account", accountId)
+            .query(Int::class.java)
+            .single()
 
         val items = jdbc.sql(
             """
@@ -38,7 +40,7 @@ class MyReservationQuery(private val jdbc: JdbcClient) {
             .list()
             .filterNotNull()
 
-        return MyReservationPage(items, paging.page, paging.size, total)
+        return MyReservationPage(items = items, page = paging.page, size = paging.size, total = total)
     }
 
     data class MyReservationPage(val items: List<MyReservation>, val page: Int, val size: Int, val total: Int)

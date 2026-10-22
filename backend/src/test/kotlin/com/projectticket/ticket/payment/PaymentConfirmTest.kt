@@ -108,7 +108,7 @@ class PaymentConfirmTest : PostgresTestBase() {
     fun no_response_is_recorded_as_failed_and_returns_to_held() {
         val paying = transitions.startPaying(accountId, hold(1))
 
-        val settled = transitions.settle(accountId, paying, verdict = null, cardLast4 = "0001")
+        val settled = transitions.settle(accountId = accountId, paying = paying, verdict = null, cardLast4 = "0001")
 
         assertThat(paymentRow(settled.paymentId)).isEqualTo("failed" to 154_000)
         assertThat(settled.reservationStatus).isEqualTo("held")
@@ -119,11 +119,15 @@ class PaymentConfirmTest : PostgresTestBase() {
         val reservationId = hold(1)
 
         assertThatThrownBy { transitions.startPaying(fixture.account("stranger@test.local"), reservationId) }
-            .isInstanceOf(TicketException::class.java).extracting("code").isEqualTo(ErrorCode.RESERVATION_NOT_FOUND)
+            .isInstanceOf(TicketException::class.java)
+            .extracting("code")
+            .isEqualTo(ErrorCode.RESERVATION_NOT_FOUND)
 
         jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
         assertThatThrownBy { transitions.startPaying(accountId, reservationId) }
-            .isInstanceOf(TicketException::class.java).extracting("code").isEqualTo(ErrorCode.HOLD_EXPIRED)
+            .isInstanceOf(TicketException::class.java)
+            .extracting("code")
+            .isEqualTo(ErrorCode.HOLD_EXPIRED)
 
         jdbc.sql("update reservation set held_until = now() + interval '5 minutes' where reservation_id = :id").param("id", reservationId).update()
         fixture.reserve(reservationId)
@@ -200,26 +204,34 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     private fun hold(seats: Int): Long = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(seats)))
 
-    private fun approved() = MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null)
+    private fun approved() = MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null)
 
-    private fun declined() = MockPaymentGateway.Result(null, "0000", MockPaymentGateway.DECLINE_REASON)
+    private fun declined() = MockPaymentGateway.Result(approvalNumber = null, cardLast4 = "0000", declineReason = MockPaymentGateway.DECLINE_REASON)
 
     private fun reservation(reservationId: Long): String =
         jdbc.sql("select status from reservation where reservation_id = :id").param("id", reservationId).query(String::class.java).single()
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql("select status from performance_seat where reservation_id = :id").param("id", reservationId)
-            .query(String::class.java).list().filterNotNull()
+            .query(String::class.java)
+            .list()
+            .filterNotNull()
 
     private fun freeSeatCount(): Long =
         jdbc.sql("select count(*) from performance_seat where performance_id = :id and status = 'available'")
-            .param("id", performanceId).query(Long::class.java).single()
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     private fun paymentRow(paymentId: Long): Pair<String, Int> =
         jdbc.sql("select status, amount from payment where payment_id = :id").param("id", paymentId)
-            .query { rs, _ -> rs.getString("status") to rs.getInt("amount") }.single()
+            .query { rs, _ -> rs.getString("status") to rs.getInt("amount") }
+            .single()
 
     private fun auditCount(eventType: String, targetId: Long): Long =
         jdbc.sql("select count(*) from audit_log where event_type = :type and target_id = :id")
-            .param("type", eventType).param("id", targetId).query(Long::class.java).single()
+            .param("type", eventType)
+            .param("id", targetId)
+            .query(Long::class.java)
+            .single()
 }

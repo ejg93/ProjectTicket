@@ -36,7 +36,7 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
     @Test
     fun the_same_event_twice_makes_one_notification() {
         val reserved = reservedSeat()
-        val envelope = envelope(reserved.reservationId, reserved.accountId, reserved.performanceId)
+        val envelope = envelope(reservationId = reserved.reservationId, accountId = reserved.accountId, performanceId = reserved.performanceId)
         val message = json.writeValueAsString(envelope)
 
         // 같은 `event_id` 로 두 번. 릴레이가 재기동하며 다시 보내는 모양이다.
@@ -66,7 +66,7 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
         val seatId = fixture.performanceSeatIds(performanceId).first()
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, listOf(seatId)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return Reserved(accountId, reservationId, performanceId)
     }
 
@@ -93,7 +93,9 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
 
     private fun notificationCount(eventId: UUID): Long =
         jdbc.sql("select count(*) from notification where event_id = :id")
-            .param("id", eventId).query(Long::class.java).single()
+            .param("id", eventId)
+            .query(Long::class.java)
+            .single()
 
     private companion object {
         /** 둘째 메시지가 처리될 시간을 준 뒤에 센다. 안 주면 「아직 안 왔다」를 「안 만들었다」로 읽는다 */

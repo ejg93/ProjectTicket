@@ -69,7 +69,12 @@ class PaymentTransitionService(
             .optional()
             .orElseThrow { cannotStart(accountId, reservationId) }
 
-        auditLog.record(AuditLog.Kind.OUTCOME, "reservation.paying", accountId, AuditLog.Target.of("reservation", reservationId))
+        auditLog.record(
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "reservation.paying",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("reservation", reservationId),
+        )
         return Paying(reservationId, amount)
     }
 
@@ -81,7 +86,8 @@ class PaymentTransitionService(
             .param("account", accountId)
             .query { rs, _ -> rs.getString("status") to rs.getBoolean("alive") }
             .optional()
-            .orElse(null) ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
+            .orElse(null)
+            ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
 
         val (status, alive) = row
         return if (status == ReservationStatus.HELD.code && !alive) {
@@ -97,6 +103,8 @@ class PaymentTransitionService(
      * 거절·실패는 예외가 아니라 결과다. 예외로 던지면 결제 행이 롤백돼 `declined`·`failed` 가 코드에서 안 쓰이고, 재전송이 PG 를 또 부른다.
      */
     @Transactional
+    // 결제사 무응답(시간 초과)이 `verdict == null` 이다 — 아래 분기가 FAILED 로 받는다. detekt 는 기본값의 `requireNotNull(verdict)` 를 보고 늘 non-null 로 읽는다
+    @Suppress("CanBeNonNullable")
     fun settle(
         accountId: Long,
         paying: Paying,
@@ -109,7 +117,7 @@ class PaymentTransitionService(
             verdict.approved -> PaymentStatus.APPROVED
             else -> PaymentStatus.DECLINED
         }
-        val paymentId = insertPayment(paying, status, verdict, cardLast4)
+        val paymentId = insertPayment(paying = paying, status = status, verdict = verdict, cardLast4 = cardLast4)
 
         val reservationStatus = if (status == PaymentStatus.APPROVED) {
             confirm(accountId, paying.reservationId)
@@ -142,7 +150,12 @@ class PaymentTransitionService(
         if (late) {
             // 스윕·타임아웃이 먼저 갔다. 돈은 받았고 좌석은 없다 — 사람이 볼 것이라 WARN 이고, 되돌리는 것은 환불 행(17b)이다.
             log.warn("승인이 늦어 좌석을 못 줬다 reservation_id={} payment_id={}", paying.reservationId, paymentId)
-            auditLog.record(AuditLog.Kind.OUTCOME, "payment.late", accountId, AuditLog.Target.of("payment", paymentId))
+            auditLog.record(
+                kind = AuditLog.Kind.OUTCOME,
+                eventType = "payment.late",
+                actorAccountId = accountId,
+                target = AuditLog.Target.of("payment", paymentId),
+            )
         }
         return Settled(paymentId, reservationStatus, late)
     }
@@ -201,11 +214,11 @@ class PaymentTransitionService(
         // 확정과 발권이 한 트랜잭션이다(18). 발권일은 DB 시각이다(`D7`).
         val issued = tickets.issue(reservationId, jdbc.sql("select now()").query(OffsetDateTime::class.java).single())
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "reservation.reserved",
-            accountId,
-            AuditLog.Target.of("reservation", reservationId),
-            mapOf("tickets_issued" to issued),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "reservation.reserved",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("reservation", reservationId),
+            detail = mapOf("tickets_issued" to issued),
         )
         return ReservationStatus.RESERVED.code
     }
@@ -256,7 +269,12 @@ class PaymentTransitionService(
             .list()
             .filterNotNull()
         seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
-        auditLog.record(AuditLog.Kind.OUTCOME, "reservation.expired", accountId, AuditLog.Target.of("reservation", reservationId))
+        auditLog.record(
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "reservation.expired",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("reservation", reservationId),
+        )
         return ReservationStatus.EXPIRED.code
     }
 

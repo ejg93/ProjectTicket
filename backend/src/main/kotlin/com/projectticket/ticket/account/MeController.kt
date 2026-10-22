@@ -42,7 +42,7 @@ class MeController(
         @Valid @RequestBody request: WithdrawRequest,
         http: HttpServletRequest,
     ): ResponseEntity<Unit> {
-        val email = withdrawals.withdraw(user.id, request.password, http.remoteAddr)
+        val email = withdrawals.withdraw(accountId = user.id, password = request.password, ip = http.remoteAddr)
         sessions.expireAll(email)
         return ResponseEntity.noContent().build()
     }

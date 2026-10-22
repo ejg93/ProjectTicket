@@ -41,6 +41,9 @@ abstract class ConcurrencyTestBase {
 
     @Autowired private lateinit var txManager: PlatformTransactionManager
 
+    /** 이 시험이 들어오기 전의 파기 흉내 계정 수. [purgeAfter] 가 이것과 대조한다. */
+    private var ghostsBefore = 0L
+
     /**
      * 정리를 **앞뒤로 한 번씩** 한다. 뒤에서만 지우면 앞선 실행이 죽었을 때 재사용 컨테이너에 남은 행이 이번 실행을 깨뜨리고,
      * 앞에서만 지우면 이 클래스 뒤에 도는 [PostgresTestBase] 계열이 남은 행을 본다.
@@ -62,35 +65,40 @@ abstract class ConcurrencyTestBase {
                     or account_id in (select account_id from account where email like :prefix)
             """
             jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_id in ($performances)")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             jdbc.sql("delete from settlement_line where settlement_id in (select settlement_id from settlement where performance_id in ($performances))")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             jdbc.sql("delete from settlement where performance_id in ($performances)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from notification where account_id in (select account_id from account where email like :prefix)")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             // 사건은 외래키가 없다 — 집합체 id 로 가리킨다. 예매를 지우기 전에 같이 걷는다.
             jdbc.sql("delete from outbox where aggregate_type = 'reservation' and aggregate_id in ($reservations)")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             jdbc.sql("delete from outbox where aggregate_type = 'performance' and aggregate_id in ($performances)")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             // 티켓 → 환불 → 결제 → 예매. 전부 `restrict` 라 자식부터다.
             jdbc.sql("delete from ticket where reservation_seat_id in (select reservation_seat_id from reservation_seat where reservation_id in ($reservations))")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             jdbc.sql("delete from refund where payment_id in (select payment_id from payment where reservation_id in ($reservations))")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             jdbc.sql("delete from payment where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from reservation where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from performance where performance_id in ($performances)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from event where organizer_id in (select organizer_id from organizer where code like :prefix)")
-                .param("prefix", "$PREFIX%").update()
+                .param("prefix", "$PREFIX%")
+                .update()
             jdbc.sql("delete from organizer where code like :prefix").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from venue where name like :prefix").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from account where email like :prefix").param("prefix", "$PREFIX%").update()
         }
     }
-
-    /** 이 시험이 들어오기 전의 파기 흉내 계정 수. [purgeAfter] 가 이것과 대조한다. */
-    private var ghostsBefore = 0L
 
     @BeforeEach
     fun purgeBefore() {

@@ -58,7 +58,8 @@ class SeatHoldConcurrencyTest : ConcurrencyTestBase() {
             .hasSize(99)
             .allSatisfy { failure ->
                 assertThat(failure.exceptionOrNull()).isInstanceOf(TicketException::class.java)
-                    .extracting("code").isEqualTo(ErrorCode.SEAT_TAKEN)
+                    .extracting("code")
+                    .isEqualTo(ErrorCode.SEAT_TAKEN)
             }
 
         val reservationId = winners.single().getOrThrow()
@@ -112,7 +113,9 @@ class SeatHoldConcurrencyTest : ConcurrencyTestBase() {
 
     private fun lock(performanceSeatId: Long) =
         jdbc.sql("select performance_seat_id from performance_seat where performance_seat_id = :id for update")
-            .param("id", performanceSeatId).query(Long::class.java).single()
+            .param("id", performanceSeatId)
+            .query(Long::class.java)
+            .single()
 
     private fun seatRow(performanceSeatId: Long): Pair<String, Long?> =
         jdbc.sql("select status, reservation_id from performance_seat where performance_seat_id = :id")

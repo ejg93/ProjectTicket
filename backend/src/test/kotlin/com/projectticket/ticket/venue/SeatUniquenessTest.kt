@@ -24,25 +24,30 @@ class SeatUniquenessTest : PostgresTestBase() {
     @BeforeEach
     fun createHall() {
         val venueId = jdbc.sql("insert into venue (name, address) values ('테스트홀', '서울') returning venue_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
         hallId = jdbc.sql("insert into hall (venue_id, name) values (:venueId, '1관') returning hall_id")
-            .param("venueId", venueId).query(Long::class.java).single()
+            .param("venueId", venueId)
+            .query(Long::class.java)
+            .single()
     }
 
     @Test
     fun same_position_twice_is_rejected() {
-        insertSeat("F1-A", "A", 1)
+        insertSeat(section = "F1-A", rowLabel = "A", number = 1)
 
-        assertThatThrownBy { insertSeat("F1-A", "A", 1) }
+        assertThatThrownBy { insertSeat(section = "F1-A", rowLabel = "A", number = 1) }
             .describedAs("같은 자리가 둘이면 회차 복제가 두 배로 늘어난다")
             .isInstanceOf(DuplicateKeyException::class.java)
     }
 
     @Test
     fun same_position_in_another_hall_is_fine() {
-        insertSeat("F1-A", "A", 1)
+        insertSeat(section = "F1-A", rowLabel = "A", number = 1)
         val other = jdbc.sql("insert into hall (venue_id, name) select venue_id, '2관' from hall where hall_id = :id returning hall_id")
-            .param("id", hallId).query(Long::class.java).single()
+            .param("id", hallId)
+            .query(Long::class.java)
+            .single()
 
         val seatId = jdbc.sql(
             "insert into seat (hall_id, section, row_label, seat_number) values (:hall, 'F1-A', 'A', 1) returning seat_id",
@@ -59,28 +64,28 @@ class SeatUniquenessTest : PostgresTestBase() {
     @Test
     fun korean_section_is_rejected() {
         // 형식을 안 걸면 `A구역`·`1층A` 가 섞여 들어와서 등급 매핑이 어느 표기를 쓰는지가 회차마다 갈린다.
-        assertThatThrownBy { insertSeat("A구역", "A", 1) }.hasStackTraceContaining("seat_section_format_check")
+        assertThatThrownBy { insertSeat(section = "A구역", rowLabel = "A", number = 1) }.hasStackTraceContaining("seat_section_format_check")
     }
 
     @Test
     fun lowercase_section_is_rejected() {
-        assertThatThrownBy { insertSeat("f1-a", "A", 1) }.hasStackTraceContaining("seat_section_format_check")
+        assertThatThrownBy { insertSeat(section = "f1-a", rowLabel = "A", number = 1) }.hasStackTraceContaining("seat_section_format_check")
     }
 
     @Test
     fun numeric_row_label_is_rejected() {
-        assertThatThrownBy { insertSeat("F1-A", "1", 1) }.hasStackTraceContaining("seat_row_label_format_check")
+        assertThatThrownBy { insertSeat(section = "F1-A", rowLabel = "1", number = 1) }.hasStackTraceContaining("seat_row_label_format_check")
     }
 
     @Test
     fun seat_number_zero_is_rejected() {
-        assertThatThrownBy { insertSeat("F1-A", "A", 0) }.hasStackTraceContaining("seat_number_positive_check")
+        assertThatThrownBy { insertSeat(section = "F1-A", rowLabel = "A", number = 0) }.hasStackTraceContaining("seat_number_positive_check")
     }
 
     @Test
     fun audience_cannot_join_an_organizer() {
         val organizerId = insertOrganizer()
-        val audience = insertAccount("audience@test.local", "audience")
+        val audience = insertAccount(email = "audience@test.local", role = "audience")
 
         // 앱 검증만 두면 소속을 넣는 입구가 늘 때 빠뜨린다 — 빠뜨리면 권한 없는 계정에 기획사 화면이 열린다.
         assertThatThrownBy { join(organizerId, audience) }
@@ -90,7 +95,7 @@ class SeatUniquenessTest : PostgresTestBase() {
     @Test
     fun organizer_can_join_and_role_cannot_be_lowered_afterwards() {
         val organizerId = insertOrganizer()
-        val member = insertAccount("organizer@test.local", "organizer")
+        val member = insertAccount(email = "organizer@test.local", role = "organizer")
         join(organizerId, member)
 
         // 들어올 때만 보면 뒤늦게 역할을 내려서 같은 구멍이 열린다.
@@ -107,12 +112,17 @@ class SeatUniquenessTest : PostgresTestBase() {
             returning seat_id
             """,
         )
-            .param("hall", hallId).param("section", section).param("rowLabel", rowLabel).param("number", number)
-            .query(Long::class.java).single()
+            .param("hall", hallId)
+            .param("section", section)
+            .param("rowLabel", rowLabel)
+            .param("number", number)
+            .query(Long::class.java)
+            .single()
 
     private fun insertOrganizer(): Long =
         jdbc.sql("insert into organizer (code, name) values ('test-org', '테스트기획') returning organizer_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
     private fun insertAccount(email: String, role: String): Long =
         jdbc.sql(
@@ -125,10 +135,12 @@ class SeatUniquenessTest : PostgresTestBase() {
 
     private fun join(organizerId: Long, accountId: Long) =
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:org, :acc)")
-            .param("org", organizerId).param("acc", accountId).update()
+            .param("org", organizerId)
+            .param("acc", accountId)
+            .update()
     @Test
     fun seat_position_cannot_be_changed() {
-        val seatId = insertSeat("F1-A", "A", 1)
+        val seatId = insertSeat(section = "F1-A", rowLabel = "A", number = 1)
 
         // 오픈 뒤에 구역을 고치면 박제된 등급·가격이 그 좌석의 구역과 어긋나고, 두 표를 나란히 놓기 전에는 안 보인다.
         assertThatThrownBy {

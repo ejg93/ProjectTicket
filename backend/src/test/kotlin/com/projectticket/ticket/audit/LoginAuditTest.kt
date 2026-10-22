@@ -25,10 +25,11 @@ class LoginAuditTest : PostgresTestBase() {
 
     @Test
     fun failed_login_survives_the_rollback() {
-        logIn("nobody@test.local", "wrong-but-long-enough")
+        logIn(email = "nobody@test.local", password = "wrong-but-long-enough")
 
         val rows = jdbc.sql("select detail::text from audit_log where event_type = 'account.login_failed'")
-            .query(String::class.java).list()
+            .query(String::class.java)
+            .list()
 
         assertThat(rows).hasSize(1)
         // 이메일을 안 담는다(`D10`). 감사 로그는 파기 예외라 오래 남는데 가입도 안 한 사람의 이메일이 3년을 남을 이유가 없다.
@@ -45,11 +46,12 @@ class LoginAuditTest : PostgresTestBase() {
             """,
         ).param("hash", passwordEncoder.encode(PASSWORD)).query(Long::class.java).single()
 
-        logIn("audit@test.local", PASSWORD)
+        logIn(email = "audit@test.local", password = PASSWORD)
 
         assertThat(
             jdbc.sql("select actor_account_id from audit_log where event_type = 'account.logged_in'")
-                .query(Long::class.java).list(),
+                .query(Long::class.java)
+                .list(),
         ).containsExactly(accountId)
     }
 

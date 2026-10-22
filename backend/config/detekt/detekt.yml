@@ -2,6 +2,9 @@
 #
 # 문턱은 「새 검출 0건」이다(`D18`). 기준선 파일은 안 만든다 — 눌러 둔 목록은 아무도 다시 안 본다.
 # 규칙을 끄거나 문턱을 올릴 때는 **근거를 여기 같이 적는다.** 근거 없이 끈 규칙은 다음 사람이 되돌릴 수가 없다.
+#
+# `allRules = true`(`G14`) — 기본 꺼진 규칙까지 켠다. 여기의 `active: false` 가 그것을 이긴다(2026-10-21 실측).
+# 번들 11(`G14`~`G18-1`)이 걸린 42규칙을 고치며 단 임시 끔·임시 제외는 다 걷었다 — 끈 것은 아래 근거가 있는 것뿐이다.
 
 config:
   validation: true
@@ -34,6 +37,9 @@ style:
     ignoreCompanionObjectPropertyDeclaration: true
     ignoreNamedArgument: true
     ignoreAnnotation: true
+  TrimMultilineRawString:
+    # `"""…""".trimIndent()` 는 `SqlTextTest` 의 「`sql(` 인자는 리터럴 하나」(`G10`)를 깬다 — SQL 공백은 DB 가 무시해 얻는 것이 없다
+    active: false
 
 exceptions:
   TooGenericExceptionCaught:
@@ -67,10 +73,23 @@ complexity:
     # 표 하나를 만지는 서비스가 그 표의 일을 다 든다(`NotificationStore`). 억지로 가르면 트랜잭션 경계가 흩어진다.
     allowedFunctionsPerClass: 20
     allowedFunctionsPerFile: 20
+  StringLiteralDuplication:
+    # 식별자 꼴 문자열은 일부러 되풀인다 — SQL 바인딩 이름(`:account` 와 짝)·감사 대상 종류·JSON 키. 상수로 빼면 짝인 SQL·계약과 갈라진다(`G15`).
+    # 문장(메시지·SQL 본문)의 중복은 그대로 잡는다
+    ignoreStringsRegex: '^[a-z][a-zA-Z_.]*$'
 
 naming:
   FunctionParameterNaming:
     # 테스트가 한글 이름을 쓰는 자리가 있다 — 읽는 사람이 한국어 화자다(`CLAUDE.md`).
+    excludes: ["**/test/**"]
+  BooleanPropertyNaming:
+    # `naming-rules.md` 「불리언의 `is_` 는 Kotlin 에서 뗀다」와 정반대다. `RefundQuote.cancellable` 은 응답 계약이다(`api-guidelines.md`)
+    active: false
+  FunctionNameMinLength:
+    # `of`·`on`·`me` 같은 두 글자 관용 이름을 쓴다(팩토리·리스너·`/api/me`). 한 글자만 막는다
+    minimumFunctionNameLength: 2
+  FunctionNameMaxLength:
+    # 시험 이름은 무엇을 증명하는지 적은 문장이다(snake_case, `coding-rules.md` 「테스트」)
     excludes: ["**/test/**"]
 
 potential-bugs:
@@ -83,4 +102,21 @@ performance:
   SpreadOperator:
     # 펼침이 나는 자리가 넷이고 전부 Java·Spring 의 vararg 다(`runApplication(*args)`·`requestMatchers(*…)`·`redis.execute(…, *args)`) —
     # 다른 호출 꼴이 없고 배열이 10개를 안 넘어 복사 값이 없다(`G8`).
+    active: false
+
+comments:
+  # 셋은 공개 요소마다 KDoc 을 강제한다 — 규약은 「주석은 왜만, 코드가 답하는 것은 안 적는다」(`coding-rules.md` 「주석」)
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false
+  # 둘은 private 의 KDoc 을 막는다 — private 에도 왜를 KDoc 으로 적는다(IDE 가 보여 준다)
+  DocumentationOverPrivateFunction:
+    active: false
+  DocumentationOverPrivateProperty:
+    active: false
+  EndOfSentenceFormat:
+    # 주석은 한국어 평서형이고 마침표로 안 끝낸다(`CLAUDE.md` 「글 작성 규칙」)
     active: false

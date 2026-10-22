@@ -48,9 +48,11 @@ class QualityGateDocTest {
         val lines = yaml.lines()
         val start = lines.indexOfFirst { it.trimEnd() == "jobs:" }
         check(start >= 0) { "jobs: 블록이 없다" }
-        return lines.drop(start + 1)
+        return lines.asSequence()
+            .drop(start + 1)
             .takeWhile { it.isBlank() || it.startsWith(" ") || it.startsWith("#") }
-            .mapNotNull { JOB.find(it)?.groupValues?.get(1) }
+            .mapNotNull { line -> JOB.find(line)?.run { groupValues[1] } }
+            .toList()
     }
 
     private companion object {

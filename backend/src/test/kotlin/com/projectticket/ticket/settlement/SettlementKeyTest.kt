@@ -36,7 +36,7 @@ class SettlementKeyTest : PostgresTestBase() {
     @Test
     fun the_same_line_kind_cannot_appear_twice_in_one_settlement() {
         val fixture = EventFixture(jdbc)
-        val performanceId = fixture.performance(fixture.event(fixture.organizer("settle-key")), fixture.hall())
+        val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("settle-key")), hallId = fixture.hall())
         val policyId = fixture.stampDefaultPolicy(performanceId)
         val settlementId = jdbc.sql(
             """
@@ -57,7 +57,8 @@ class SettlementKeyTest : PostgresTestBase() {
     fun settlement_on_an_unstamped_performance_is_rejected() {
         val performanceId = draftPerformance("settle-draft")
         val current = jdbc.sql("select settlement_policy_id from settlement_policy where organizer_id is null and effective_at <= now() order by effective_at desc limit 1")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
         // 실패가 트랜잭션을 깨므로 경우마다 시험 하나다(롤백 바탕).
         assertThatThrownBy { insertSettlement(performanceId, current) }
@@ -84,10 +85,12 @@ class SettlementKeyTest : PostgresTestBase() {
 
     private fun draftPerformance(organizerCode: String): Long {
         val fixture = EventFixture(jdbc)
-        return fixture.performance(fixture.event(fixture.organizer(organizerCode)), fixture.hall())
+        return fixture.performance(eventId = fixture.event(fixture.organizer(organizerCode)), hallId = fixture.hall())
     }
 
     private fun insertSettlement(performanceId: Long, policyId: Long) =
         jdbc.sql("insert into settlement (performance_id, settlement_policy_id, settle_at) values (:performance, :policy, now())")
-            .param("performance", performanceId).param("policy", policyId).update()
+            .param("performance", performanceId)
+            .param("policy", policyId)
+            .update()
 }

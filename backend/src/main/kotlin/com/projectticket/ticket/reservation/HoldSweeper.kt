@@ -81,7 +81,12 @@ class HoldSweeper(
 
         // 전이마다 감사 사건 하나(`D3` 「상태 이력」). 행위자가 없다 — 시간이 옮긴 것이다.
         expired.forEach { reservationId ->
-            auditLog.record(AuditLog.Kind.OUTCOME, "reservation.expired", null, AuditLog.Target.of("reservation", reservationId))
+            auditLog.record(
+                kind = AuditLog.Kind.OUTCOME,
+                eventType = "reservation.expired",
+                actorAccountId = null,
+                target = AuditLog.Target.of("reservation", reservationId),
+            )
         }
         log.info("선점 만료 스윕 예매={}건 좌석={}석", expired.size, released)
         return expired.size

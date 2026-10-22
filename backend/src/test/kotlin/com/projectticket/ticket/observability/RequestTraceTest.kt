@@ -75,7 +75,9 @@ class RequestTraceTest : PostgresTestBase() {
     fun error_response_carries_the_same_id_as_the_log() {
         // 인증 없이 막히는 경로다. 보안 필터가 끊는 자리라 응답 본문을 ProblemFactory 가 만든다.
         val body = mvc.get("/api/me").andExpect { status { isUnauthorized() } }
-            .andReturn().response.contentAsString
+            .andReturn()
+            .response
+            .contentAsString
 
         // 사용자가 불러 준 ID 로 로그를 못 찾으면 ID 를 내려 준 뜻이 없다.
         assertThat(json.readTree(body)["trace_id"].asString()).isIn(traceIdsInLog())

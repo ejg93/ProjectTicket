@@ -15,12 +15,11 @@ object EventTopics {
 
     const val RESERVATION = "ticket.reservation"
     const val PERFORMANCE = "ticket.performance"
+    private const val PREFIX = "ticket."
 
     /** 집합체 타입 → 토픽. 새 집합체가 생기면 상수도 같이 는다 */
     fun of(aggregateType: AggregateType): String = "$PREFIX${aggregateType.code}"
 
     /** 키는 문자열이다 — 브로커가 그 바이트를 해시해서 파티션을 고른다 */
     fun keyOf(aggregateId: Long): String = aggregateId.toString()
-
-    private const val PREFIX = "ticket."
 }

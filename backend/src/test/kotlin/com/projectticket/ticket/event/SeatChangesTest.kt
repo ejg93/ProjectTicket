@@ -87,9 +87,9 @@ class SeatChangesTest : ConcurrencyTestBase() {
 
         // 로그 밖을 물으면 410 이다. 조용히 빈 목록을 주면 **화면이 영영 틀린 그림을 든다**.
         assertThatThrownBy { seatQuery.changes(performanceId, since = 0) }
-            .isInstanceOfSatisfying(TicketException::class.java) {
-                assertThat(it.code.slug).isEqualTo("seat-changes-expired")
-                assertThat(it.properties["version"]).isEqualTo(seatQuery.version(performanceId))
+            .isInstanceOfSatisfying(TicketException::class.java) { thrown ->
+                assertThat(thrown.code.slug).isEqualTo("seat-changes-expired")
+                assertThat(thrown.properties["version"]).isEqualTo(seatQuery.version(performanceId))
             }
     }
 
@@ -139,7 +139,8 @@ class SeatChangesTest : ConcurrencyTestBase() {
     /** 90초를 기다릴 수 없다. 스윕이 집을 수 있게 만료 시각을 뒤로 민다 */
     private fun expire(reservationId: Long) =
         jdbc.sql("update reservation set held_until = now() - interval '1 minute' where reservation_id = :id")
-            .param("id", reservationId).update()
+            .param("id", reservationId)
+            .update()
 
     private fun built(): Double = meters.find("seat.snapshot.built").counter()?.count() ?: 0.0
 

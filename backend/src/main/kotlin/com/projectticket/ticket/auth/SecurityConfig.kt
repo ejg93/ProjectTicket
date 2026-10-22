@@ -77,12 +77,17 @@ class SecurityConfig {
         http
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers(HttpMethod.GET, *PUBLIC_GET_PATHS.toTypedArray()).permitAll()
-                    .requestMatchers(HttpMethod.POST, *PUBLIC_POST_PATHS.toTypedArray()).permitAll()
+                    .requestMatchers(HttpMethod.GET, *PUBLIC_GET_PATHS.toTypedArray())
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, *PUBLIC_POST_PATHS.toTypedArray())
+                    .permitAll()
                     // 경로 접두로 역할을 가른다(`D5`). **필터라 컨트롤러 밖이다** — 기획사 입구가 늘어도 빠뜨릴 자리가 없다.
-                    .requestMatchers(ORGANIZER_PREFIX).hasAuthority(AccountRole.ORGANIZER.authority)
-                    .requestMatchers(ADMIN_PREFIX).hasAuthority(AccountRole.ADMIN.authority)
-                    .anyRequest().authenticated()
+                    .requestMatchers(ORGANIZER_PREFIX)
+                    .hasAuthority(AccountRole.ORGANIZER.authority)
+                    .requestMatchers(ADMIN_PREFIX)
+                    .hasAuthority(AccountRole.ADMIN.authority)
+                    .anyRequest()
+                    .authenticated()
             }
             .formLogin { it.disable() }
             .httpBasic { it.disable() }
@@ -119,7 +124,7 @@ class SecurityConfig {
      */
     private class CsrfCookieFilter : OncePerRequestFilter() {
         override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
-            (request.getAttribute(CsrfToken::class.java.name) as CsrfToken?)?.token
+            (request.getAttribute(CsrfToken::class.java.name) as? CsrfToken)?.token
             chain.doFilter(request, response)
         }
     }
@@ -151,14 +156,15 @@ class SecurityConfig {
      * 값은 `application.yml` 의 `server.servlet.session.cookie` 한 곳에서 읽는다 — 두 벌로 적지 않는다.
      */
     @Bean
-    fun cookieSerializer(server: ServerProperties): CookieSerializer =
-        DefaultCookieSerializer().apply {
-            val cookie = server.servlet.session.cookie
-            cookie.name?.let { setCookieName(it) }
-            cookie.httpOnly?.let { setUseHttpOnlyCookie(it) }
-            cookie.secure?.let { setUseSecureCookie(it) }
-            cookie.sameSite?.let { setSameSite(it.attributeValue()) }
-        }
+    fun cookieSerializer(server: ServerProperties): CookieSerializer {
+        val cookie = server.servlet.session.cookie
+        val serializer = DefaultCookieSerializer()
+        cookie.name?.let { serializer.setCookieName(it) }
+        cookie.httpOnly?.let { serializer.setUseHttpOnlyCookie(it) }
+        cookie.secure?.let { serializer.setUseSecureCookie(it) }
+        cookie.sameSite?.let { serializer.setSameSite(it.attributeValue()) }
+        return serializer
+    }
 
     /** 빈으로 두는 이유는 로그인(토큰 회전)·로그아웃(쿠키 삭제)도 같은 저장소를 봐야 해서다 */
     @Bean

@@ -2,6 +2,7 @@ package com.projectticket.ticket.event
 
 import com.projectticket.ticket.PostgresTestBase
 import com.projectticket.ticket.Snapshot
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -45,9 +46,9 @@ class EventListTest : PostgresTestBase() {
 
         // 식별자와 시각은 실행마다 다르다. 계약에서 고정할 것은 **이름과 구조**다.
         Snapshot(json, javaClass).assertMatches(
-            "detail",
-            body,
-            setOf("event_id", "performance_id", "starts_at", "sales_open_at", "sales_close_at"),
+            name = "detail",
+            actualJson = body,
+            volatileFields = setOf("event_id", "performance_id", "starts_at", "sales_open_at", "sales_close_at"),
         )
     }
 
@@ -60,7 +61,7 @@ class EventListTest : PostgresTestBase() {
         val listed = titlesOf(mockMvc.get("/api/events?size=100").andReturn().response.contentAsString)
 
         // `draft` 는 기획사가 아직 안 연 것이다. 목록에 두면 살 수 없는 줄을 보여주는 것이 된다.
-        org.assertj.core.api.Assertions.assertThat(listed).contains("목록 계약 공연").doesNotContain("안 연 공연")
+        assertThat(listed).contains("목록 계약 공연").doesNotContain("안 연 공연")
     }
 
     @Test

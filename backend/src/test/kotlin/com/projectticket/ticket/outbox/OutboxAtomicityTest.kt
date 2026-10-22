@@ -96,7 +96,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
         val paying = payments.startPaying(accountId, reservationId)
         jdbc.sql("update reservation set paying_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
 
-        val settled = payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        val settled = payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
 
         // 돈은 받았고 좌석은 못 줬다 — 예매가 성립 안 했으니 확정 사건도 없다. 되돌리는 것은 환불(17b)이다.
         assertThat(settled.late).isTrue()
@@ -119,7 +119,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
     private fun reserved(startsInDays: Long): Pair<Long, Long> {
         val reservationId = hold(startsInDays)
         val paying = payments.startPaying(accountId, reservationId)
-        return reservationId to payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null)).paymentId
+        return reservationId to payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null)).paymentId
     }
 
     private fun eventOf(reservationId: Long, type: String): Row =
@@ -129,7 +129,10 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
 
     private fun eventCount(reservationId: Long, type: String): Long =
         jdbc.sql("select count(*) from outbox where type = :type and aggregate_id = :id")
-            .param("type", type).param("id", reservationId).query(Long::class.java).single()
+            .param("type", type)
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .single()
 
     @Suppress("UNCHECKED_CAST")
     private fun payloadOf(row: Row): Map<String, Any?> = json.readValue(row.payload, Map::class.java) as Map<String, Any?>

@@ -96,7 +96,7 @@ class SchemaNamingTest : PostgresTestBase() {
             """,
         )
             .param("flyway", FLYWAY)
-            .query { rs, _ -> Column(rs.getString("table_name"), rs.getString("column_name"), rs.getString("data_type")) }
+            .query { rs, _ -> Column(table = rs.getString("table_name"), name = rs.getString("column_name"), type = rs.getString("data_type")) }
             .list()
 
     /** 표마다 그 제약이 잡은 컬럼들 */
@@ -117,7 +117,7 @@ class SchemaNamingTest : PostgresTestBase() {
             .param("flyway", FLYWAY)
             .query { rs, _ -> rs.getString("table_name") to rs.getString("column_name") }
             .list()
-            .groupBy({ it.first }, { it.second })
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
 
     private companion object {
         /** 이름을 짓는 규칙이 아니라 Flyway 가 만드는 표다 */

@@ -27,29 +27,30 @@ class TicketMetrics(private val registry: MeterRegistry) {
     }
 
     /** @param result `won`·`taken`·`rejected` — 경합에서 이겼나, 남이 먼저 잡았나, 규칙에 막혔나 */
-    fun seatHoldAttempt(result: String) = registry.counter(SEAT_HOLD_ATTEMPTS, "result", result).increment()
+    fun seatHoldAttempt(result: String) { registry.counter(SEAT_HOLD_ATTEMPTS, "result", result).increment() }
 
     /** 선점 트랜잭션이 얼마나 걸렸나. 부하 청크(31)가 이 분포로 p95 를 읽는다 */
-    fun seatHoldLatency(elapsed: Duration) = registry.timer(SEAT_HOLD_LATENCY).record(elapsed)
+    fun seatHoldLatency(elapsed: Duration) { registry.timer(SEAT_HOLD_LATENCY).record(elapsed) }
 
-    fun seatSweepExpired(seats: Int) = registry.counter(SEAT_SWEEP_EXPIRED).increment(seats.toDouble())
+    fun seatSweepExpired(seats: Int) { registry.counter(SEAT_SWEEP_EXPIRED).increment(seats.toDouble()) }
 
-    fun reservationConfirmed() = registry.counter(RESERVATION_CONFIRMED).increment()
+    fun reservationConfirmed() { registry.counter(RESERVATION_CONFIRMED).increment() }
 
-    /** @param reason `audience`·`organizer` — 무엇이 물렀나(26a 의 `cancelled_by` 와 같은 축) */
-    fun reservationCancelled(reason: String, count: Int = 1) =
+    /** [reason] 은 `audience`·`organizer` 다 — 무엇이 물렀나(26a 의 `cancelled_by` 와 같은 축) */
+    fun reservationCancelled(reason: String, count: Int = 1) {
         registry.counter(RESERVATION_CANCELLED, "reason", reason).increment(count.toDouble())
+    }
 
-    fun queueAdmitted(people: Long) = registry.counter(QUEUE_ADMITTED).increment(people.toDouble())
+    fun queueAdmitted(people: Long) { registry.counter(QUEUE_ADMITTED).increment(people.toDouble()) }
 
     /** 진입부터 입장까지. 줄이 길어지는 것은 게이지가, 「얼마나 기다렸나」는 이 분포가 답한다 */
-    fun queueWaited(waited: Duration) = registry.timer(QUEUE_WAIT_SECONDS).record(waited)
+    fun queueWaited(waited: Duration) { registry.timer(QUEUE_WAIT_SECONDS).record(waited) }
 
     /** @param reason `admission-required`·`admission-mismatch`·`queue-unavailable`(`D5` 의 `type` 슬러그) */
-    fun gateRejected(reason: String) = registry.counter(QUEUE_GATE_REJECTED, "reason", reason).increment()
+    fun gateRejected(reason: String) { registry.counter(QUEUE_GATE_REJECTED, "reason", reason).increment() }
 
     /** 읽기 모델이 DB 에서 스냅샷을 만든 횟수(`D20`). 이 수가 폴링 수에 비례하면 캐시가 안 먹는 것이다 */
-    fun snapshotBuilt() = registry.counter(SEAT_SNAPSHOT_BUILT).increment()
+    fun snapshotBuilt() { registry.counter(SEAT_SNAPSHOT_BUILT).increment() }
 
     /** 회차 합이다(`D10`). 회차별 길이는 시계열이 무한히 늘어서 태그로 안 둔다 */
     fun queueSizes(length: Long, active: Long) {

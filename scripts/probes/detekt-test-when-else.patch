@@ -3,15 +3,18 @@
 # 문구: ElseCaseInsteadOfExhaustiveWhen
 diff --git a/backend/src/test/kotlin/com/projectticket/ticket/ProbeTestWhen.kt b/backend/src/test/kotlin/com/projectticket/ticket/ProbeTestWhen.kt
 new file mode 100644
-index 0000000..dab4787
+index 0000000..f1327ea
 --- /dev/null
 +++ b/backend/src/test/kotlin/com/projectticket/ticket/ProbeTestWhen.kt
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,11 @@
 +package com.projectticket.ticket
 +
-+/** 탐침 — 테스트 소스의 열거·Boolean `when` 에 `else` 가 `check` 를 세우나(`detektTest`, 마무리 15차) */
-+internal fun probeTestWhen(flag: Boolean): Int =
-+    when (flag) {
-+        true -> 1
++import com.projectticket.ticket.payment.PaymentStatus
++
++/** 탐침 — 테스트 소스의 열거 `when` 에 `else` 가 `check` 를 세우나(`detektTest`, 마무리 15차). 갈래가 둘이면 `UseIfInsteadOfWhen` 이 먼저 선다(`G15`) */
++internal fun probeTestWhen(status: PaymentStatus): Int =
++    when (status) {
++        PaymentStatus.APPROVED -> 1
++        PaymentStatus.DECLINED -> 2
 +        else -> 0
 +    }

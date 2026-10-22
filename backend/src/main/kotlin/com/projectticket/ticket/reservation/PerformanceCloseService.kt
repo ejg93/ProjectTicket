@@ -47,7 +47,8 @@ class PerformanceCloseService(
             .param("id", performanceId)
             .query(OffsetDateTime::class.java)
             .optional()
-            .orElse(null) ?: return null
+            .orElse(null)
+            ?: return null
 
         val expired = jdbc.sql(
             """
@@ -82,8 +83,13 @@ class PerformanceCloseService(
                 .filterNotNull()
             seatVersions.publishAfterCommit(released, PerformanceSeatStatus.AVAILABLE)
 
-            expired.forEach {
-                auditLog.record(AuditLog.Kind.OUTCOME, "reservation.expired", null, AuditLog.Target.of("reservation", it))
+            expired.forEach { reservationId ->
+                auditLog.record(
+                    kind = AuditLog.Kind.OUTCOME,
+                    eventType = "reservation.expired",
+                    actorAccountId = null,
+                    target = AuditLog.Target.of("reservation", reservationId),
+                )
             }
         }
 
@@ -94,11 +100,11 @@ class PerformanceCloseService(
             mapOf("performance_id" to performanceId, "closed_at" to closedAt.toString()),
         )
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "performance.closed",
-            null,
-            AuditLog.Target.of("performance", performanceId),
-            mapOf("expired_reservation_count" to expired.size),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "performance.closed",
+            actorAccountId = null,
+            target = AuditLog.Target.of("performance", performanceId),
+            detail = mapOf("expired_reservation_count" to expired.size),
         )
         return expired.size
     }

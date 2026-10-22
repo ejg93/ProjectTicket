@@ -110,7 +110,10 @@ class SettlementStore(private val jdbc: JdbcClient) {
 
         lines.forEach { (kind, lineAmount) ->
             jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, :kind, :amount)")
-                .param("id", due.settlementId).param("kind", kind.code).param("amount", lineAmount).update()
+                .param("id", due.settlementId)
+                .param("kind", kind.code)
+                .param("amount", lineAmount)
+                .update()
         }
         return amount
     }

@@ -7,6 +7,8 @@ package com.projectticket.ticket.queue
  * 하나를 빠뜨리고, 빠뜨린 키는 아무 오류도 안 내면서 다음 오픈까지 남는다.
  */
 object QueueKeys {
+    /** 토큰 키의 접두. 스크립트가 이름을 만들 때 쓴다 */
+    const val ADMISSION_PREFIX = "admit:"
 
     /** 대기 줄. member = accountId, score = 진입 시각(ms) */
     fun waiting(performanceId: Long): String = "queue:$performanceId"
@@ -42,7 +44,4 @@ object QueueKeys {
      */
     fun ofPerformance(performanceId: Long): List<String> =
         listOf(waiting(performanceId), seen(performanceId), active(performanceId), admitWindow(performanceId))
-
-    /** 토큰 키의 접두. 스크립트가 이름을 만들 때 쓴다 */
-    const val ADMISSION_PREFIX = "admit:"
 }

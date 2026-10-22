@@ -56,7 +56,7 @@ class PaymentFlowTest : PostgresTestBase() {
     fun approved_card_confirms_the_reservation() {
         pay("4242 4242 4242 4242").andExpect {
             status { isCreated() }
-            header { string("Location", "/api/reservations/$reservationId") }
+            header { string(name = "Location", value = "/api/reservations/$reservationId") }
             jsonPath("$.status") { value("approved") }
             jsonPath("$.amount") { value(308_000) }
             jsonPath("$.approval_number") { exists() }
@@ -167,7 +167,7 @@ class PaymentFlowTest : PostgresTestBase() {
         }
 
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
     private fun paymentCount(): Long =
         jdbc.sql("select count(*) from payment where reservation_id = :id").param("id", reservationId).query(Long::class.java).single()

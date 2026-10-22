@@ -25,12 +25,16 @@ class ComposeContractTest {
     private val compose = Files.readString(root.resolve("docker-compose.yml"))
     private val dockerfile = Files.readString(root.resolve("backend/Dockerfile"))
     private val prometheus = Files.readString(root.resolve("docker/prometheus/prometheus.yml"))
-        .lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+        .lines()
+        .filterNot { it.trimStart().startsWith("#") }
+        .joinToString("\n")
     private val dashboard = Files.readString(root.resolve("docker/grafana/dashboards/ticket.json"))
 
     /** 주석은 걷어낸다 — 무엇을 안 쓰기로 했는지 설명하는 줄이 검사에 걸리면 안 된다 */
     private val nginx = Files.readString(root.resolve("docker/nginx/nginx.conf"))
-        .lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+        .lines()
+        .filterNot { it.trimStart().startsWith("#") }
+        .joinToString("\n")
 
     @Test
     fun the_gateway_resolves_the_app_name_on_every_request() {
@@ -53,8 +57,8 @@ class ComposeContractTest {
     @Test
     fun the_gateway_has_more_than_one_worker() {
         // 워커 1 × 1,024 연결에서 공개 GET 이 약 4,000 rps 에서 끊겼다(`35k`). `auto` 는 컨테이너에서 VM 의 CPU 수(22)를 읽는다 — 박는다.
-        val workers = Regex("""worker_processes\s+(\d+)\s*;""").find(nginx)?.groupValues?.get(1)?.toInt()
-        val connections = Regex("""worker_connections\s+(\d+)\s*;""").find(nginx)?.groupValues?.get(1)?.toInt()
+        val workers = Regex("""worker_processes\s+(\d+)\s*;""").find(nginx)?.run { groupValues[1].toInt() }
+        val connections = Regex("""worker_connections\s+(\d+)\s*;""").find(nginx)?.run { groupValues[1].toInt() }
         assertThat(workers).describedAs("worker_processes 를 숫자로 박는다(`35k`)").isNotNull().isGreaterThanOrEqualTo(2)
         assertThat(connections).describedAs("worker_connections").isNotNull().isGreaterThanOrEqualTo(4096)
     }
@@ -66,9 +70,10 @@ class ComposeContractTest {
         // JRE 이미지에는 `wget` 도 `curl` 도 없다. 쓰려면 Dockerfile 이 깔아야 한다.
         val tool = TOOLS.firstOrNull { check.contains("$it ") }
         assertThat(tool).describedAs("app healthcheck 가 아는 도구를 안 쓴다: $check").isNotNull()
+        val used = checkNotNull(tool) { "바로 위 단언이 null 을 막는다" }
         assertThat(dockerfile)
-            .describedAs("healthcheck 가 `$tool` 을 쓰는데 Dockerfile 이 안 깐다")
-            .contains("$tool ")
+            .describedAs("healthcheck 가 `$used` 을 쓰는데 Dockerfile 이 안 깐다")
+            .contains("$used ")
     }
 
     @Test
@@ -99,7 +104,7 @@ class ComposeContractTest {
     fun grafana_gauges_do_not_sum_instances() {
         // 게이지 둘은 대마다 **같은** Redis 합을 보고한다 — 대가 여럿이면 시계열이 대수만큼 생겨 겹치거나, 더하면 대수배가 된다.
         assertThat(dashboard).contains("\"max(queue_length)\"").contains("\"max(queue_active)\"")
-        assertThat(dashboard).doesNotContain("\"expr\": \"queue_length\"").doesNotContain("\"expr\": \"queue_active\"")
+        assertThat(dashboard).doesNotContain(""""expr": "queue_length"""").doesNotContain(""""expr": "queue_active"""")
     }
 
     /** compose 의 그 서비스 블록. 두 칸 들여쓴 다음 서비스 머리 줄 전까지다 */

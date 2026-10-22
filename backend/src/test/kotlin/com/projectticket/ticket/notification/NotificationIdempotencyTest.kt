@@ -123,7 +123,9 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
         assertThat(sweeper.sweep()).isZero()
 
         val row = jdbc.sql("select status, failure_reason from notification where account_id = :id")
-            .param("id", bouncing).query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }.single()
+            .param("id", bouncing)
+            .query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }
+            .single()
         assertThat(row).isEqualTo("failed" to "unknown_recipient")
     }
 
@@ -134,12 +136,15 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
             insertPending(leaving)
             // 파기는 컬럼을 비운다(`V2`). 다시 해도 같으니 재시도가 아니다.
             jdbc.sql("update account set email = null, password_hash = null, display_name = null, deleted_at = now() where account_id = :id")
-                .param("id", leaving).update()
+                .param("id", leaving)
+                .update()
 
             sweeper.sweep()
 
             val row = jdbc.sql("select status, failure_reason from notification where account_id = :id")
-                .param("id", leaving).query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }.single()
+                .param("id", leaving)
+                .query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }
+                .single()
             assertThat(row).isEqualTo("skipped" to "withdrawn_account")
         } finally {
             // 이메일이 비어 바탕의 접두 정리가 못 찾는다 — 제 id 로 지운다(`ConcurrencyTestBase.purgeAfter`).
@@ -164,7 +169,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
         val performanceId = fixture.performance(eventId, hallId, startsInDays).also { openService.open(it, actorAccountId = null) }
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
         val paying = payments.startPaying(accountId, reservationId)
-        payments.settle(accountId, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 
@@ -175,11 +180,12 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
         ).param("type", type.code).param("id", reservationId)
             .query { rs, _ ->
                 Triple(rs.getObject("event_id", UUID::class.java), rs.getObject("occurred_at", OffsetDateTime::class.java), rs.getString("payload"))
-            }.single()
+            }
+            .single()
 
         @Suppress("UNCHECKED_CAST")
-        val payload = tools.jackson.databind.ObjectMapper().readValue(row.third, Map::class.java) as Map<String, Any?>
-        return OutboxRelay.Envelope(row.first, type, 1, row.second, AggregateType.RESERVATION, reservationId, payload)
+        val payload = ObjectMapper().readValue(row.third, Map::class.java) as Map<String, Any?>
+        return OutboxRelay.Envelope(eventId = row.first, type = type, version = 1, occurredAt = row.second, aggregateType = AggregateType.RESERVATION, aggregateId = reservationId, payload = payload)
     }
 
     private fun insertPending(account: Long) =
@@ -201,7 +207,9 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
 
     private fun mailCount(reservationId: Long): Long =
         jdbc.sql("select count(*) from notification n join outbox o on o.event_id = n.event_id where o.aggregate_id = :id")
-            .param("id", reservationId).query(Long::class.java).single()
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .single()
 
     data class Mail(val subject: String, val body: String, val status: String)
 

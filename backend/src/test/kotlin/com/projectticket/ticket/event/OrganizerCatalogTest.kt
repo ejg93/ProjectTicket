@@ -35,8 +35,10 @@ class OrganizerCatalogTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values ('catalog@test.local', 'x', '담당자', 'organizer') returning account_id",
         ).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", myOrganizer).param("account", accountId).update()
-        mine = TicketUser(accountId, "catalog@test.local", AccountRole.ORGANIZER, null, true)
+            .param("organizer", myOrganizer)
+            .param("account", accountId)
+            .update()
+        mine = TicketUser(id = accountId, email = "catalog@test.local", role = AccountRole.ORGANIZER, passwordHash = null, active = true)
         hallId = fixture.hall(name = "카탈로그관", venueName = "카탈로그홀")
         fixture.seats(hallId, "F1-A", 3)
         fixture.seats(hallId, "F2-B", 2)
@@ -55,14 +57,14 @@ class OrganizerCatalogTest : PostgresTestBase() {
         val body = json.readTree(mvc.get("/api/organizer/halls") { with(user(mine)) }.andReturn().response.contentAsString)
         val hall = (0 until body.size()).map { body[it] }.single { it["hall_id"].asLong() == hallId }
 
-        assertThat(hall["venue_name"].asText()).isEqualTo("카탈로그홀")
-        assertThat((0 until hall["sections"].size()).map { hall["sections"][it]["code"].asText() to hall["sections"][it]["seat_count"].asInt() })
+        assertThat(hall["venue_name"].asString()).isEqualTo("카탈로그홀")
+        assertThat((0 until hall["sections"].size()).map { hall["sections"][it]["code"].asString() to hall["sections"][it]["seat_count"].asInt() })
             .containsExactly("F1-A" to 3, "F2-B" to 2)
     }
 
     @Test
     fun an_audience_is_forbidden() {
-        val audience = TicketUser(fixture.account("catalog-audience@test.local"), "catalog-audience@test.local", AccountRole.AUDIENCE, null, true)
+        val audience = TicketUser(id = fixture.account("catalog-audience@test.local"), email = "catalog-audience@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
         mvc.get("/api/organizer/halls") { with(user(audience)) }.andExpect {
             status { isForbidden() }

@@ -35,7 +35,7 @@ class ScreenLengthTest {
     @Test
     fun every_form_is_classified() {
         val forms = Files.walk(app).use { paths ->
-            paths.filter { it.name.endsWith("-form.tsx") }.map { app.relativize(it).toString().replace('\\', '/') }.toList()
+            paths.filter { it.name.endsWith("-form.tsx") }.map { app.relativize(it).toString().replace(oldChar = '\\', newChar = '/') }.toList()
         }
         assertThat(forms).describedAs("못 읽었다 — `frontend/src/app` 에서 `*-form.tsx` 를 하나도 못 찾았다").isNotEmpty()
         assertThat(forms)
@@ -48,7 +48,7 @@ class ScreenLengthTest {
         PAIRS.forEach { (form, request) ->
             val onScreen = fields(Files.readString(app.resolve(form)))
             val onServer = sizedFields(request)
-            assertThat(onServer).describedAs("못 읽었다 — ${request.simpleName} 에서 `@Size(max)` 필드를 하나도 못 찾았다").isNotEmpty()
+            assertThat(onServer).describedAs("못 읽었다 — ${request.simpleName ?: "(없음)"} 에서 `@Size(max)` 필드를 하나도 못 찾았다").isNotEmpty()
 
             onServer.forEach { (name, max) ->
                 assertThat(onScreen)
@@ -56,13 +56,13 @@ class ScreenLengthTest {
                     .containsKey(name)
                 val raw = onScreen.getValue(name)
                 assertThat(raw)
-                    .describedAs("갈렸다 — $form 의 `$name` 칸에 `maxLength` 가 없다. 서버 ${request.simpleName} 는 ${max}자까지 받는다")
+                    .describedAs("갈렸다 — $form 의 `$name` 칸에 `maxLength` 가 없다. 서버 ${request.simpleName ?: "(없음)"} 는 ${max}자까지 받는다")
                     .isNotNull()
                 assertThat(raw)
-                    .describedAs("못 읽었다 — $form 의 `$name` 칸 `maxLength={$raw}` 가 리터럴 숫자가 아니다")
+                    .describedAs("못 읽었다 — $form 의 `$name` 칸 `maxLength={${raw ?: "(없음)"}}` 가 리터럴 숫자가 아니다")
                     .matches("\\d+")
                 assertThat(raw?.toInt())
-                    .describedAs("갈렸다 — $form 의 `$name` 칸은 `maxLength={$raw}`, 서버 ${request.simpleName} 는 ${max}자까지 받는다")
+                    .describedAs("갈렸다 — $form 의 `$name` 칸은 `maxLength={${raw ?: "(없음)"}}`, 서버 ${request.simpleName ?: "(없음)"} 는 ${max}자까지 받는다")
                     .isEqualTo(max)
             }
         }
@@ -85,23 +85,25 @@ class ScreenLengthTest {
                 .containsKey(name)
             val raw = onScreen.getValue(name)
             assertThat(raw)
-                .describedAs("갈렸다 — $form 의 `$name` 칸에 `minLength` 가 없다. 서버 ${request.simpleName} 는 ${min}자부터 받는다")
+                .describedAs("갈렸다 — $form 의 `$name` 칸에 `minLength` 가 없다. 서버 ${request.simpleName ?: "(없음)"} 는 ${min}자부터 받는다")
                 .isNotNull()
             assertThat(raw)
-                .describedAs("못 읽었다 — $form 의 `$name` 칸 `minLength={$raw}` 가 리터럴 숫자가 아니다")
+                .describedAs("못 읽었다 — $form 의 `$name` 칸 `minLength={${raw ?: "(없음)"}}` 가 리터럴 숫자가 아니다")
                 .matches("\\d+")
             assertThat(raw?.toInt())
-                .describedAs("갈렸다 — $form 의 `$name` 칸은 `minLength={$raw}`, 서버 ${request.simpleName} 는 ${min}자부터 받는다")
+                .describedAs("갈렸다 — $form 의 `$name` 칸은 `minLength={${raw ?: "(없음)"}}`, 서버 ${request.simpleName ?: "(없음)"} 는 ${min}자부터 받는다")
                 .isEqualTo(min)
         }
     }
 
     /** `<Field … name="x" … maxLength={N} … />` 에서 이름 → [attribute] 의 글자(없으면 null). 주석 안의 칸은 뺀다 */
     private fun fields(source: String, attribute: Regex = MAX_LENGTH): Map<String, String?> {
-        val code = LINE_COMMENT.replace(BLOCK_COMMENT.replace(source, ""), "")
+        val code = LINE_COMMENT.replace(input = BLOCK_COMMENT.replace(input = source, replacement = ""), replacement = "")
         return FIELD.findAll(code).mapNotNull { match ->
             val attributes = match.groupValues[1]
-            NAME.find(attributes)?.groupValues?.get(1)?.let { it to attribute.find(attributes)?.groupValues?.get(1) }
+            val name = NAME.find(attributes)?.run { groupValues[1] }
+            val bound = attribute.find(attributes)?.run { groupValues[1] }
+            name?.let { it to bound }
         }.toMap()
     }
 

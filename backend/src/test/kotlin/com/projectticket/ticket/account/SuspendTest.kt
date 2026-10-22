@@ -107,7 +107,8 @@ class SuspendTest : PostgresTestBase() {
             content = """{"email":"$EMAIL","password":"$PASSWORD","display_name":"관객","consents":{"terms_of_service":true,"privacy_collect":true}}"""
         }.andExpect { status { isCreated() } }
         return jdbc.sql("select account_id from account where email = :email").param("email", EMAIL)
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
     }
 
     private fun logIn(): Cookie =
@@ -122,14 +123,15 @@ class SuspendTest : PostgresTestBase() {
 
     private fun statusOf(): String =
         jdbc.sql("select status from account where account_id = :id").param("id", targetId)
-            .query(String::class.java).single()
+            .query(String::class.java)
+            .single()
 
     /** 관리자·기획사는 가입 경로로 못 얻는다(`V2`) — 시드처럼 직접 넣는다 */
     private fun principal(email: String, role: AccountRole): TicketUser {
         val id = jdbc.sql(
             "insert into account (email, password_hash, display_name, role) values (:email, 'x', '관리자', :role) returning account_id",
         ).param("email", email).param("role", role.code).query(Long::class.java).single()
-        return TicketUser(id, email, role, passwordHash = null, active = true)
+        return TicketUser(id = id, email = email, role = role, passwordHash = null, active = true)
     }
 
     private companion object {

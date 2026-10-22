@@ -7,7 +7,7 @@
 # 범위 모드(`B0-2`): 인자로 파일을 주면 그 파일만 본다 — 편집 훅이 쓴다(전체는 12초, 한 파일은 1초 안).
 # 인자 없으면 전체(CI·마무리). PLAN·PROGRESS 의 구조 검사는 그 파일이 범위에 들 때만 돈다.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 skill_files=(.claude/skills/*/SKILL.md)
 

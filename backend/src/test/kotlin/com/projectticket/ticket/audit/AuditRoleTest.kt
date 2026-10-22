@@ -40,7 +40,8 @@ class AuditRoleTest : PostgresTestBase() {
         assertThatThrownBy {
             asRole("ticket_app") {
                 jdbc.sql("update audit_log set event_type = 'account.logged_in' where audit_log_id = :id")
-                    .param("id", id).update()
+                    .param("id", id)
+                    .update()
             }
         }.hasMessageContaining("audit_log")
     }

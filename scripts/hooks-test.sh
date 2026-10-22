@@ -6,8 +6,7 @@
 # `scripts/`·설정·문서 몇을 복사해 넣는다. 훅은 그 사본을 `CLAUDE_PROJECT_DIR` 로 받는다 —
 # 도장·지문·가지가 사람 작업 트리를 타지 않게 하려는 것이다(설계 실패 사다리의 `GIT_DIR` 고정).
 set -uo pipefail
-cd "$(dirname "$0")/.."
-root=$(pwd)
+cd "$(dirname "$0")/.." || exit 1
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 # `session-state` 가 진짜 `gh` 로 네트워크를 타지 않게 — CI 줄 경우만 가짜를 끼운다(`I9-5`).
 export GH=/nonexistent

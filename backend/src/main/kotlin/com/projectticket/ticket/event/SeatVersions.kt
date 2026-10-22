@@ -146,17 +146,17 @@ class SeatVersions(
          */
         private val BUMP = DefaultRedisScript<Long>(
             """
-            local v = redis.call('INCR', KEYS[1])
-            -- **정수를 %d 로 박는다.** 그냥 이으면 Lua 가 큰 수를 지수 표기(1.78e+15)로 접어 스트림 id 가 깨진다.
-            local version = string.format('%d', v)
-            local changed = (#ARGV - 1) / 2
-            for i = 1, changed do
-                redis.call(
-                    'XADD', KEYS[2], 'MAXLEN', '~', ARGV[1], version .. '-' .. i,
-                    'id', ARGV[2 * i], 's', ARGV[2 * i + 1]
-                )
-            end
-            return v
+                local v = redis.call('INCR', KEYS[1])
+                -- **정수를 %d 로 박는다.** 그냥 이으면 Lua 가 큰 수를 지수 표기(1.78e+15)로 접어 스트림 id 가 깨진다.
+                local version = string.format('%d', v)
+                local changed = (#ARGV - 1) / 2
+                for i = 1, changed do
+                    redis.call(
+                        'XADD', KEYS[2], 'MAXLEN', '~', ARGV[1], version .. '-' .. i,
+                        'id', ARGV[2 * i], 's', ARGV[2 * i + 1]
+                    )
+                end
+                return v
             """.trimIndent(),
             Long::class.java,
         )
@@ -168,24 +168,24 @@ class SeatVersions(
          */
         private val CHANGES = DefaultRedisScript<String>(
             """
-            local ver = tonumber(redis.call('GET', KEYS[1]) or '0')
-            local since = tonumber(ARGV[1])
-            -- 지수 표기로 접히지 않게 %d 로 박는다(BUMP 와 같은 이유).
-            local head = string.format('%d', ver) .. '|'
-            if since >= ver then return head end
+                local ver = tonumber(redis.call('GET', KEYS[1]) or '0')
+                local since = tonumber(ARGV[1])
+                -- 지수 표기로 접히지 않게 %d 로 박는다(BUMP 와 같은 이유).
+                local head = string.format('%d', ver) .. '|'
+                if since >= ver then return head end
 
-            local first = redis.call('XRANGE', KEYS[2], '-', '+', 'COUNT', 1)
-            if #first == 0 then return head .. 'gone' end
-            local firstVersion = tonumber(string.match(first[1][1], '^(%d+)'))
-            if since + 1 < firstVersion then return head .. 'gone' end
+                local first = redis.call('XRANGE', KEYS[2], '-', '+', 'COUNT', 1)
+                if #first == 0 then return head .. 'gone' end
+                local firstVersion = tonumber(string.match(first[1][1], '^(%d+)'))
+                if since + 1 < firstVersion then return head .. 'gone' end
 
-            local entries = redis.call('XRANGE', KEYS[2], string.format('%d', since + 1) .. '-0', '+')
-            local out = {}
-            for i = 1, #entries do
-                local fields = entries[i][2]
-                out[#out + 1] = fields[2] .. ':' .. fields[4]
-            end
-            return head .. table.concat(out, ',')
+                local entries = redis.call('XRANGE', KEYS[2], string.format('%d', since + 1) .. '-0', '+')
+                local out = {}
+                for i = 1, #entries do
+                    local fields = entries[i][2]
+                    out[#out + 1] = fields[2] .. ':' .. fields[4]
+                end
+                return head .. table.concat(out, ',')
             """.trimIndent(),
             String::class.java,
         )

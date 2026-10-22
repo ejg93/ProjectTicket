@@ -43,23 +43,25 @@ class OrganizerEventValidationTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values ('mine@test.local', 'x', '담당자', 'organizer') returning account_id",
         ).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
-        organizer = TicketUser(accountId, "mine@test.local", AccountRole.ORGANIZER, null, true)
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
+        organizer = TicketUser(id = accountId, email = "mine@test.local", role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 
     @Test
     fun a_duplicate_grade_code_points_at_the_grade() {
         createEvent(
-            grade("VIP", "F1-A"),
-            grade("VIP", "F1-B"),
+            grade(code = "VIP", section = "F1-A"),
+            grade(code = "VIP", section = "F1-B"),
         ).andExpect(validationFailedAt("grades[1].code"))
     }
 
     @Test
     fun a_section_under_two_grades_points_at_the_grade() {
         createEvent(
-            grade("VIP", "F1-A"),
-            grade("R", "F1-A"),
+            grade(code = "VIP", section = "F1-A"),
+            grade(code = "R", section = "F1-A"),
         ).andExpect(validationFailedAt("grades[1].sections"))
     }
 
@@ -88,7 +90,7 @@ class OrganizerEventValidationTest : PostgresTestBase() {
     }
 
     private fun createPerformance(startsAt: OffsetDateTime, salesOpenAt: OffsetDateTime, salesCloseAt: OffsetDateTime? = null): ResultActionsDsl {
-        val eventId = createEvent(grade("VIP", "F1-A")).andExpect { status { isCreated() } }.andReturn().response.let {
+        val eventId = createEvent(grade(code = "VIP", section = "F1-A")).andExpect { status { isCreated() } }.andReturn().response.let {
             json.readTree(it.contentAsString)["event_id"].asLong()
         }
         val body = mapOf("hall_id" to hallId, "starts_at" to startsAt.toString(), "sales_open_at" to salesOpenAt.toString()) +

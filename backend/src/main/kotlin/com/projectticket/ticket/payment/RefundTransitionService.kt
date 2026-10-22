@@ -48,7 +48,7 @@ class RefundTransitionService(
      * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 그 밖의 상태 → 409 `invalid-transition`.
      * 당일이면 그 뒤에 던진다 — 예외가 이 트랜잭션을 통째로 되돌리므로 옮긴 상태도 사라진다. 본 금액이 다를 때(`44a-1a`)도 같은 자리다.
      *
-     * @param expectedRefund 화면이 본 환불액. **필수다**(`44a-1c`) — 널로 대조를 건너뛰게 두면 새 호출자가 빼는 순간 검사가 조용히 빠진다.
+     * [expectedRefund] 는 화면이 본 환불액이다. **필수다**(`44a-1c`) — 널로 대조를 건너뛰게 두면 새 호출자가 빼는 순간 검사가 조용히 빠진다.
      */
     @Transactional
     fun request(accountId: Long, reservationId: Long, expectedRefund: Int): Requested {
@@ -72,7 +72,7 @@ class RefundTransitionService(
             .orElseThrow { cannotCancel(accountId, reservationId) }
 
         val payment = approvedPaymentOf(reservationId)
-        val amounts = quote.amounts(cancelled.startsAt, cancelled.cancelledAt, payment.amount)
+        val amounts = quote.amounts(startsAt = cancelled.startsAt, at = cancelled.cancelledAt, paymentAmount = payment.amount)
             ?: throw TicketException(
                 ErrorCode.CANCEL_WINDOW_CLOSED,
                 "관람일 당일이라 취소할 수 없다: starts_at=${cancelled.startsAt}",
@@ -90,7 +90,7 @@ class RefundTransitionService(
         val rate = amounts.tierRate
         val fee = amounts.feeAmount
         val refundAmount = amounts.refundAmount
-        val refundId = insertRefund(payment.paymentId, daysBefore, rate, fee, refundAmount)
+        val refundId = insertRefund(paymentId = payment.paymentId, daysBefore = daysBefore, rate = rate, fee = fee, refund = refundAmount)
 
         val released = jdbc.sql(
             """
@@ -124,13 +124,21 @@ class RefundTransitionService(
         )
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "reservation.cancelled",
-            accountId,
-            AuditLog.Target.of("reservation", reservationId),
-            mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to refundAmount),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "reservation.cancelled",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("reservation", reservationId),
+            detail = mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to refundAmount),
         )
-        return Requested(refundId, reservationId, payment.paymentId, daysBefore, rate, fee, refundAmount)
+        return Requested(
+            refundId = refundId,
+            reservationId = reservationId,
+            paymentId = payment.paymentId,
+            daysBefore = daysBefore,
+            tierRate = rate,
+            feeAmount = fee,
+            refundAmount = refundAmount,
+        )
     }
 
     private fun cannotCancel(accountId: Long, reservationId: Long): TicketException {
@@ -139,7 +147,8 @@ class RefundTransitionService(
             .param("account", accountId)
             .query(String::class.java)
             .optional()
-            .orElse(null) ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
+            .orElse(null)
+            ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
         return TicketException(ErrorCode.INVALID_TRANSITION, "취소할 수 없는 상태다: $status", mapOf("from" to status, "action" to "cancel"))
     }
 

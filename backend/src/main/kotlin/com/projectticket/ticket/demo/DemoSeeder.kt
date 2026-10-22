@@ -48,13 +48,15 @@ class DemoSeeder(
         }
 
         val organizerId = insertOrganizer()
-        val organizerAccount = insertAccount("organizer@demo.local", "데모기획 담당", AccountRole.ORGANIZER)
+        val organizerAccount = insertAccount(email = "organizer@demo.local", displayName = "데모기획 담당", role = AccountRole.ORGANIZER)
         joinOrganizer(organizerId, organizerAccount)
-        insertAccount("admin@demo.local", "관리자", AccountRole.ADMIN)
-        repeat(AUDIENCE_COUNT) { insertAccount("audience${it + 1}@demo.local", "관객${it + 1}", AccountRole.AUDIENCE) }
+        insertAccount(email = "admin@demo.local", displayName = "관리자", role = AccountRole.ADMIN)
+        repeat(AUDIENCE_COUNT) { insertAccount(email = "audience${it + 1}@demo.local", displayName = "관객${it + 1}", role = AccountRole.AUDIENCE) }
 
         val hallIds = insertVenueAndHalls()
-        val performanceIds = HALL_SECTIONS.keys.flatMapIndexed { index, _ -> seedEvent(organizerAccount, organizerId, hallIds, index) }
+        val performanceIds = HALL_SECTIONS.keys.flatMapIndexed { index, _ ->
+            seedEvent(accountId = organizerAccount, organizerId = organizerId, hallIds = hallIds, index = index)
+        }
 
         log.info("데모 데이터 — 계정={} 홀={} 회차={}", AUDIENCE_COUNT + 2, hallIds.size, performanceIds.size)
     }
@@ -97,7 +99,9 @@ class DemoSeeder(
 
     private fun insertOrganizer(): Long =
         jdbc.sql("insert into organizer (code, name) values (:code, '데모기획') returning organizer_id")
-            .param("code", ORGANIZER_CODE).query(Long::class.java).single()
+            .param("code", ORGANIZER_CODE)
+            .query(Long::class.java)
+            .single()
 
     /** 비밀번호가 하나인 것은 `local` 전용이라서다. 운영 경로로는 이 러너가 아예 안 뜬다(`@ConditionalOnProperty`) */
     private fun insertAccount(email: String, displayName: String, role: AccountRole): Long =
@@ -117,16 +121,22 @@ class DemoSeeder(
 
     private fun joinOrganizer(organizerId: Long, accountId: Long) =
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
 
     /** 홀 둘에 좌석 2천 — 구역마다 열 20 × 번호 25 */
     private fun insertVenueAndHalls(): List<Long> {
         val venueId = jdbc.sql("insert into venue (name, address) values ('데모아트홀', '서울') returning venue_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
         return HALL_SECTIONS.map { (hallName, sections) ->
             val hallId = jdbc.sql("insert into hall (venue_id, name) values (:venue, :name) returning hall_id")
-                .param("venue", venueId).param("name", hallName).query(Long::class.java).single()
+                .param("venue", venueId)
+                .param("name", hallName)
+                .query(Long::class.java)
+                .single()
 
             sections.forEach { section ->
                 jdbc.sql(
@@ -136,8 +146,10 @@ class DemoSeeder(
                       from generate_series(1, :rows) r, generate_series(1, :seats) n
                     """,
                 )
-                    .param("hall", hallId).param("section", section)
-                    .param("rows", ROWS_PER_SECTION).param("seats", SEATS_PER_ROW)
+                    .param("hall", hallId)
+                    .param("section", section)
+                    .param("rows", ROWS_PER_SECTION)
+                    .param("seats", SEATS_PER_ROW)
                     .update()
             }
             hallId

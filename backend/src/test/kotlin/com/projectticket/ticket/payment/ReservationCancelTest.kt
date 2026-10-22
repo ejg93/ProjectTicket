@@ -64,7 +64,17 @@ class ReservationCancelTest : PostgresTestBase() {
 
         assertThat(reservation(reservationId)).isEqualTo("cancelled" to true)
         assertThat(seatStatuses(reservationId)).containsOnly("available")
-        assertThat(refundRow(reservationId)).isEqualTo(RefundRow("audience", 8, BigDecimal("0.10"), 30_800, 277_200, "done", true))
+        assertThat(refundRow(reservationId)).isEqualTo(
+            RefundRow(
+                reason = "audience",
+                daysBefore = 8,
+                tierRate = "0.10".toBigDecimal(),
+                fee = 30_800,
+                refund = 277_200,
+                status = "done",
+                numbered = true,
+            ),
+        )
         assertThat(auditCount("reservation.cancelled", reservationId)).isOne()
     }
 
@@ -200,7 +210,7 @@ class ReservationCancelTest : PostgresTestBase() {
     private fun reserved(startsInDays: Long): Long {
         val reservationId = hold(startsInDays)
         val paying = payments.startPaying(buyer.id, reservationId)
-        payments.settle(buyer.id, paying, MockPaymentGateway.Result("M-${System.nanoTime()}", "4242", null))
+        payments.settle(buyer.id, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 
@@ -217,11 +227,13 @@ class ReservationCancelTest : PostgresTestBase() {
         }
 
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
     private fun reservation(reservationId: Long): Pair<String, Boolean> =
         jdbc.sql("select status, cancelled_at is not null as cancelled from reservation where reservation_id = :id")
-            .param("id", reservationId).query { rs, _ -> rs.getString("status") to rs.getBoolean("cancelled") }.single()
+            .param("id", reservationId)
+            .query { rs, _ -> rs.getString("status") to rs.getBoolean("cancelled") }
+            .single()
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql(
@@ -244,5 +256,8 @@ class ReservationCancelTest : PostgresTestBase() {
 
     private fun auditCount(eventType: String, targetId: Long): Long =
         jdbc.sql("select count(*) from audit_log where event_type = :type and target_id = :id")
-            .param("type", eventType).param("id", targetId).query(Long::class.java).single()
+            .param("type", eventType)
+            .param("id", targetId)
+            .query(Long::class.java)
+            .single()
 }

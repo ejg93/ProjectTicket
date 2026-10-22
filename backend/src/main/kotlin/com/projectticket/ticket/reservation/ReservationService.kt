@@ -20,7 +20,7 @@ class ReservationService(
 
     fun hold(accountId: Long, idempotencyKey: String, command: SeatHoldService.Command): ReservationQuery.Reservation =
         retryOnceOnDeadlock {
-            idempotency.run(accountId, idempotencyKey, command, ReservationQuery.Reservation::class.java) {
+            idempotency.run(accountId = accountId, key = idempotencyKey, request = command, responseType = ReservationQuery.Reservation::class.java) {
                 reservationQuery.get(seatHold.hold(accountId, command), accountId)
             }
         }

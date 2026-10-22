@@ -85,7 +85,10 @@ class IdempotencyCleanerTest : PostgresTestBase() {
 
     private fun exists(keyValue: String): Boolean =
         jdbc.sql("select exists(select 1 from idempotency_key where account_id = :account and key_value = :key)")
-            .param("account", accountId).param("key", keyValue).query(Boolean::class.java).single()
+            .param("account", accountId)
+            .param("key", keyValue)
+            .query(Boolean::class.java)
+            .single()
 
     private companion object {
         const val PREFIX = "idem-clean-"

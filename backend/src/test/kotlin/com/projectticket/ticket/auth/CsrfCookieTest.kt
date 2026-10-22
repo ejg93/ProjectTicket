@@ -39,7 +39,7 @@ class CsrfCookieTest : PostgresTestBase() {
      * **클래스 순서에 기대지 않는다.** 여기서 되돌리면 이 테스트가 무엇을 재는지가 순서와 무관해진다.
      */
     @BeforeEach
-    fun restoreOurCsrfRepository() = csrfFilters().forEach { repositoryField().set(it, csrfTokenRepository) }
+    fun restoreOurCsrfRepository() { csrfFilters().forEach { repositoryField().set(it, csrfTokenRepository) } }
 
     @Test
     fun get_issues_cookie_and_header_from_it_passes() {
@@ -60,7 +60,7 @@ class CsrfCookieTest : PostgresTestBase() {
             // CSRF 를 지났다는 증거는 403 이 아니라 로그인 판정(401)까지 갔다는 것이다.
             status { isUnauthorized() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:login-failed") }
-            header { string("WWW-Authenticate", "Session") }
+            header { string(name = "WWW-Authenticate", value = "Session") }
         }
     }
 
@@ -101,5 +101,5 @@ class CsrfCookieTest : PostgresTestBase() {
     /** 실패했을 때 무엇이 물려 있었는지 말해 준다. 이 값이 위 `@BeforeEach` 를 세운 근거였다 */
     private fun repositoriesInUse(): String = runCatching {
         csrfFilters().joinToString { repositoryField().get(it)!!::class.java.simpleName }
-    }.getOrElse { "못 읽음: ${it.message}" }
+    }.getOrElse { "못 읽음: ${it.message ?: it::class.java.simpleName}" }
 }

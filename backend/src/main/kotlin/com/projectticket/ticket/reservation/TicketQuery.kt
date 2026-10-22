@@ -15,7 +15,10 @@ class TicketQuery(private val jdbc: JdbcClient) {
 
     fun forReservation(reservationId: Long, accountId: Long): List<Ticket> {
         val owned = jdbc.sql("select count(*) from reservation where reservation_id = :id and account_id = :account")
-            .param("id", reservationId).param("account", accountId).query(Long::class.java).single()
+            .param("id", reservationId)
+            .param("account", accountId)
+            .query(Long::class.java)
+            .single()
         if (owned == 0L) throw TicketException(ErrorCode.RESERVATION_NOT_FOUND)
 
         return jdbc.sql(

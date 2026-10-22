@@ -46,9 +46,9 @@ class PerformanceCloser(
         var expired = 0
         due.forEach { performanceId ->
             try {
-                closeService.close(performanceId)?.let {
+                closeService.close(performanceId)?.let { expiredSeats ->
                     closed++
-                    expired += it
+                    expired += expiredSeats
                     // 줄을 걷는 것은 **커밋 뒤**다(`D12`). close() 가 트랜잭션 경계라 여기는 이미 그 밖이고,
                     // 안에서 지우면 롤백된 종료가 남의 줄을 날린다 — Redis 에는 되돌릴 방법이 없다.
                     queue.drop(performanceId)

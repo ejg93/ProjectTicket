@@ -20,7 +20,7 @@ class LoginAttemptService(private val redis: StringRedisTemplate) {
 
     /** 세는 것은 실패뿐이다. 성공하면 [reset] 이 지운다 */
     fun isBlocked(email: String, ip: String): Boolean =
-        (redis.opsForValue().get(key(email, ip))?.toIntOrNull() ?: 0) >= MAX_ATTEMPTS
+        redis.opsForValue().get(key(email, ip))?.toIntOrNull() ?: 0 >= MAX_ATTEMPTS
 
     /** 첫 실패에만 TTL 을 건다. 매번 걸면 계속 두드리는 동안 잠금이 영원히 밀린다 */
     fun recordFailure(email: String, ip: String) {

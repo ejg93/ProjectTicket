@@ -56,12 +56,12 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
         val problem = problems.create(ErrorCode.VALIDATION_FAILED, null, servletRequestOf(request))
         problem.setProperty(
             "errors",
-            e.bindingResult.fieldErrors.map { FieldError(toSnakeCase(it.field), it.defaultMessage) },
+            e.bindingResult.fieldErrors.map { FieldError(field = toSnakeCase(it.field), message = it.defaultMessage) },
         )
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status).body(problem)
     }
 
-    /** @param field 요청 본문의 필드 이름. Jackson 이 snake_case 로 내보내므로 여기서 맞춘다(`D5`) */
+    /** [field] 는 요청 본문의 필드 이름이다. Jackson 이 snake_case 로 내보내므로 여기서 맞춘다(`D5`) */
     data class FieldError(val field: String, val message: String?)
 
     /**

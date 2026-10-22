@@ -4,7 +4,6 @@ import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.Waits
 import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration

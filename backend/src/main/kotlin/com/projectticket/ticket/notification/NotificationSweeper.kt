@@ -33,16 +33,16 @@ class NotificationSweeper(private val store: NotificationStore, private val send
         var sent = 0
         var failed = 0
         var skipped = 0
-        pending.forEach { row ->
+        for (row in pending) {
             val email = row.email
             if (email == null) {
                 // 탈퇴하면 이메일이 null 이다(`V2` — 파기가 컬럼을 비운다). 다시 해도 같으니 재시도가 아니라 건너뛴다.
                 store.markSkipped(row.notificationId, MockNotificationSender.WITHDRAWN_REASON)
                 skipped++
-                return@forEach
+                continue
             }
 
-            val result = sender.send(email, row.subject, row.body)
+            val result = sender.send(address = email, subject = row.subject, body = row.body)
             if (result.succeeded) {
                 store.markSent(row.notificationId)
                 sent++

@@ -48,6 +48,8 @@ class LockComparisonTest : ConcurrencyTestBase() {
         jdbc.sql("drop table if exists lock_measure_seat").update()
     }
 
+    // 측정 표를 표준 출력으로 낸다 — measure 레인이 그것을 doc/notes 로 옮긴다(로거면 로그 꼴이 섞인다)
+    @Suppress("ForbiddenMethodCall")
     @Test
     fun compare_three_strategies() {
         val rows = mutableListOf<Row>()
@@ -70,24 +72,34 @@ class LockComparisonTest : ConcurrencyTestBase() {
     /** @return 이 스레드가 좌석을 잡았나 */
     private fun conditionalUpdate(): Boolean =
         jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id and status = 'available'")
-            .param("id", SEAT).update() == 1
+            .param("id", SEAT)
+            .update() == 1
 
     // `execute` 는 콜백의 타입을 그대로 돌려준다(Spring 7 — `<T extends @Nullable Object>`). 콜백이 `Boolean` 이라 널 검사가 필요 없다(`G8`).
     private fun pessimistic(): Boolean =
         TransactionTemplate(transactionManager).execute {
             val status = jdbc.sql("select status from lock_measure_seat where seat_id = :id for update")
-                .param("id", SEAT).query(String::class.java).single()
-            if (status != "available") return@execute false
-            jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id").param("id", SEAT).update()
-            true
+                .param("id", SEAT)
+                .query(String::class.java)
+                .single()
+            if (status != "available") {
+                false
+            } else {
+                jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id").param("id", SEAT).update()
+                true
+            }
         }
 
     private fun optimistic(): Boolean {
         val (status, version) = jdbc.sql("select status, version from lock_measure_seat where seat_id = :id")
-            .param("id", SEAT).query { rs, _ -> rs.getString("status") to rs.getInt("version") }.single()
+            .param("id", SEAT)
+            .query { rs, _ -> rs.getString("status") to rs.getInt("version") }
+            .single()
         if (status != "available") return false
         return jdbc.sql("update lock_measure_seat set status = 'held', version = version + 1 where seat_id = :id and version = :version")
-            .param("id", SEAT).param("version", version).update() == 1
+            .param("id", SEAT)
+            .param("version", version)
+            .update() == 1
     }
 
     /**
@@ -97,8 +109,9 @@ class LockComparisonTest : ConcurrencyTestBase() {
     private fun redisLock(): Boolean =
         schedulerLock.runExclusively("seat-$SEAT", Duration.ofSeconds(5)) {
             jdbc.sql("update lock_measure_seat set status = 'held' where seat_id = :id and status = 'available'")
-                .param("id", SEAT).update() == 1
-        } ?: false
+                .param("id", SEAT)
+                .update() == 1
+        } == true
 
     private fun measure(strategy: String, threads: Int, attempt: () -> Boolean): Row {
         jdbc.sql("delete from lock_measure_seat").update()
@@ -129,7 +142,7 @@ class LockComparisonTest : ConcurrencyTestBase() {
         )
     }
 
-    private fun List<Long>.percentile(p: Int): Long = if (isEmpty()) 0 else this[((size - 1) * p) / 100]
+    private fun List<Long>.percentile(p: Int): Long = if (isEmpty()) 0 else this[(size - 1) * p / 100]
 
     private fun sqlStateOf(e: Throwable): String? =
         generateSequence(e) { it.cause }.filterIsInstance<SQLException>().firstOrNull()?.sqlState
@@ -137,9 +150,9 @@ class LockComparisonTest : ConcurrencyTestBase() {
     private fun render(rows: List<Row>): String = buildString {
         appendLine("| 방식 | 스레드 | 승자 | 패자 | 오류(SQLSTATE) | 전체 ms | p50 ms | p95 ms | max ms |")
         appendLine("|---|---|---|---|---|---|---|---|---|")
-        rows.forEach {
-            val errors = if (it.errors == 0) "0" else "${it.errors}(${it.errorStates.entries.joinToString { (s, n) -> "$s×$n" }})"
-            appendLine("| ${it.strategy} | ${it.threads} | ${it.winners} | ${it.losers} | $errors | ${it.wallMs} | ${it.p50Ms} | ${it.p95Ms} | ${it.maxMs} |")
+        rows.forEach { row ->
+            val errors = if (row.errors == 0) "0" else "${row.errors}(${row.errorStates.entries.joinToString { (s, n) -> "$s×$n" }})"
+            appendLine("| ${row.strategy} | ${row.threads} | ${row.winners} | ${row.losers} | $errors | ${row.wallMs} | ${row.p50Ms} | ${row.p95Ms} | ${row.maxMs} |")
         }
     }
 

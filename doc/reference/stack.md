@@ -37,6 +37,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | kubectl | 1.36.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
 | k6 | 2.2.0 | `grafana/k6:2.2.0` 컨테이너 — `load/README.md`, `scripts/k8s-rollout-test.sh`. 쓰는 법의 함정은 아래 「k6」 |
 | Playwright | 1.64.0 | `frontend/package.json`(`^1.64.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
+| ShellCheck | 0.11.0 | `.github/workflows/ci.yml`(`docs` 잡 — 판과 sha256 을 박는다). 로컬은 winget `koalaman.shellcheck` — 패키지 폴더가 사용자 PATH 에 들어가서 **설치 전에 연 셸은 못 찾는다**(`scripts/shell-lint.sh` 가 그 폴더를 직접 본다) |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
 **버전을 물으면 이 표가 아니라 위 파일들을 본다.** 표가 낡을 수 있다 — `StackVersionConsistencyTest` 가 이 표와 파일을 대조해서 낡으면 빨개진다.

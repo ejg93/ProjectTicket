@@ -82,7 +82,7 @@ class SqlTextTest {
      */
     @Test
     fun status_literals_sit_only_where_an_index_needs_them() {
-        val found = statusLiterals.groupBy({ it.first }, { it.second }).mapValues { (_, values) -> values.sorted() }
+        val found = statusLiterals.groupBy(keySelector = { it.first }, valueTransform = { it.second }).mapValues { (_, values) -> values.sorted() }
         assertThat(found)
             .describedAs("상태 리터럴은 부분 인덱스 조건·`on conflict … where` 와 짝인 자리에만 둔다 — 나머지는 열거형 `code` 를 바인딩한다(coding-rules.md 「SQL」)")
             .isEqualTo(INDEXED_LITERALS)
@@ -117,8 +117,12 @@ class SqlTextTest {
 
         val source = sources.toMap()
         val interpolated = sqlCalls.flatMap { call ->
-            val literal = call.literal ?: return@flatMap emptyList()
-            interpolations(literal).filterNot { fixedIn(it, source.getValue(call.path)) }.map { "${call.where} $it" }
+            val literal = call.literal
+            if (literal == null) {
+                emptyList()
+            } else {
+                interpolations(literal).filterNot { fixedIn(token = it, file = source.getValue(call.path)) }.map { "${call.where} $it" }
+            }
         }
         assertThat(interpolated)
             .describedAs("결합했다 — `.sql(` 리터럴 안의 보간이 허용 목록(정렬 조각·같은 파일의 const val) 밖이다. 값은 이름 바인딩으로 싣는다(D9)")
@@ -149,7 +153,7 @@ class SqlTextTest {
     private fun fixedIn(token: String, file: String): Boolean {
         if (token == DOLLAR_LITERAL) return true
         if (token == ORDER_FRAGMENT) return ORDER_DECLARATION.containsMatchIn(file)
-        val name = CONSTANT_NAME.matchEntire(token)?.groupValues?.get(1) ?: return false
+        val name = CONSTANT_NAME.matchEntire(token)?.run { groupValues[1] } ?: return false
         return Regex("""\bconst\s+val\s+$name\b""").containsMatchIn(file)
     }
 
@@ -162,13 +166,15 @@ class SqlTextTest {
         val (body, end) = when {
             text.startsWith(RAW_QUOTE, start) -> {
                 val close = text.indexOf(RAW_QUOTE, start + RAW_QUOTE.length).takeIf { it >= 0 } ?: return null
-                Literal(text.substring(start + RAW_QUOTE.length, close), raw = true) to close + RAW_QUOTE.length
+                Literal(text.substring(startIndex = start + RAW_QUOTE.length, endIndex = close), raw = true) to close + RAW_QUOTE.length
             }
             text.getOrNull(start) == '"' -> {
                 val close = closingQuote(text, start + 1) ?: return null
-                Literal(text.substring(start + 1, close), raw = false) to close + 1
+                Literal(text.substring(startIndex = start + 1, endIndex = close), raw = false) to close + 1
             }
-            else -> return null
+            else -> {
+                return null
+            }
         }
         var next = skipBlank(text, end)
         if (text.getOrNull(next) == ',') next = skipBlank(text, next + 1)
@@ -194,7 +200,7 @@ class SqlTextTest {
         return i
     }
 
-    private fun lineOf(text: String, index: Int): Int = text.substring(0, index).count { it == '\n' } + 1
+    private fun lineOf(text: String, index: Int): Int = text.substring(startIndex = 0, endIndex = index).count { it == '\n' } + 1
 
     /**
      * `where` 뒤에 좌석 표(별칭 또는 맨 이름)의 `status = …`·`status in (…)` 이 있나.
@@ -202,7 +208,7 @@ class SqlTextTest {
      * 남겨 두면 좌석 조건이 없어도 통과한다(마무리 12차 독립 리뷰).
      */
     private fun conditionsOnStatus(sql: String): Boolean {
-        val alias = SEAT_UPDATE.find(sql)?.groupValues?.get(1)?.takeUnless { it.equals("set", ignoreCase = true) }
+        val alias = SEAT_UPDATE.find(sql)?.run { groupValues[1].takeUnless { it.equals("set", ignoreCase = true) } }
         val where = withoutSubqueries(sql.substringAfter(WHERE_KEYWORD.find(sql)?.value ?: return false))
         val qualifier = if (alias.isNullOrEmpty()) """(?<![\w.])""" else """(?:(?<![\w.])|\b$alias\.)"""
         return Regex("""(?i)${qualifier}status\s*(?:=|in\s*\()""").containsMatchIn(where)
@@ -213,29 +219,36 @@ class SqlTextTest {
         var i = 0
         while (i < text.length) {
             if (text[i] == '(' && SUBQUERY_START.matchesAt(text, i)) {
-                var depth = 0
-                while (i < text.length) {
-                    if (text[i] == '(') depth++
-                    if (text[i] == ')') depth--
-                    i++
-                    if (depth == 0) break
-                }
+                i = afterGroup(text, i)
             } else {
                 append(text[i++])
             }
         }
     }
 
+    /** [open] 의 여는 괄호와 짝이 맞는 닫는 괄호 바로 뒤. 짝이 없으면 끝이다 */
+    private fun afterGroup(text: String, open: Int): Int {
+        var i = open
+        var depth = 0
+        while (i < text.length) {
+            if (text[i] == '(') depth++
+            if (text[i] == ')') depth--
+            i++
+            if (depth == 0) break
+        }
+        return i
+    }
+
     private companion object {
         /** 지금 좌석 UPDATE 는 일곱이다(`PaymentTransition` 둘·`PerformanceCancel`·`RefundTransition`·`HoldSweeper`·`PerformanceClose`·`SeatHold`) */
         const val SEAT_UPDATES_FLOOR = 7
 
-        val RAW_STRING = Regex("\"\"\"(.*?)\"\"\"", RegexOption.DOT_MATCHES_ALL)
+        const val RAW_QUOTE = "\"\"\""
+        val RAW_STRING = Regex("$RAW_QUOTE(.*?)$RAW_QUOTE", RegexOption.DOT_MATCHES_ALL)
         val SEAT_UPDATE = Regex("""(?i)\bupdate\s+performance_seat\b(?:\s+(?:as\s+)?(\w+))?""")
         val WHERE_KEYWORD = Regex("""(?i)\bwhere\b""")
         val SUBQUERY_START = Regex("""(?i)\(\s*select\b""")
 
-        const val RAW_QUOTE = "\"\"\""
 
         /** `status = 'a'`·`p.status <> 'a'`·`status in ('a', 'b')`·`status not in (…)`. `payment_status` 같은 다른 이름은 안 문다 */
         val STATUS_LITERAL = Regex("""(?i)\bstatus\s*(?:=|<>|!=|(?:not\s+)?in\b)\s*\(?\s*('[^']*'(?:\s*,\s*'[^']*')*)""")

@@ -48,9 +48,9 @@ class LoginAttemptTest : PostgresTestBase() {
         repeat(LoginAttemptService.MAX_ATTEMPTS - 1) { logIn(WRONG) }
 
         // 넷까지는 아직이다. 하나 일찍 막으면 오타 몇 번에 사람이 갇힌다.
-        assertThat(attempts.isBlocked(EMAIL, IP)).isFalse()
+        assertThat(attempts.isBlocked(email = EMAIL, ip = IP)).isFalse()
         logIn(WRONG)
-        assertThat(attempts.isBlocked(EMAIL, IP)).isTrue()
+        assertThat(attempts.isBlocked(email = EMAIL, ip = IP)).isTrue()
     }
 
     @Test
@@ -60,7 +60,7 @@ class LoginAttemptTest : PostgresTestBase() {
 
         // 안 지우면 오타 넷을 낸 사람이 다음 실수에 막힌다.
         repeat(LoginAttemptService.MAX_ATTEMPTS - 1) { logIn(WRONG) }
-        assertThat(attempts.isBlocked(EMAIL, IP)).isFalse()
+        assertThat(attempts.isBlocked(email = EMAIL, ip = IP)).isFalse()
     }
 
     @Test
@@ -77,7 +77,7 @@ class LoginAttemptTest : PostgresTestBase() {
         repeat(LoginAttemptService.MAX_ATTEMPTS) { logIn(WRONG) }
 
         // 이메일만 세면 남의 계정을 잠글 수 있다. 막히는 것은 그 자리에서 두드리는 쪽이다.
-        assertThat(attempts.isBlocked(EMAIL, "203.0.113.99")).isFalse()
+        assertThat(attempts.isBlocked(email = EMAIL, ip = "203.0.113.99")).isFalse()
     }
 
     private fun signUp() =

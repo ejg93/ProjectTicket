@@ -42,7 +42,7 @@ class MetricNamesTest {
 
         // 상수만 있고 아무도 안 부르면 그 지표는 영원히 0 이다 — 그림이 비는 것과 구분이 안 된다.
         TicketMetrics.ALL.forEach { name ->
-            val constant = name.uppercase().replace('.', '_')
+            val constant = name.uppercase().replace(oldChar = '.', newChar = '_')
             assertThat(sources)
                 .describedAs("$name 을 쓰는 자리가 없다")
                 .contains("metrics.${callOf(constant)}", "const val $constant")

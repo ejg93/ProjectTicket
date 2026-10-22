@@ -28,8 +28,8 @@ class K8sManifestTest {
     private val docs = Files.readString(root.resolve("k8s/chart/snapshot.yaml"))
         .split(Regex("""(?m)^---$"""))
         .map { doc -> doc.lines().filterNot { it.trimStart().startsWith("#") }.joinToString("\n") }
-    private val app = docOf("Deployment", "app")
-    private val hpa = docOf("HorizontalPodAutoscaler", "app")
+    private val app = docOf(kind = "Deployment", name = "app")
+    private val hpa = docOf(kind = "HorizontalPodAutoscaler", name = "app")
     private val up = Files.readString(root.resolve("scripts/k8s-up.sh"))
 
     @Test
@@ -52,7 +52,7 @@ class K8sManifestTest {
                 .doesNotContain("replicas:")
         }
 
-        val grace = Regex("""terminationGracePeriodSeconds:\s*(\d+)""").find(app)?.groupValues?.get(1)?.toInt()
+        val grace = Regex("""terminationGracePeriodSeconds:\s*(\d+)""").find(app)?.run { groupValues[1].toInt() }
         assertThat(grace).describedAs("terminationGracePeriodSeconds 를 못 읽었다").isNotNull()
         assertThat(grace).describedAs("앱의 graceful 상한 20초보다 넉넉해야 한다").isGreaterThanOrEqualTo(MIN_GRACE_SECONDS)
     }
@@ -67,14 +67,15 @@ class K8sManifestTest {
     fun the_image_is_the_one_the_script_loads() {
         assertThat(app).contains("imagePullPolicy: Never")
 
-        val built = Regex("""IMAGE=(\S+)""").find(up)?.groupValues?.get(1)
+        val built = Regex("""IMAGE=(\S+)""").find(up)?.run { groupValues[1] }
         assertThat(built).describedAs("scripts/k8s-up.sh 에서 IMAGE= 를 못 읽었다").isNotNull()
-        assertThat(app).describedAs("매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $built")
+        val image = checkNotNull(built) { "바로 위 단언이 null 을 막는다" }
+        assertThat(app).describedAs("매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $image")
     }
 
     @Test
     fun the_web_image_bakes_the_backend_origin_at_build_time() {
-        val web = docOf("Deployment", "web")
+        val web = docOf(kind = "Deployment", name = "web")
         assertThat(web).describedAs("k8s/chart/snapshot.yaml 에서 화면 Deployment 를 못 읽었다(36a)").contains("kind: Deployment")
         // 로그인 화면은 백엔드를 안 부른다 — 앱이 롤링 중이어도 화면 대가 엔드포인트에서 안 빠진다.
         assertThat(web).contains("path: /login")

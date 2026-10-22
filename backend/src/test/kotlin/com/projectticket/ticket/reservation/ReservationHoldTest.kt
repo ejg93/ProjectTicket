@@ -9,6 +9,7 @@ import com.projectticket.ticket.queue.AdmissionService
 import com.projectticket.ticket.queue.QueueGateFilter
 import com.projectticket.ticket.queue.QueueService
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -64,7 +65,7 @@ class ReservationHoldTest : PostgresTestBase() {
         val body = hold(seatIds.take(2))
             .andExpect {
                 status { isCreated() }
-                header { string("Location", org.hamcrest.Matchers.startsWith("/api/reservations/")) }
+                header { string("Location", Matchers.startsWith("/api/reservations/")) }
                 jsonPath("$.reservation_id") { isNumber() }
                 jsonPath("$.performance_id") { value(performanceId) }
                 jsonPath("$.status") { value("held") }
@@ -74,13 +75,17 @@ class ReservationHoldTest : PostgresTestBase() {
                 jsonPath("$.seats.length()") { value(2) }
                 jsonPath("$.seats[0].price") { value(154_000) }
             }
-            .andReturn().response.contentAsString
+            .andReturn()
+            .response
+            .contentAsString
         val reservationId = json.readTree(body)["reservation_id"].asLong()
 
         assertThat(seatStatuses(reservationId)).containsExactly("held", "held")
         assertThat(
             jdbc.sql("select count(*) from audit_log where event_type = 'reservation.held' and target_id = :id")
-                .param("id", reservationId).query(Long::class.java).single(),
+                .param("id", reservationId)
+                .query(Long::class.java)
+                .single(),
         ).isOne()
     }
 
@@ -101,7 +106,7 @@ class ReservationHoldTest : PostgresTestBase() {
         hold(seatIds.take(1), key = key).andExpect { status { isCreated() } }
 
         hold(seatIds.drop(1).take(1), key = key).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:idempotency-key-reused") }
         }
     }
@@ -120,7 +125,7 @@ class ReservationHoldTest : PostgresTestBase() {
     @Test
     fun more_than_four_seats_is_over_limit() {
         hold(seatIds.take(5)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:over-limit") }
             jsonPath("$.limit") { value(4) }
             jsonPath("$.requested") { value(5) }
@@ -130,7 +135,7 @@ class ReservationHoldTest : PostgresTestBase() {
     @Test
     fun seat_of_another_performance_is_rejected() {
         hold(listOf(seatIds[0], -1)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:seat-not-in-performance") }
             jsonPath("$.seat_ids[0]") { value(-1) }
         }
@@ -138,7 +143,7 @@ class ReservationHoldTest : PostgresTestBase() {
 
     @Test
     fun taken_seat_is_a_conflict_and_nothing_is_held() {
-        fixture.hold(fixture.account("other@test.local"), performanceId, "F1-A", 1)
+        fixture.hold(accountId = fixture.account("other@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
 
         hold(seatIds.take(2)).andExpect {
             status { isConflict() }
@@ -201,15 +206,17 @@ class ReservationHoldTest : PostgresTestBase() {
      */
     private fun admissionToken(performance: Long): String? =
         runCatching {
-            queue.enter(performance, buyer.id)
-            admission.tokenFor(performance, buyer.id)
+            queue.enter(performanceId = performance, accountId = buyer.id)
+            admission.tokenFor(performanceId = performance, accountId = buyer.id)
         }.getOrNull()
 
     /** DB 에 실제 계정이 있어야 한다 — 예매가 계정을 외래키로 잡는다 */
     private fun principal(email: String): TicketUser =
-        TicketUser(fixture.account(email), email, AccountRole.AUDIENCE, passwordHash = null, active = true)
+        TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
     private fun seatStatuses(reservationId: Long): List<String> =
         jdbc.sql("select status from performance_seat where reservation_id = :id").param("id", reservationId)
-            .query(String::class.java).list().filterNotNull()
+            .query(String::class.java)
+            .list()
+            .filterNotNull()
 }

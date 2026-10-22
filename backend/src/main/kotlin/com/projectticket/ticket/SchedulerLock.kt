@@ -55,10 +55,10 @@ class SchedulerLock(private val redis: StringRedisTemplate) {
         /** 내 토큰일 때만 지운다. `GET` 뒤 `DEL` 을 따로 하면 그 사이에 TTL 이 끝나 남이 잡은 락을 지운다 */
         private val RELEASE = DefaultRedisScript<Long>(
             """
-            if redis.call('GET', KEYS[1]) == ARGV[1] then
-                return redis.call('DEL', KEYS[1])
-            end
-            return 0
+                if redis.call('GET', KEYS[1]) == ARGV[1] then
+                    return redis.call('DEL', KEYS[1])
+                end
+                return 0
             """.trimIndent(),
             Long::class.java,
         )

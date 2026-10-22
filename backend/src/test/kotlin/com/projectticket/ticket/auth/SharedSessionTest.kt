@@ -40,6 +40,8 @@ class SharedSessionTest {
     private var portA = 0
     private var portB = 0
 
+    // 두 인스턴스는 클래스 수명이다 — `stopTwoInstances`(@AfterAll)가 닫는다
+    @Suppress("MissingUseCall")
     @BeforeAll
     fun startTwoInstances() {
         postgres.start()
@@ -55,7 +57,9 @@ class SharedSessionTest {
     fun stopTwoInstances() {
         // 이 테스트는 롤백이 없다 — 진짜 포트로 HTTP 를 보내니 커밋된다. 남긴 계정을 손으로 지운다(동의는 cascade).
         instanceA.getBean(JdbcClient::class.java)
-            .sql("delete from account where email = :email").param("email", EMAIL).update()
+            .sql("delete from account where email = :email")
+            .param("email", EMAIL)
+            .update()
         instanceA.close()
         instanceB.close()
         // 컨테이너는 안 멈춘다. 재사용이 켜져 있으면 Spring 컨텍스트들이 붙어 쓰는 그 컨테이너라,
@@ -64,13 +68,13 @@ class SharedSessionTest {
 
     @Test
     fun login_on_one_context_is_seen_by_another() {
-        val xsrf = cookieOf(request(portA, "GET", "/api/health"), "XSRF-TOKEN")
-        request(portA, "POST", "/api/auth/signup", SIGNUP, mapOf("XSRF-TOKEN" to xsrf))
-        val login = request(portA, "POST", "/api/auth/login", LOGIN, mapOf("XSRF-TOKEN" to xsrf))
+        val xsrf = cookieOf(request(port = portA, method = "GET", path = "/api/health"), "XSRF-TOKEN")
+        request(port = portA, method = "POST", path = "/api/auth/signup", body = SIGNUP, cookies = mapOf("XSRF-TOKEN" to xsrf))
+        val login = request(port = portA, method = "POST", path = "/api/auth/login", body = LOGIN, cookies = mapOf("XSRF-TOKEN" to xsrf))
         assertThat(login.statusCode()).isEqualTo(200)
 
         // A 에서 받은 세션 쿠키 하나만 들고 B 로 간다. 세션이 JVM 안에 있으면 여기서 401 이다.
-        val me = request(portB, "GET", "/api/me", cookies = mapOf("TICKETSESSION" to cookieOf(login, "TICKETSESSION")))
+        val me = request(port = portB, method = "GET", path = "/api/me", cookies = mapOf("TICKETSESSION" to cookieOf(login, "TICKETSESSION")))
         assertThat(me.statusCode()).isEqualTo(200)
         assertThat(me.body()).contains(EMAIL)
         // 쿠키 계약도 여기서 잰다(`D9`). 자동설정에 맡기면 배포 모양에 따라 이름·속성이 달라진다(`SecurityConfig.cookieSerializer`).
@@ -80,24 +84,24 @@ class SharedSessionTest {
 
     @Test
     fun logout_on_one_context_ends_it_on_the_other() {
-        val xsrf = cookieOf(request(portA, "GET", "/api/health"), "XSRF-TOKEN")
-        request(portA, "POST", "/api/auth/signup", SIGNUP, mapOf("XSRF-TOKEN" to xsrf))
-        val login = request(portA, "POST", "/api/auth/login", LOGIN, mapOf("XSRF-TOKEN" to xsrf))
+        val xsrf = cookieOf(request(port = portA, method = "GET", path = "/api/health"), "XSRF-TOKEN")
+        request(port = portA, method = "POST", path = "/api/auth/signup", body = SIGNUP, cookies = mapOf("XSRF-TOKEN" to xsrf))
+        val login = request(port = portA, method = "POST", path = "/api/auth/login", body = LOGIN, cookies = mapOf("XSRF-TOKEN" to xsrf))
         val session = cookieOf(login, "TICKETSESSION")
         // 로그인은 CSRF 토큰을 버리기만 한다. 새 토큰은 다음 GET 에서 받는다 — 화면도 그렇게 돈다.
-        val rotated = cookieOf(request(portB, "GET", "/api/me", cookies = mapOf("TICKETSESSION" to session)), "XSRF-TOKEN")
+        val rotated = cookieOf(request(port = portB, method = "GET", path = "/api/me", cookies = mapOf("TICKETSESSION" to session)), "XSRF-TOKEN")
 
         val loggedOut = request(
-            portB,
-            "POST",
-            "/api/auth/logout",
-            "",
-            mapOf("TICKETSESSION" to session, "XSRF-TOKEN" to rotated),
+            port = portB,
+            method = "POST",
+            path = "/api/auth/logout",
+            body = "",
+            cookies = mapOf("TICKETSESSION" to session, "XSRF-TOKEN" to rotated),
         )
         assertThat(loggedOut.statusCode()).isEqualTo(204)
 
         // 끊은 곳이 B 인데 A 도 같이 끊긴다. 저장소가 하나라서다 — 정지·탈퇴(`5a`·`5b`)가 기대는 성질이 이것이다.
-        val me = request(portA, "GET", "/api/me", cookies = mapOf("TICKETSESSION" to session))
+        val me = request(port = portA, method = "GET", path = "/api/me", cookies = mapOf("TICKETSESSION" to session))
         assertThat(me.statusCode()).isEqualTo(401)
     }
 
@@ -107,6 +111,8 @@ class SharedSessionTest {
      * 설정을 **명령행 인자로** 넘긴다. `properties()` 는 기본값이라 `application.yml` 이 이기고,
      * 그러면 컨테이너가 아니라 로컬 5432 를 찾다가 인증에서 죽는다.
      */
+    // 만든 컨텍스트를 돌려준다 — 닫는 것은 부른 쪽(@AfterAll)이다
+    @Suppress("MissingUseCall")
     private fun boot(): ConfigurableApplicationContext =
         SpringApplicationBuilder(TicketApplication::class.java).run(
             "--server.port=0",
@@ -139,9 +145,10 @@ class SharedSessionTest {
             builder.header("Cookie", cookies.entries.joinToString("; ") { "${it.key}=${it.value}" })
         }
         cookies["XSRF-TOKEN"]?.let { builder.header("X-XSRF-TOKEN", it) }
-        val request = when (method) {
-            "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(body.orEmpty()))
-            else -> builder.GET()
+        val request = if (method == "POST") {
+            builder.POST(HttpRequest.BodyPublishers.ofString(body.orEmpty()))
+        } else {
+            builder.GET()
         }.build()
         return client.send(request, HttpResponse.BodyHandlers.ofString())
     }

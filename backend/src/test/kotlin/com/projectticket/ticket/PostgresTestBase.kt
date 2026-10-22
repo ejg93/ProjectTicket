@@ -54,6 +54,12 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 @Suppress("AbstractClassCanBeConcreteClass")
 abstract class PostgresTestBase {
 
+    @Autowired private lateinit var redisConnections: RedisConnectionFactory
+
+    @Autowired private lateinit var auditCleanup: JdbcClient
+
+    @Autowired private lateinit var auditTxManager: PlatformTransactionManager
+
     /**
      * 인증을 스레드에서 걷어낸다. `@Transactional` 은 데이터만 되돌린다 — 로그인 컨트롤러가 `SecurityContextHolder` 에 심은 값은
      * 스레드에 남고, MockMvc 테스트들이 스레드를 나눠 쓰기 때문에 다음 테스트 클래스가 인증된 상태로 시작한다.
@@ -64,8 +70,6 @@ abstract class PostgresTestBase {
         SecurityContextHolder.clearContext()
         TestSecurityContextHolder.clearContext()
     }
-
-    @Autowired private lateinit var redisConnections: RedisConnectionFactory
 
     /**
      * 앞 테스트가 남긴 세션을 지운다. `@Transactional` 은 DB 만 되돌려서 Redis 는 그대로 남고,
@@ -80,10 +84,6 @@ abstract class PostgresTestBase {
             connection.close()
         }
     }
-
-    @Autowired private lateinit var auditCleanup: JdbcClient
-
-    @Autowired private lateinit var auditTxManager: PlatformTransactionManager
 
     /**
      * 앞 테스트가 따로 커밋한 감사 기록을 걷어낸다.
@@ -111,6 +111,8 @@ abstract class PostgresTestBase {
             }
     }
 
+    // 컨테이너는 빈이다 — Spring 컨텍스트가 닫힐 때 같이 닫히고, 그 사이 시험 클래스들이 나눠 쓴다(재사용)
+    @Suppress("MissingUseCall")
     @TestConfiguration(proxyBeanMethods = false)
     class Containers {
 

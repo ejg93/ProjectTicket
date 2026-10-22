@@ -48,5 +48,5 @@ class SeatController(private val seatQuery: SeatQuery) {
 
     /** RFC 9110 §13.1.2 — `*` 는 전부, 나머지는 쉼표 목록. 약한 표시(`W/`)는 재검증에서 같은 값으로 친다(§8.8.3.2) */
     private fun matches(ifNoneMatch: String?, etag: String): Boolean =
-        ifNoneMatch?.split(',')?.map { it.trim().removePrefix("W/") }?.any { it == "*" || it == etag } ?: false
+        ifNoneMatch?.run { split(',').map { it.trim().removePrefix("W/") }.any { it == "*" || it == etag } } == true
 }

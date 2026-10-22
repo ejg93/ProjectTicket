@@ -44,8 +44,10 @@ class PerformanceDetailTest : PostgresTestBase() {
             "insert into account (email, password_hash, display_name, role) values ('detail@test.local', 'x', '담당자', 'organizer') returning account_id",
         ).query(Long::class.java).single()
         jdbc.sql("insert into organizer_member (organizer_id, account_id) values (:organizer, :account)")
-            .param("organizer", organizerId).param("account", accountId).update()
-        organizer = TicketUser(accountId, "detail@test.local", AccountRole.ORGANIZER, null, true)
+            .param("organizer", organizerId)
+            .param("account", accountId)
+            .update()
+        organizer = TicketUser(id = accountId, email = "detail@test.local", role = AccountRole.ORGANIZER, passwordHash = null, active = true)
         fixture.seats(hallId, "F1-A", 2)
     }
 
@@ -95,7 +97,7 @@ class PerformanceDetailTest : PostgresTestBase() {
     @Test
     fun a_draft_is_hidden_from_everyone_but_its_organizer() {
         val draft = fixture.performance(fixture.event(organizerId), hallId)
-        val stranger = TicketUser(fixture.account("stranger@test.local"), "stranger@test.local", AccountRole.AUDIENCE, null, true)
+        val stranger = TicketUser(id = fixture.account("stranger@test.local"), email = "stranger@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
         // 번호가 순번이라 훑으면 미공개 공연이 드러난다. 남에게는 없는 회차와 한 이름이다(`D5`).
         mvc.get("/api/performances/$draft").andExpect {

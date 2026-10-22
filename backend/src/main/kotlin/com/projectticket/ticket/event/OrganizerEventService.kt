@@ -26,7 +26,7 @@ class OrganizerEventService(
     private val membership: OrganizerMembership,
 ) {
 
-    /** @param sections 이 등급이 붙는 구역들. 같은 구역을 두 등급이 가리키면 `seat_grade_map` 의 기본키가 막는다 */
+    /** [sections] 는 이 등급이 붙는 구역들이다. 같은 구역을 두 등급이 가리키면 `seat_grade_map` 의 기본키가 막는다 */
     data class GradeCommand(val code: String, val price: Int, val sections: List<String>)
 
     data class EventCommand(val organizerId: Long, val title: String, val grades: List<GradeCommand>)
@@ -51,15 +51,15 @@ class OrganizerEventService(
 
         command.grades.forEachIndexed { index, grade ->
             val gradeId = insertGrade(eventId, grade, index)
-            grade.sections.forEach { section -> mapSection(eventId, section, gradeId, index) }
+            grade.sections.forEach { section -> mapSection(eventId = eventId, section = section, gradeId = gradeId, index = index) }
         }
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "event.created",
-            accountId,
-            AuditLog.Target.of("event", eventId),
-            mapOf("organizer_id" to command.organizerId, "grade_count" to command.grades.size),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "event.created",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("event", eventId),
+            detail = mapOf("organizer_id" to command.organizerId, "grade_count" to command.grades.size),
         )
         return eventId
     }
@@ -94,11 +94,11 @@ class OrganizerEventService(
         }
 
         auditLog.record(
-            AuditLog.Kind.OUTCOME,
-            "performance.created",
-            accountId,
-            AuditLog.Target.of("performance", performanceId),
-            mapOf("event_id" to eventId, "hall_id" to command.hallId),
+            kind = AuditLog.Kind.OUTCOME,
+            eventType = "performance.created",
+            actorAccountId = accountId,
+            target = AuditLog.Target.of("performance", performanceId),
+            detail = mapOf("event_id" to eventId, "hall_id" to command.hallId),
         )
         return performanceId
     }
@@ -115,16 +115,19 @@ class OrganizerEventService(
                 .single()
         } catch (e: DuplicateKeyException) {
             // 한 공연 안에서 등급 코드는 하나다(`seat_grade_event_code_key`, `V5`).
-            throw fieldRejected("grades[$index].code", "등급 코드가 겹친다: ${grade.code}")
+            throw fieldRejected(field = "grades[$index].code", message = "등급 코드가 겹친다: ${grade.code}")
         }
 
     private fun mapSection(eventId: Long, section: String, gradeId: Long, index: Int) =
         try {
             jdbc.sql("insert into seat_grade_map (event_id, section, seat_grade_id) values (:event, :section, :grade)")
-                .param("event", eventId).param("section", section).param("grade", gradeId).update()
+                .param("event", eventId)
+                .param("section", section)
+                .param("grade", gradeId)
+                .update()
         } catch (e: DuplicateKeyException) {
             // 구역 하나가 등급 둘을 가지면 그 구역의 가격이 안 정해진다(`V5` 기본키).
-            throw fieldRejected("grades[$index].sections", "같은 구역에 등급을 두 번 붙였다: $section")
+            throw fieldRejected(field = "grades[$index].sections", message = "같은 구역에 등급을 두 번 붙였다: $section")
         }
 
     /**
@@ -140,9 +143,9 @@ class OrganizerEventService(
         if (SALES_CHECKS.none { it in message }) return e
         val closeAt = command.salesCloseAt
         return if (closeAt != null && closeAt >= command.startsAt) {
-            fieldRejected("sales_close_at", "판매 마감은 관람 시각보다 앞이어야 한다")
+            fieldRejected(field = "sales_close_at", message = "판매 마감은 관람 시각보다 앞이어야 한다")
         } else {
-            fieldRejected("sales_open_at", "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다")
+            fieldRejected(field = "sales_open_at", message = "판매 시작은 판매 마감(기본 관람 1시간 전)보다 앞이어야 한다")
         }
     }
 

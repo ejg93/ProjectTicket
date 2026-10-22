@@ -36,7 +36,8 @@ class AdmissionService(
      * 창 안에서 [BATCH_SIZE] 를 다 썼으면 아무도 안 들인다. **줄이 비었을 때의 즉시 입장**([QueueService.enter], `D12` 「항상 켠다」)도
      * 같은 예산을 쓴다 — 한가한 시간에는 예산이 남아 바로 들어가고, 몰리면 예산이 바닥나 줄에 선다. 그래서 어느 길로 들어오든 R 은 상한이다.
      *
-     * @param limit 이번에 들일 상한. 스케줄러는 [BATCH_SIZE], 즉시 입장은 1
+     * [limit] 은 이번에 들일 상한이다. 스케줄러는 [BATCH_SIZE], 즉시 입장은 1.
+     *
      * @return 이번에 들인 사람 수. 줄이 비었거나 정원이 찼거나 예산이 없으면 0
      */
     fun admit(performanceId: Long, limit: Long = BATCH_SIZE): Long {
@@ -45,7 +46,7 @@ class AdmissionService(
         if (waiting == 0L) return 0
 
         // 줄 길이보다 많은 토큰을 만들 이유가 없다. 토큰 생성은 앱이 한다 — Lua 에는 난수원이 없다.
-        val tokens = List(minOf(waiting, limit, BATCH_SIZE).toInt()) { newToken() }
+        val tokens = List(minOf(a = waiting, b = limit, c = BATCH_SIZE).toInt()) { newToken() }
         val args = listOf(
             CAPACITY.toString(),
             TOKEN_TTL.toMillis().toString(),
@@ -118,7 +119,7 @@ class AdmissionService(
 
     /** 무작위 32바이트. 추측으로 남의 자리를 못 쓴다(`D9`) */
     private fun newToken(): String =
-        ByteArray(TOKEN_BYTES).also(random::nextBytes).let(Base64.getUrlEncoder().withoutPadding()::encodeToString)
+        Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(TOKEN_BYTES).also(random::nextBytes))
 
     /** 토큰에 박힌 것(`D12`). 관문이 셋을 대조한다 — 토큰 하나로 남의 계정·다른 회차를 못 산다 */
     data class Admission(val accountId: Long, val performanceId: Long, val issuedAt: Long)
@@ -169,61 +170,61 @@ class AdmissionService(
          */
         private val ADMIT = DefaultRedisScript<String>(
             """
-            local t = redis.call('TIME')
-            local now = t[1] * 1000 + math.floor(t[2] / 1000)
-            local capacity = tonumber(ARGV[1])
-            local ttl = tonumber(ARGV[2])
-            local tokenPrefix = ARGV[3]
-            local accountPrefix = ARGV[4]
-            local performanceId = ARGV[5]
-            local interval = tonumber(ARGV[6])
-            local budget = tonumber(ARGV[7])
+                local t = redis.call('TIME')
+                local now = t[1] * 1000 + math.floor(t[2] / 1000)
+                local capacity = tonumber(ARGV[1])
+                local ttl = tonumber(ARGV[2])
+                local tokenPrefix = ARGV[3]
+                local accountPrefix = ARGV[4]
+                local performanceId = ARGV[5]
+                local interval = tonumber(ARGV[6])
+                local budget = tonumber(ARGV[7])
 
-            local w = redis.call('HMGET', KEYS[3], 'start', 'used')
-            local start = tonumber(w[1])
-            local used = tonumber(w[2]) or 0
-            if (not start) or now - start >= interval then
-                start = now
-                used = 0
-            end
-            local left = budget - used
-            if left <= 0 then return '0|' end
+                local w = redis.call('HMGET', KEYS[3], 'start', 'used')
+                local start = tonumber(w[1])
+                local used = tonumber(w[2]) or 0
+                if (not start) or now - start >= interval then
+                    start = now
+                    used = 0
+                end
+                local left = budget - used
+                if left <= 0 then return '0|' end
 
-            redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
-            local free = capacity - redis.call('ZCARD', KEYS[2])
-            local wanted = #ARGV - 7
-            if free < wanted then wanted = free end
-            if left < wanted then wanted = left end
-            if wanted <= 0 then return '0|' end
+                redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', now)
+                local free = capacity - redis.call('ZCARD', KEYS[2])
+                local wanted = #ARGV - 7
+                if free < wanted then wanted = free end
+                if left < wanted then wanted = left end
+                if wanted <= 0 then return '0|' end
 
-            local popped = redis.call('ZPOPMIN', KEYS[1], wanted)
-            local count = 0
-            local waits = {}
-            for i = 1, #popped, 2 do
-                local account = popped[i]
-                count = count + 1
-                local token = ARGV[7 + count]
-                redis.call('ZADD', KEYS[2], now + ttl, token)
-                redis.call(
-                    'SET',
-                    tokenPrefix .. token,
-                    cjson.encode({
-                        account_id = tonumber(account),
-                        performance_id = tonumber(performanceId),
-                        issued_at = now
-                    }),
-                    'PX',
-                    ttl
-                )
-                redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
-                -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
-                waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
-            end
-            if count > 0 then
-                redis.call('HSET', KEYS[3], 'start', string.format('%d', start), 'used', string.format('%d', used + count))
-                redis.call('PEXPIRE', KEYS[3], interval * 2)
-            end
-            return count .. '|' .. table.concat(waits, ',')
+                local popped = redis.call('ZPOPMIN', KEYS[1], wanted)
+                local count = 0
+                local waits = {}
+                for i = 1, #popped, 2 do
+                    local account = popped[i]
+                    count = count + 1
+                    local token = ARGV[7 + count]
+                    redis.call('ZADD', KEYS[2], now + ttl, token)
+                    redis.call(
+                        'SET',
+                        tokenPrefix .. token,
+                        cjson.encode({
+                            account_id = tonumber(account),
+                            performance_id = tonumber(performanceId),
+                            issued_at = now
+                        }),
+                        'PX',
+                        ttl
+                    )
+                    redis.call('SET', accountPrefix .. account, token, 'PX', ttl)
+                    -- 진입 시각이 score 라 지금과의 차가 곧 기다린 시간이다(30 의 `queue.wait_seconds`).
+                    waits[#waits + 1] = string.format('%d', now - tonumber(popped[i + 1]))
+                end
+                if count > 0 then
+                    redis.call('HSET', KEYS[3], 'start', string.format('%d', start), 'used', string.format('%d', used + count))
+                    redis.call('PEXPIRE', KEYS[3], interval * 2)
+                end
+                return count .. '|' .. table.concat(waits, ',')
             """.trimIndent(),
             String::class.java,
         )
@@ -237,14 +238,14 @@ class AdmissionService(
          */
         private val RELEASE_AFTER_HOLD = DefaultRedisScript<Long>(
             """
-            redis.call('ZREM', KEYS[1], ARGV[1])
-            redis.call('DEL', KEYS[3])
-            local grace = tonumber(ARGV[2])
-            local ttl = redis.call('PTTL', KEYS[2])
-            if ttl > grace then
-                redis.call('PEXPIRE', KEYS[2], grace)
-            end
-            return ttl
+                redis.call('ZREM', KEYS[1], ARGV[1])
+                redis.call('DEL', KEYS[3])
+                local grace = tonumber(ARGV[2])
+                local ttl = redis.call('PTTL', KEYS[2])
+                if ttl > grace then
+                    redis.call('PEXPIRE', KEYS[2], grace)
+                end
+                return ttl
             """.trimIndent(),
             Long::class.java,
         )

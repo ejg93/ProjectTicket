@@ -2,6 +2,7 @@ package com.projectticket.ticket.consent
 
 import com.projectticket.ticket.PostgresTestBase
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
@@ -40,7 +41,7 @@ class ConsentSignupTest : PostgresTestBase() {
         mvc.get("/api/consent-items/terms_of_service").andExpect {
             status { isOk() }
             jsonPath("$.title") { value("이용약관") }
-            jsonPath("$.body") { value(org.hamcrest.Matchers.containsString("## 제1조")) }
+            jsonPath("$.body") { value(Matchers.containsString("## 제1조")) }
             jsonPath("$.purpose") { value(null as Any?) }
         }
         mvc.get("/api/consent-items/privacy_collect").andExpect {
@@ -63,22 +64,23 @@ class ConsentSignupTest : PostgresTestBase() {
         mvc.get("/api/consent-items/privacy_collect").andExpect {
             status { isOk() }
             jsonPath("$.version") { value(2) }
-            jsonPath("$.collected_items") { value(org.hamcrest.Matchers.containsString("로그인")) }
-            jsonPath("$.collected_items") { value(org.hamcrest.Matchers.containsString("탈퇴")) }
-            jsonPath("$.retention_period") { value(org.hamcrest.Matchers.containsString("3년")) }
+            jsonPath("$.collected_items") { value(Matchers.containsString("로그인")) }
+            jsonPath("$.collected_items") { value(Matchers.containsString("탈퇴")) }
+            jsonPath("$.retention_period") { value(Matchers.containsString("3년")) }
         }
 
         signUp(mapOf("terms_of_service" to true, "privacy_collect" to true)).andExpect { status { isCreated() } }
         assertThat(
             jdbc.sql("select item_version from current_consent where item_code = 'privacy_collect'")
-                .query(Int::class.java).single(),
+                .query(Int::class.java)
+                .single(),
         ).describedAs("새 가입은 지금 판에 동의한다").isEqualTo(2)
     }
 
     @Test
     fun signup_without_required_consent_is_rejected() {
         signUp(mapOf("terms_of_service" to true)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:required-consent-missing") }
         }
         assertThat(accountCount()).describedAs("동의가 빠졌는데 계정이 생기면 안 된다").isZero()
@@ -87,7 +89,7 @@ class ConsentSignupTest : PostgresTestBase() {
     @Test
     fun refusing_required_consent_is_rejected() {
         signUp(mapOf("terms_of_service" to true, "privacy_collect" to false)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:required-consent-missing") }
         }
     }
@@ -95,7 +97,7 @@ class ConsentSignupTest : PostgresTestBase() {
     @Test
     fun unknown_item_is_rejected() {
         signUp(mapOf("terms_of_service" to true, "privacy_collect" to true, "nope" to true)).andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:unknown-consent-item") }
         }
     }
@@ -116,7 +118,8 @@ class ConsentSignupTest : PostgresTestBase() {
         assertThat(consentCodes()).contains("marketing_email")
         assertThat(
             jdbc.sql("select granted from current_consent where item_code = 'marketing_email'")
-                .query(Boolean::class.java).single(),
+                .query(Boolean::class.java)
+                .single(),
         ).isFalse()
     }
 
@@ -125,7 +128,7 @@ class ConsentSignupTest : PostgresTestBase() {
         // 타입이 Boolean 이어도 JSON 의 null 은 들어온다. 그대로 두면 not null 컬럼에 부딪쳐 500 이 되고,
         // 사용자는 무엇을 고쳐야 하는지 못 듣는다.
         signUpRaw("""{"terms_of_service":true,"privacy_collect":true,"marketing_email":null}""").andExpect {
-            status { isUnprocessableEntity() }
+            status { isUnprocessableContent() }
             jsonPath("$.detail") { value("동의 여부가 비어 있다: marketing_email") }
         }
     }
@@ -136,7 +139,8 @@ class ConsentSignupTest : PostgresTestBase() {
 
         assertThat(
             jdbc.sql("select count(*) from audit_log where event_type = 'account.signed_up'")
-                .query(Long::class.java).single(),
+                .query(Long::class.java)
+                .single(),
         ).isEqualTo(1)
     }
 
@@ -150,7 +154,7 @@ class ConsentSignupTest : PostgresTestBase() {
         contentType = MediaType.APPLICATION_JSON
         content = """
             {"email":"consent@test.local","password":"hunter2-and-then-some",
-             "display_name":"관객","consents":${consents.entries.joinToString(",", "{", "}") { """"${it.key}":${it.value}""" }}}
+             "display_name":"관객","consents":${consents.entries.joinToString(separator = ",", prefix = "{", postfix = "}") { """"${it.key}":${it.value}""" }}}
         """.trimIndent()
         with(csrf())
     }

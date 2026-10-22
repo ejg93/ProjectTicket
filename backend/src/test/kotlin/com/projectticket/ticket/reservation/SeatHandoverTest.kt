@@ -37,22 +37,24 @@ class SeatHandoverTest : PostgresTestBase() {
 
     @Test
     fun a_held_seat_cannot_move_to_another_reservation() {
-        val first = fixture.hold(fixture.account("first@test.local"), performanceId, "F1-A", 1)
-        val second = fixture.hold(fixture.account("second@test.local"), performanceId, "F1-A", 2)
+        val first = fixture.hold(accountId = fixture.account("first@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
+        val second = fixture.hold(accountId = fixture.account("second@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 2)
         val held = seatOf(first)
         val free = fixture.performanceSeatIds(performanceId).last()
 
-        assertThat(point(free, first)).describedAs("null→A 는 선점이다").isEqualTo(1)
+        assertThat(point(performanceSeatId = free, reservationId = first)).describedAs("null→A 는 선점이다").isEqualTo(1)
         assertThat(release(free)).describedAs("A→null 은 해제다").isEqualTo(1)
 
-        val thrown = catchThrowable { point(held, second) }
+        val thrown = catchThrowable { point(performanceSeatId = held, reservationId = second) }
         assertThat(thrown).withFailMessage("트리거가 안 막았다 — 잡힌 좌석이 둘째 예매를 가리키게 됐다").isNotNull()
         assertThat(thrown).hasStackTraceContaining("좌석이 다른 예매로 넘어간다")
     }
 
     private fun seatOf(reservationId: Long): Long =
         jdbc.sql("select performance_seat_id from performance_seat where reservation_id = :id")
-            .param("id", reservationId).query(Long::class.java).single()
+            .param("id", reservationId)
+            .query(Long::class.java)
+            .single()
 
     private fun point(performanceSeatId: Long, reservationId: Long): Int =
         jdbc.sql(
@@ -66,5 +68,6 @@ class SeatHandoverTest : PostgresTestBase() {
 
     private fun release(performanceSeatId: Long): Int =
         jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where performance_seat_id = :seat")
-            .param("seat", performanceSeatId).update()
+            .param("seat", performanceSeatId)
+            .update()
 }
