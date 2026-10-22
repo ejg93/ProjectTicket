@@ -1,0 +1,26 @@
+# 게이트: OversellConcurrencyTest — 갱신 행 수 대조
+# 명령: cd backend && TESTCONTAINERS_REUSE_ENABLE=false ./gradlew integrationTest --tests '*OversellConcurrency*' --no-daemon -q; r=$?; cat build/test-results/integrationTest/*OversellConcurrency*.xml 2>/dev/null; exit $r
+# 문구: 두 번 팔렸다
+diff --git a/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt b/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt
+--- a/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt
++++ b/backend/src/main/kotlin/com/projectticket/ticket/reservation/SeatHoldService.kt
+@@ -110,19 +110,6 @@
+ 
+         val heldSeats = holdAvailable(command.performanceId, seatIds, reservationId)
+         val held = heldSeats.map { it.performanceSeatId }
+-        if (held.size != seatIds.size) {
+-            // 0행의 원인이 「좌석이 잡혔다」인지 「그 사이에 회차가 닫혔다」인지는 잠근 상태에서 다시 읽으면 갈린다.
+-            val statusNow = performanceStatusOf(command.performanceId)
+-            if (statusNow != PerformanceStatus.OPEN.code) {
+-                throw TicketException(ErrorCode.PERFORMANCE_NOT_OPEN, "회차가 닫혔다: status=$statusNow", mapOf("performance_status" to statusNow))
+-            }
+-            val taken = seatIds - held.toSet()
+-            throw TicketException(
+-                ErrorCode.SEAT_TAKEN,
+-                "${seatIds.size}석 중 ${taken.size}석이 이미 잡혔다",
+-                mapOf("taken_seat_ids" to taken),
+-            )
+-        }
+ 
+         recordSeats(reservationId, seatIds)
+ 
