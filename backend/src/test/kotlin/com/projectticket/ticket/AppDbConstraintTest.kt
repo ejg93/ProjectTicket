@@ -74,6 +74,8 @@ class AppDbConstraintTest {
     @Test
     fun every_length_check_in_the_migrations_is_accounted_for() {
         val inMigrations = liveChecks().filterValues { LENGTH_CALL.containsMatchIn(it) }.keys
+        // 하나도 못 읽으면 아래 `isSubsetOf` 가 빈 집합으로 초록이다(`I10-1`)
+        assertThat(inMigrations).describedAs("마이그레이션에서 길이 check 를 하나도 못 읽었다 — CHECK·LENGTH_CALL 꼴을 본다").isNotEmpty()
 
         // 길이 check 를 새로 파면 **여기서 선다.** 위 표에 적든 「앱 입구가 없다」고 적든 하나는 해야 지나간다.
         assertThat(inMigrations)
@@ -84,6 +86,7 @@ class AppDbConstraintTest {
     @Test
     fun every_format_check_in_the_migrations_is_accounted_for() {
         val inMigrations = liveChecks().filterValues { DB_REGEX.containsMatchIn(it) }.keys
+        assertThat(inMigrations).describedAs("마이그레이션에서 정규식 check 를 하나도 못 읽었다 — CHECK·DB_REGEX 꼴을 본다").isNotEmpty()
 
         assertThat(inMigrations)
             .describedAs("정규식 check 가 생겼는데 앱 쪽 짝도, 짝이 없다는 근거도 없다")

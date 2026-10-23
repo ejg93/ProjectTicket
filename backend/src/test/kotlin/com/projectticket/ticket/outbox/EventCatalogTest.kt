@@ -1,5 +1,6 @@
 package com.projectticket.ticket.outbox
 
+import com.projectticket.ticket.MigrationSql
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
@@ -17,8 +18,11 @@ class EventCatalogTest {
 
     @Test
     fun enum_matches_the_catalog_table() {
+        val doc = Files.readString(root.resolve("doc/reference/event-catalog.md"))
+        // 표제가 없으면 `substringAfter` 가 문서 전문을 돌려준다 — 다른 표를 카탈로그로 읽는다(`I10-1`)
+        assertThat(doc).describedAs("event-catalog.md 에서 카탈로그 표제를 못 찾았다 — 「## 카탈로그」").contains("## 카탈로그")
         // 「아직 안 내는 것」 표가 바로 아래에 있다 — 거기서 끊는다. 헤더 행(`type`)도 같은 모양이라 뺀다.
-        val catalog = Files.readString(root.resolve("doc/reference/event-catalog.md"))
+        val catalog = doc
             .substringAfter("## 카탈로그")
             .substringBefore("**아직 안 내는 것**")
             .lineSequence()
@@ -34,14 +38,10 @@ class EventCatalogTest {
 
     @Test
     fun migration_check_matches_the_enum() {
-        val migration = Files.readString(root.resolve("backend/src/main/resources/db/migration/V13__outbox.sql"))
-        val values = migration.substringAfter("constraint outbox_type_check check (type in (")
-            .substringBefore("))")
-            .split(",")
-            .map { it.trim().trim('\'', '\n', ' ') }
-            .filter { it.isNotEmpty() }
-            .toSet()
+        // 마지막 판을 읽는다 — 파일 하나(`V13`)를 박으면 뒤 판이 제약을 다시 걸었을 때 낡은 목록을 본다(`I10-1`)
+        val values = MigrationSql.closedValueSets(root)["outbox_type_check"]
+        assertThat(values).describedAs("마이그레이션에서 `outbox_type_check` 를 못 읽었다").isNotNull().isNotEmpty()
 
-        assertThat(values).isEqualTo(EventType.entries.map { it.code }.toSet())
+        assertThat(checkNotNull(values) { "바로 위 단언이 null 을 막는다" }.toSet()).isEqualTo(EventType.entries.map { it.code }.toSet())
     }
 }
