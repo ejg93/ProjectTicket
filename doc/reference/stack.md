@@ -514,6 +514,14 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 | `docker stats --no-stream` | 한 번이 3초쯤 걸린다(컨테이너 열 남짓). 측정 중 CPU 표본은 횟수가 아니라 끝 시각으로 돌린다 — 횟수로 돌리면 앞 구간만 잰다(`35d-재`) |
 | 요약의 섞임 | `setup()` 의 요청도 `http_req_duration` 에 든다. 측정 요청에 꼬리표(`options.tags`)를 달고 그 하위 지표에 문턱을 하나 두면 요약에 따로 나온다(`phase:run`) |
 
+### k8s 앱 파드의 기동
+
+| 무엇 | 사실 |
+|---|---|
+| 기동 줄 | `Started TicketApplicationKt in N seconds` — **`Kt` 가 붙는다**(`main` 이 최상위 함수라 클래스가 `TicketApplicationKt`). `Started TicketApplication in` 으로 찾으면 늘 0건이다(`load-5` 가 그래서 못 건졌다, `53a`) |
+| 부하 중 `kubectl logs` | 요청 로그가 kubelet 의 로그 파일(10Mi)을 몇 초 만에 돌려 써서 기동 줄이 남지 않는다. 컨테이너 안 FILE 로그 `/app/logs/ticket.log`(하루 단위)를 `kubectl exec … grep` 으로 읽는다 |
+| readiness `initialDelaySeconds` 와 startupProbe | 개념 문서는 「startupProbe 가 성공한 뒤부터 센다」고 읽힌다. **실측은 컨테이너 시작부터 세는 쪽이다** — 지연 20초를 두고도 Ready 26~31초(`load-5`)였고 JVM 기동만 17~34초다(`load-6`). 지연은 기동과 겹쳐 기동이 그보다 짧을 때만 바닥으로 보인다 |
+
 ## 데이터 접근은 `JdbcClient` 다
 
 **JPA 를 안 쓴다.** `spring-boot-starter-jdbc` 만 들이고 엔티티는 하나도 안 만든다(ADR 0001). 좌석 선점이 조건부 UPDATE 의 갱신 행 수로 판정하는 코드라(`D4`) SQL 이 그대로 보여야 하고,

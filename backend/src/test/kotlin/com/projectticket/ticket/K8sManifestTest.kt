@@ -38,6 +38,10 @@ class K8sManifestTest {
         assertThat(app).describedAs("k8s/chart/snapshot.yaml 에서 앱 Deployment 를 못 읽었다 — 이름을 바꿨거나 스냅샷을 안 만들었다").contains("kind: Deployment")
 
         assertThat(app).contains("path: /actuator/health/readiness")
+        val readiness = Regex("""readinessProbe:.*?periodSeconds:""", RegexOption.DOT_MATCHES_ALL).find(app)?.value
+        assertThat(readiness).describedAs("readinessProbe 를 못 읽었다").isNotNull()
+        assertThat(readiness).describedAs("readiness 지연은 기동이 그보다 짧으면 Ready 의 바닥이 된다 — 기동은 startupProbe 가 지킨다(53a)")
+            .doesNotContain("initialDelaySeconds")
         assertThat(app).contains("maxUnavailable: 0")
         assertThat(app).describedAs("preStop 이 없다 — 롤링 동안 닫힌 대로 요청이 간다(38)").contains("preStop:")
 

@@ -14,6 +14,7 @@ K6_IMAGE=grafana/k6:2.2.0
 VUS=${VUS:-500}
 HOLD=${HOLD:-660s}
 ACCOUNTS=${ACCOUNTS:-10000}
+STARTED='Started TicketApplicationKt in'
 out=load/results/hpa-$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$out"
 
@@ -106,7 +107,17 @@ echo "== 본판 시작 $(date -u +%s)"
 (
   while true; do
     echo "== $(date -u +%s) $(kubectl -n "$NS" get hpa app -o jsonpath='{.status.currentReplicas} {.status.desiredReplicas} {.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null)"
-    kubectl -n "$NS" get pods -l app=app -o jsonpath='{range .items[*]}pod {.metadata.name} {.status.startTime} {.status.conditions[?(@.type=="Ready")].status} {.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\n"}{end}' 2>/dev/null
+    pods=$(kubectl -n "$NS" get pods -l app=app -o jsonpath='{range .items[*]}pod {.metadata.name} {.status.startTime} {.status.conditions[?(@.type=="Ready")].status} {.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\n"}{end}' 2>/dev/null || true)
+    printf '%s\n' "$pods"
+    # Ready 가 된 파드마다 한 번 기동 줄을 건진다. 줄: 이름 · startTime · Ready 시각 · Started 시각(UTC 시:분:초) · JVM 이 센 초.
+    # **`kubectl logs` 로 안 읽는다** — 부하 중 요청 로그가 kubelet 의 로그 파일을 몇 초 만에 돌려 써서 기동 줄이 없다.
+    # 컨테이너 안 FILE 로그(`/app/logs/ticket.log`, 하루 단위로 돈다)에는 남는다. 클래스 이름은 `TicketApplicationKt` 다(53a)
+    while read -r _ name start ready since; do
+      [ "$ready" = True ] || continue
+      grep -q "^$name " "$out/started.log" 2>/dev/null && continue
+      line=$(MSYS_NO_PATHCONV=1 kubectl -n "$NS" exec "$name" -c app -- grep -m1 "$STARTED" /app/logs/ticket.log 2>/dev/null || true)
+      echo "$name $start $since ${line%% *} $(grep -o 'in [0-9.]* seconds (process running for [0-9.]*)' <<<"$line")" >> "$out/started.log"
+    done <<<"$pods"
     kubectl -n "$NS" top pods -l app=app --no-headers 2>/dev/null | sed 's/^/top /'
     sleep 5
   done
@@ -122,10 +133,12 @@ for _ in $(seq 1 240); do
 done
 
 kubectl -n "$NS" logs job/k6-hpa -c k6 > "$out/k6.log" || true
-# 콜드스타트 — JVM 이 스스로 적는 기동 시간. 처음 셋도 같이 적는다(대조군)
+# 표본 고리가 못 건진 파드만 보충한다 — 줄을 못 건진 채 적힌 파드(끝 칸이 빈 것)와 판 막판에 뜬 파드
 for p in $(kubectl -n "$NS" get pods -l app=app -o jsonpath='{.items[*].metadata.name}'); do
-  echo "$p $(kubectl -n "$NS" logs "$p" -c app 2>/dev/null | grep -o 'Started TicketApplication in [0-9.]* seconds' | head -1)"
-done > "$out/started.log"
+  grep -q "^$p .*)$" "$out/started.log" 2>/dev/null && continue
+  line=$(MSYS_NO_PATHCONV=1 kubectl -n "$NS" exec "$p" -c app -- grep -m1 "$STARTED" /app/logs/ticket.log 2>/dev/null || true)
+  echo "$p - - ${line%% *} $(grep -o 'in [0-9.]* seconds (process running for [0-9.]*)' <<<"$line") (판 뒤)"
+done >> "$out/started.log"
 
 echo "== k6 요약"
 grep -E "✓|✗|entered|seats_won|seats_taken|hold_won_ms|poll_latency_ms|wait_over_expected|http_req_failed|http_reqs" "$out/k6.log" || true
