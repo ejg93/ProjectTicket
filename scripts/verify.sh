@@ -24,9 +24,9 @@ git rev-parse -q --verify origin/main >/dev/null || { echo "origin/main 이 없�
 
 # `--full` 의 컨테이너 레인이 남긴 Testcontainers 컨테이너를 끝에 지운다 — 초록·빨강 무관(`G20`, 사용자 결정 (가)).
 # 재사용(`~/.testcontainers.properties`)으로 판마다 일곱이 남는다. 라벨이 같아 ProjectShop 것도 같이 지워진다 — 결정대로다.
-tc_cleanup=0
+tc_cleanup=0; tmp=; fperr=
 cleanup() {
-  rm -f "$tmp"
+  rm -f "$tmp" "$fperr"
   [ "$tc_cleanup" = 1 ] || return 0
   local ids; ids=$(docker ps -aq --filter label=org.testcontainers=true 2>/dev/null)
   [ -n "$ids" ] || return 0
@@ -40,7 +40,17 @@ GIT_INDEX_FILE="$tmp" git read-tree HEAD
 GIT_INDEX_FILE="$tmp" git add -A . 2>/dev/null
 tree=$(GIT_INDEX_FILE="$tmp" git write-tree)
 
-fp_work=$(bash scripts/verify-fingerprint.sh "$tree"); fp_main=$(bash scripts/verify-fingerprint.sh origin/main)
+fperr=$(mktemp)
+fp_work=$(bash scripts/verify-fingerprint.sh "$tree" 2>"$fperr"); fp_main=$(bash scripts/verify-fingerprint.sh origin/main 2>/dev/null)
+# 지문이 비면 아래 `changed()` 가 빈 줄 둘을 「같다」로 읽어 「돌릴 것이 없다」 → 세 레인 full 도장이 된다(`G21`).
+for fp in "$fp_work" "$fp_main"; do
+  [ "$(printf '%s\n' "$fp" | grep -cE '^(backend|frontend|tools) [0-9a-f]+$')" -eq 3 ] \
+    || { echo "지문을 못 냈다 — scripts/verify-fingerprint.sh 가 레인 셋을 안 냈다: ${fp:-(빈 출력)}"; exit 1; }
+done
+if [ -s "$fperr" ]; then
+  echo "지문 목록의 경로가 작업 트리에 없다 — 옮기거나 지웠으면 scripts/verify-fingerprint.sh 의 목록도 고친다:"
+  sed 's/^/    /' "$fperr"; exit 1
+fi
 changed() { [ "$(echo "$fp_work" | grep "^$1 ")" != "$(echo "$fp_main" | grep "^$1 ")" ]; }
 fp_of() { echo "$fp_work" | grep "^$1 " | cut -d' ' -f2; }
 st="$(git rev-parse --git-dir)/verify-stamp"
@@ -112,7 +122,8 @@ if changed frontend && [ -d frontend ]; then
           echo "Playwright 가 있는데 백엔드가 안 떠 있다 — local 로 띄우고 다시 돌린다(/verify)."; ok=0
         fi
       else
-        echo "== e2e 건너뜀 — Playwright 가 없다(46b 가 들인다)"
+        # `46b` 전에는 건너뛰었다. 지금 건너뛰면 e2e 없이 full 도장이 찍힌다(`G21`).
+        echo "Playwright 나 \"e2e\" 스크립트가 없다 — cd frontend && npm ci 뒤 다시 돌린다"; ok=0
       fi
     else
       echo "== frontend 지문이 origin/main 과 다르다 → tsc --noEmit · lint · test"

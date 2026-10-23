@@ -6,8 +6,13 @@
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 git rev-parse -q --verify origin/main >/dev/null 2>&1 || exit 0
 st="$(git rev-parse --git-dir)/verify-stamp"
-head=$(bash scripts/verify-fingerprint.sh HEAD)
-main=$(bash scripts/verify-fingerprint.sh origin/main)
+head=$(bash scripts/verify-fingerprint.sh HEAD 2>/dev/null)
+main=$(bash scripts/verify-fingerprint.sh origin/main 2>/dev/null)
+# 지문이 비면 아래 비교가 빈 줄 둘을 「같다」로 읽어 그냥 지나간다(`G21`) — 레인 셋이 다 있는지 먼저 본다.
+for fp in "$head" "$main"; do
+  [ "$(printf '%s\n' "$fp" | grep -cE '^(backend|frontend|tools) [0-9a-f]+$')" -eq 3 ] \
+    || { echo "지문을 못 냈다(scripts/verify-fingerprint.sh) — 도장을 못 견준다" >&2; exit 2; }
+done
 fail=''
 for d in backend frontend tools; do
   h=$(echo "$head" | grep "^$d ")
