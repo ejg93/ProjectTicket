@@ -14,6 +14,9 @@ K6_IMAGE=grafana/k6:2.2.0
 VUS=${VUS:-500}
 HOLD=${HOLD:-660s}
 ACCOUNTS=${ACCOUNTS:-10000}
+# k8s 칸(`D13` 「k8s 3~6대」, `54`) — 네 판(`load-5`·`load-6`) 최악 + 20%. `open-rush.js` 의 기본은 compose 셋 칸이다
+POLL_P95=${POLL_P95:-350}
+HOLD_WON_P95=${HOLD_WON_P95:-680}
 STARTED='Started TicketApplicationKt in'
 out=load/results/hpa-$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$out"
@@ -67,6 +70,8 @@ spec:
             - { name: ACCOUNTS, value: "$ACCOUNTS" }
             - { name: VUS, value: "$VUS" }
             - { name: HOLD, value: "$HOLD" }
+            - { name: POLL_P95, value: "$POLL_P95" }
+            - { name: HOLD_WON_P95, value: "$HOLD_WON_P95" }
           # k6 가 넘치면 노드가 아니라 k6 만 죽게(stack.md 「k6」). 이 heredoc 은 변수를 풀어서 백틱도 명령으로 돈다 — 안 쓴다
           resources: { limits: { memory: 2Gi } }
           volumeMounts:
@@ -107,13 +112,14 @@ echo "== 본판 시작 $(date -u +%s)"
 (
   while true; do
     echo "== $(date -u +%s) $(kubectl -n "$NS" get hpa app -o jsonpath='{.status.currentReplicas} {.status.desiredReplicas} {.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null)"
-    pods=$(kubectl -n "$NS" get pods -l app=app -o jsonpath='{range .items[*]}pod {.metadata.name} {.status.startTime} {.status.conditions[?(@.type=="Ready")].status} {.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\n"}{end}' 2>/dev/null || true)
+    pods=$(kubectl -n "$NS" get pods -l app=app -o jsonpath='{range .items[*]}pod {.metadata.name} {.status.startTime} {.status.conditions[?(@.type=="Ready")].status} {.status.conditions[?(@.type=="Ready")].lastTransitionTime} del={.metadata.deletionTimestamp}{"\n"}{end}' 2>/dev/null || true)
     printf '%s\n' "$pods"
     # Ready 가 된 파드마다 한 번 기동 줄을 건진다. 줄: 이름 · startTime · Ready 시각 · Started 시각(UTC 시:분:초) · JVM 이 센 초.
     # **`kubectl logs` 로 안 읽는다** — 부하 중 요청 로그가 kubelet 의 로그 파일을 몇 초 만에 돌려 써서 기동 줄이 없다.
     # 컨테이너 안 FILE 로그(`/app/logs/ticket.log`, 하루 단위로 돈다)에는 남는다. 클래스 이름은 `TicketApplicationKt` 다(53a)
-    while read -r _ name start ready since; do
-      [ "$ready" = True ] || continue
+    # 줄이는 중인 파드(`del=` 뒤에 시각)는 건너뛴다 — 종료 중인 컨테이너에는 `exec` 가 안 붙어 빈 칸만 남는다(`54` 첫 판)
+    while read -r _ name start ready since del; do
+      [ "$ready" = True ] && [ "$del" = del= ] || continue
       grep -q "^$name " "$out/started.log" 2>/dev/null && continue
       line=$(MSYS_NO_PATHCONV=1 kubectl -n "$NS" exec "$name" -c app -- grep -m1 "$STARTED" /app/logs/ticket.log 2>/dev/null || true)
       echo "$name $start $since ${line%% *} $(grep -o 'in [0-9.]* seconds (process running for [0-9.]*)' <<<"$line")" >> "$out/started.log"
@@ -124,7 +130,8 @@ echo "== 본판 시작 $(date -u +%s)"
   done
 ) > "$out/samples.log" &
 sampler=$!
-trap 'kill $sampler 2>/dev/null' EXIT
+# 표본 고리는 판 끝에 이미 끝냈다(보충 앞) — 여기서 `kill` 이 실패해도 `set -e` 가 판정을 1 로 바꾸지 않게(`54`)
+trap 'kill $sampler 2>/dev/null || true' EXIT
 
 # 문턱을 넘으면 k6 가 0 이 아닌 코드로 끝나 Job 이 Failed 다 — 그것도 결과라 둘 다 기다린다. HOLD 660s + 램프·꼬리 > 12분.
 for _ in $(seq 1 240); do
@@ -148,3 +155,12 @@ echo "== k6 요약"
 grep -E "✓|✗|entered|seats_won|seats_taken|hold_won_ms|poll_latency_ms|wait_over_expected|http_req_failed|http_reqs" "$out/k6.log" || true
 echo "== 대수 최대: $(awk '/^==/{print $3}' "$out/samples.log" | sort -n | tail -1) · Job: $(kubectl -n "$NS" get job k6-hpa -o jsonpath='{.status.conditions[0].type}') · 표본 $out"
 cat "$out/started.log"
+
+# 판의 판정(`54`). 예전에는 Job 이 Failed 여도 exit 0 이라 5xx 가 나도 같은 모양이었다
+rc=0
+[ "$(kubectl -n "$NS" get job k6-hpa -o jsonpath='{.status.succeeded}')" = 1 ] \
+  || { echo "k6 Job 이 성공이 아니다 — 문턱(폴링 p95<$POLL_P95 · 이긴 선점 p95<$HOLD_WON_P95 · 5xx 0)을 넘었거나 시간 안에 안 끝났다" >&2; rc=1; }
+# 파드마다 기동 줄을 한 번은 건져야 한다 — 빈 칸이 남으면 「생성 → Started」를 못 가른 판이다
+blank=$(awk '{seen[$1]=1} /process running for/{ok[$1]=1} END{for (p in seen) if (!(p in ok)) print p}' "$out/started.log")
+[ -z "$blank" ] || { echo "기동 줄을 못 건진 파드: $(echo "$blank" | tr '\n' ' ')" >&2; rc=1; }
+exit $rc

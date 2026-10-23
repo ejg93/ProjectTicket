@@ -62,7 +62,7 @@ kubectl -n "$NS" wait --for=condition=ready pod -l job-name=k6 --timeout=300s >/
 samples=$(mktemp)
 ( while true; do kubectl -n "$NS" get deployment app -o jsonpath='{.status.replicas}' 2>/dev/null; echo; sleep 5; done ) > "$samples" &
 sampler=$!
-trap 'kill $sampler 2>/dev/null; rm -f "$samples"' EXIT
+trap 'kill $sampler 2>/dev/null || true; rm -f "$samples"' EXIT
 
 if [ "$restart" = 1 ]; then
   sleep 20
@@ -81,3 +81,7 @@ done
 echo "== k6 요약"
 kubectl -n "$NS" logs job/k6 | grep -E "http_req_failed|http_req_duration|hold_latency_ms|seats_won|seats_taken|gate_rejected|checks" || true
 echo "== 앱 대수 최대: $(sort -n "$samples" | tail -1) · Job: $(kubectl -n "$NS" get job k6 -o jsonpath='{.status.conditions[0].type}')"
+
+# 판의 판정(`54`) — Job 이 Failed 여도 exit 0 이면 롤링 중 5xx 가 나도 초록으로 끝난다
+[ "$(kubectl -n "$NS" get job k6 -o jsonpath='{.status.succeeded}')" = 1 ] \
+  || { echo "k6 Job 이 성공이 아니다 — 롤링 중 5xx·연결 오류가 났거나(rate==0) 시간 안에 안 끝났다" >&2; exit 1; }
