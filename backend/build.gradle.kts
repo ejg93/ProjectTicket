@@ -125,7 +125,7 @@ val measure = tasks.register<Test>("measure") {
 val pitest = configurations.create("pitest")
 
 dependencies {
-	pitest("org.pitest:pitest-command-line:1.30.0")
+	pitest("org.pitest:pitest-command-line:1.30.1")
 	pitest("org.pitest:pitest-junit5-plugin:1.2.3")
 }
 

@@ -25,7 +25,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
 | ArchUnit | 1.5.1 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | dependency-management | 1.1.7 | `build.gradle.kts` 의 `io.spring.dependency-management` 플러그인. Boot BOM 을 들이는 도구라 BOM 밖이다 |
-| pitest | 1.30.0 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
+| pitest | 1.30.1 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
 | pitest-junit5-plugin | 1.2.3 | 같은 구성. JUnit 플랫폼에서 시험을 찾는다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
