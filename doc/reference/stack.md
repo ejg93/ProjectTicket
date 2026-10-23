@@ -521,6 +521,7 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 | 기동 줄 | `Started TicketApplicationKt in N seconds` — **`Kt` 가 붙는다**(`main` 이 최상위 함수라 클래스가 `TicketApplicationKt`). `Started TicketApplication in` 으로 찾으면 늘 0건이다(`load-5` 가 그래서 못 건졌다, `53a`) |
 | 부하 중 `kubectl logs` | 요청 로그가 kubelet 의 로그 파일(10Mi)을 몇 초 만에 돌려 써서 기동 줄이 남지 않는다. 컨테이너 안 FILE 로그 `/app/logs/ticket.log`(하루 단위)를 `kubectl exec … grep` 으로 읽는다 |
 | readiness `initialDelaySeconds` 와 startupProbe | 개념 문서는 「startupProbe 가 성공한 뒤부터 센다」고 읽힌다. **실측은 컨테이너 시작부터 세는 쪽이다** — 지연 20초를 두고도 Ready 26~31초(`load-5`)였고 JVM 기동만 17~34초다(`load-6`). 지연은 기동과 겹쳐 기동이 그보다 짧을 때만 바닥으로 보인다 |
+| CDS 학습 실행(`backend/Dockerfile`) | DB·Redis·Kafka 없이 refresh 까지 가려면 다섯을 끈다 — Flyway · Hikari 첫 연결(`initialization-fail-timeout=-1`) · Kafka 소비자(`listener.auto-startup`) · **Kafka 토픽 생성(`admin.auto-create`) — 안 끄면 실패는 안 해도 시간 초과까지 30초 넘게 기다린다** · Spring Session 의 `CONFIG SET`(`spring.session.data.redis.configure-action=none` — Boot 4 는 `data` 가 낀다). `onRefresh` 로 끝나면 `Started` 줄이 안 찍힌다 |
 
 ## 데이터 접근은 `JdbcClient` 다
 
