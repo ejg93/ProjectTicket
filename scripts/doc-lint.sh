@@ -12,8 +12,8 @@ cd "$(dirname "$0")/.." || exit 1
 skill_files=(.claude/skills/*/SKILL.md)
 
 title_check_files=(CLAUDE.md backend/CLAUDE.md PLAN.md PROGRESS.md "${skill_files[@]}" doc/reference/*.md)
-dup_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md frontend/CLAUDE.md frontend/AGENTS.md "${skill_files[@]}" doc/reference/*.md)
-honorific_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md frontend/CLAUDE.md frontend/AGENTS.md "${skill_files[@]}" doc/reference/*.md)
+dup_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md "${skill_files[@]}" doc/reference/*.md)
+honorific_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md "${skill_files[@]}" doc/reference/*.md)
 dated_title_files=(doc/reference/*.md)
 
 # 범위: 인자를 저장소 상대 경로로 맞춰 두고, 목록마다 그 안에 든 것만 남긴다. 목록 밖 파일은 조용히 통과.
@@ -31,8 +31,15 @@ mapfile -t dated_title_files < <(narrow "${dated_title_files[@]}")
 
 fail=0
 
+# 목록의 파일이 없으면 그 검사가 말없이 빠진다(`G22`) — 전체 실행에서만 빨강이다.
+# 범위 모드는 훅이 방금 건드린(지운 것일 수도 있는) 파일을 넘기는 자리라 막지 않는다.
+missing() {
+  [ "${#scope[@]}" -eq 0 ] || return 0
+  echo "[파일 없음] $1 — 옮기거나 지웠으면 scripts/doc-lint.sh 의 목록도 고친다"; fail=1
+}
+
 for f in "${title_check_files[@]}"; do
-  [ -f "$f" ] || continue
+  [ -f "$f" ] || { missing "$f"; continue; }
   first_line=$(head -n 1 "$f")
   # 스킬 파일은 frontmatter 가 먼저다 — 닫는 `---` 다음의 첫 줄을 본다.
   if [ "$first_line" = "---" ]; then
@@ -49,7 +56,7 @@ for f in "${title_check_files[@]}"; do
 done
 
 for f in "${dup_check_files[@]}"; do
-  [ -f "$f" ] || continue
+  [ -f "$f" ] || { missing "$f"; continue; }
   # 코드펜스 안을 지우고, 표 행·제목·20자 미만 줄을 뺀 뒤 완전 중복만 본다.
   dups=$(awk '/^```/{c=!c; next} !c' "$f" \
     | grep -vE '^[[:space:]]*(\||#+[[:space:]]|>)' \
@@ -69,7 +76,7 @@ for f in "${dup_check_files[@]}"; do
 done
 
 for f in "${dated_title_files[@]}"; do
-  [ -f "$f" ] || continue
+  [ -f "$f" ] || { missing "$f"; continue; }
   # `external-references.md` 는 날짜가 내용이다 — 언제 원문으로 확인했나.
   case "$f" in doc/reference/external-references.md) continue ;; esac
   dated=$(grep -nE '^#+[[:space:]].*[12][0-9]{3}-[0-9]{2}-[0-9]{2}' "$f")
@@ -80,7 +87,7 @@ for f in "${dated_title_files[@]}"; do
 done
 
 for f in "${honorific_check_files[@]}"; do
-  [ -f "$f" ] || continue
+  [ -f "$f" ] || { missing "$f"; continue; }
   # `screen-rules.md` 는 화면 문구를 정의하는 자리라 존댓말이 본문이다.
   case "$f" in doc/reference/screen-rules.md) continue ;; esac
   # 인용은 위반이 아니다 — 백틱·「」·큰따옴표 안을 걷어내고 본다.
@@ -150,6 +157,8 @@ if [ "$history_no_hash" -gt 0 ]; then
 fi
 
 # 「현재 상태」는 표다. 서사가 붙으면 세션마다 hook 이 통째로 주입한다.
+# 앵커를 못 찾으면 아래가 0줄로 통과한다(`G22`)
+grep -q '^## 현재 상태$' PROGRESS.md || { echo "[앵커 없음] PROGRESS.md — 「## 현재 상태」 표제를 못 찾았다"; fail=1; }
 state_lines=$(awk '/^## 현재 상태$/{on=1; next} /^## /{on=0} on' PROGRESS.md | wc -l)
 if [ "$state_lines" -gt 25 ]; then
   echo "[현재 상태 비대] PROGRESS.md — 「현재 상태」가 ${state_lines}줄이다(상한 25). 표만 남기고 서사는 이력으로"

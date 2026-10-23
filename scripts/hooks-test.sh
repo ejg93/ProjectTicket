@@ -17,6 +17,10 @@ cp -r scripts "$fx/"
 cp .claude/settings.json "$fx/.claude/"
 cp .claude/skills/verify/SKILL.md "$fx/.claude/skills/verify/"
 cp CLAUDE.md PLAN.md PROGRESS.md "$fx/"
+# `doc-lint` 전체 실행의 목록 파일 — 없으면 「파일 없음」으로 선다(`G22`)
+mkdir -p "$fx/backend" "$fx/doc"
+cp backend/CLAUDE.md "$fx/backend/"
+cp -r doc/reference "$fx/doc/"
 # `core.autocrlf` 를 끈다 — 켜진 환경에서 `restore` 가 셸 파일을 CRLF 로 되살리면 뒤 경우가 문법으로 죽는다.
 g() { git -C "$fx" -c core.autocrlf=false -c user.name=hooks-test -c user.email=hooks-test@localhost -c commit.gpgsign=false "$@"; }
 g init -q
@@ -132,6 +136,14 @@ restore
 
 printf '\xff\xfe\n' >> "$fx/.claude/skills/verify/SKILL.md"
 lint 'UTF-8'        1 '[UTF-8 깨짐]' .claude/skills/verify/SKILL.md
+restore
+
+# ── 조용한 건너뜀(`G22`). 목록의 파일을 지우면 전체 실행이 선다 — 예전에는 말없이 빠졌다
+rm "$fx/backend/CLAUDE.md"
+lint '목록 파일 없음' 1 '[파일 없음]'
+restore
+sed -i 's/^## 현재 상태$/## 현재 상태(옛)/' "$fx/PROGRESS.md"
+lint '앵커 없음'    1 '[앵커 없음]' PROGRESS.md
 restore
 
 # ── 도장이 공허하게 찍히는 길(`G21`). 지문이 비면 「같다」로 읽혀 세 레인 full 도장 · 훅 통과였다
