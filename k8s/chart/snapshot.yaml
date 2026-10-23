@@ -197,11 +197,11 @@ spec:
           ports:
             - containerPort: 8080
           # 준비됐나(db·redis)와 살아 있나를 가른다(35a). DB 가 끊긴 대는 엔드포인트에서 빠지되 재시작되지 않는다.
+          # 지연을 안 둔다 — 기동은 startupProbe 가 지킨다. 20초는 JVM 기동(18.7~34.3초, load-6)과 겹쳐 안 보였을 뿐, 기동이 그보다 짧아지면 바닥이 된다(53a).
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8080
-            initialDelaySeconds: 20
             periodSeconds: 5
             failureThreshold: 3
           # 셋이 한꺼번에 뜨면 Flyway 락을 기다리는 대가 생긴다 — 기동 동안은 liveness 를 미룬다(최대 150초).

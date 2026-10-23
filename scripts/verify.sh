@@ -90,8 +90,9 @@ if changed frontend && [ -d frontend ]; then
       echo "== frontend 지문이 origin/main 과 다르다 → next build · lint · test"
       { (cd frontend && npm run build >/dev/null && npm run lint) && vitest_run; } || ok=0
       # e2e 는 실물이 있을 때만 — Playwright 와 `e2e` 스크립트(`46b`). 있으면 백엔드가 떠 있어야 한다.
+      # 화면과 같은 주소를 본다 — 8080 을 남이 쥐면 백엔드를 다른 포트로 띄우고 `BACKEND_ORIGIN` 을 준다(마무리 24차)
       if [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json; then
-        if curl -sf localhost:8080/api/health >/dev/null; then
+        if curl -sf "${BACKEND_ORIGIN:-http://localhost:8080}/api/health" >/dev/null; then
           echo "== Playwright 있음 → npm run e2e"
           (cd frontend && npm run e2e) || ok=0
         else

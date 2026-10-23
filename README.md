@@ -56,6 +56,8 @@ bash scripts/k8s-smoke.sh   # 앱 /api/health(port-forward) + 화면 /login·/ev
 bash scripts/k8s-down.sh    # 지운다
 ```
 
+앱 이미지(`backend/Dockerfile`)는 빌드 때 CDS 아카이브를 만든다(`53b`) — 학습 실행·확인 실행이 컨텍스트를 두 번 띄워서 빌드가 20초쯤 길다. 확인 실행이 서면 빌드가 선다.
+
 ## 요구 사항
 
 - Docker Desktop

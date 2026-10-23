@@ -25,18 +25,18 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
 | ArchUnit | 1.5.1 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | dependency-management | 1.1.7 | `build.gradle.kts` 의 `io.spring.dependency-management` 플러그인. Boot BOM 을 들이는 도구라 BOM 밖이다 |
-| pitest | 1.30.0 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
+| pitest | 1.30.1 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
 | pitest-junit5-plugin | 1.2.3 | 같은 구성. JUnit 플랫폼에서 시험을 찾는다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
 | Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
-| Next | 16.4.0 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
-| React | 19.3.0 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
+| Next | 16.4.2 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
+| React | 19.3.1 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
 | kind | 0.33.0 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
 | Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
 | kubectl | 1.36.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
 | k6 | 2.2.0 | `grafana/k6:2.2.0` 컨테이너 — `load/README.md`, `scripts/k8s-rollout-test.sh`. 쓰는 법의 함정은 아래 「k6」 |
-| Playwright | 1.64.0 | `frontend/package.json`(`^1.64.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
+| Playwright | 1.64.1 | `frontend/package.json`(`^1.64.1`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | ShellCheck | 0.11.0 | `.github/workflows/ci.yml`(`docs` 잡 — 판과 sha256 을 박는다). 로컬은 winget `koalaman.shellcheck` — 패키지 폴더가 사용자 PATH 에 들어가서 **설치 전에 연 셸은 못 찾는다**(`scripts/shell-lint.sh` 가 그 폴더를 직접 본다) |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
@@ -409,7 +409,7 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 ### 필수 검사는 이름으로 붙지 이벤트를 안 가린다
 
 가지 보호의 필수 검사는 `{context, app_id}` 로 맞춘다. `push` 와 `pull_request` 를 둘 다 걸면 같은 커밋을 두 번 검사하고 `concurrency` 가 못 막는다(그룹 키 `github.ref` 가 다르다).
-필수 검사 넷이 전부 `ci.yml`(`backend`·`frontend`·`secrets`·`docs`)에 있다 — 그 파일의 트리거를 건드릴 때 이 문단을 본다. fork 에서 온 PR 은 base 에 push 가 안 돌므로 바깥 PR 을 받기 시작하면 `pull_request:` 를 되돌린다.
+필수 검사 다섯이 전부 `ci.yml`(`backend`·`frontend`·`secrets`·`docs`·`e2e`)에 있다 — 그 파일의 트리거를 건드릴 때 이 문단을 본다. fork 에서 온 PR 은 base 에 push 가 안 돌므로 바깥 PR 을 받기 시작하면 `pull_request:` 를 되돌린다.
 
 ### `main` 가지 보호는 admin 을 기본으로 안 막는다
 
@@ -451,6 +451,10 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 
 `eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
 Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
+
+### detekt 타입 해석이 오래 쓴 데몬에서 「diagnostic collector has been interrupted」로 선다
+
+`gradle.properties` 에 `jvmargs` 가 없어 데몬은 기본 힙(512MB)이다. `gate-probe.sh all`(빌드 37판)을 같은 데몬에서 돌린 뒤 `detektTest` 가 그 문구로 서고 `backend/java_pid*.hprof`(434MB)를 떨궜다(마무리 24차). 코드 탓이 아니다 — `./gradlew --stop` 뒤 초록. CI 는 판마다 새 데몬이라 안 걸린다. `*.hprof` 는 `.gitignore` 에 있다.
 
 ### CodeQL 의 Kotlin 추출기는 컴파일러 안에서 돈다 — 데몬 힙이 같이 터진다
 
@@ -513,6 +517,15 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 | 메모리 상한 | k6 컨테이너에 `--memory=2g` 를 건다 — 넘치면 VM 이 아니라 k6 만 죽는다 |
 | `docker stats --no-stream` | 한 번이 3초쯤 걸린다(컨테이너 열 남짓). 측정 중 CPU 표본은 횟수가 아니라 끝 시각으로 돌린다 — 횟수로 돌리면 앞 구간만 잰다(`35d-재`) |
 | 요약의 섞임 | `setup()` 의 요청도 `http_req_duration` 에 든다. 측정 요청에 꼬리표(`options.tags`)를 달고 그 하위 지표에 문턱을 하나 두면 요약에 따로 나온다(`phase:run`) |
+
+### k8s 앱 파드의 기동
+
+| 무엇 | 사실 |
+|---|---|
+| 기동 줄 | `Started TicketApplicationKt in N seconds` — **`Kt` 가 붙는다**(`main` 이 최상위 함수라 클래스가 `TicketApplicationKt`). `Started TicketApplication in` 으로 찾으면 늘 0건이다(`load-5` 가 그래서 못 건졌다, `53a`) |
+| 부하 중 `kubectl logs` | 요청 로그가 kubelet 의 로그 파일(10Mi)을 몇 초 만에 돌려 써서 기동 줄이 남지 않는다. 컨테이너 안 FILE 로그 `/app/logs/ticket.log`(하루 단위)를 `kubectl exec … grep` 으로 읽는다 |
+| readiness `initialDelaySeconds` 와 startupProbe | 개념 문서는 「startupProbe 가 성공한 뒤부터 센다」고 읽힌다. **실측은 컨테이너 시작부터 세는 쪽이다** — 지연 20초를 두고도 Ready 26~31초(`load-5`)였고 JVM 기동만 18.7~34.3초다(`load-6`). 지연은 기동과 겹쳐 기동이 그보다 짧을 때만 바닥으로 보인다 |
+| CDS 학습 실행(`backend/Dockerfile`) | DB·Redis·Kafka 없이 refresh 까지 가려면 다섯을 끈다 — Flyway · Hikari 첫 연결(`initialization-fail-timeout=-1`) · Kafka 소비자(`listener.auto-startup`) · **Kafka 토픽 생성(`admin.auto-create`) — 안 끄면 실패는 안 해도 시간 초과까지 30초 넘게 기다린다** · Spring Session 의 `CONFIG SET`(`spring.session.data.redis.configure-action=none` — Boot 4 는 `data` 가 낀다). `onRefresh` 로 끝나면 `Started` 줄이 안 찍힌다. **`-Xshare:on` 만으로는 확인이 안 된다** — 동적(top) 아카이브는 못 써도 갈 수 있어서 `-Xlog:class+load` 의 `source: shared objects file (top)` 을 센다(쓰면 1만 줄 넘게, 안 쓰면 0). 파드 실행은 `-Xshare:auto` 라 아카이브가 조용히 꺼져도 안 선다 — 신호는 기동 초(`load-6`) |
 
 ## 데이터 접근은 `JdbcClient` 다
 
