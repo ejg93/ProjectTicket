@@ -67,14 +67,14 @@
 | ShellCheck(`scripts/shell-lint.sh`) | 4 테스트 | `verify.sh` tools 레인 · CI `docs` 잡 | 셸 스크립트의 warning 이상 — `cd` 실패 무시·따옴표 빠짐·안 쓰는 변수 같은 것(`G13`). info·style 은 안 막는다(사용자 결정 2026-10-21) | `G13` 2026-10-21 — 탐침 `shellcheck`(`cd` 실패를 안 받는 스크립트 → SC2164) |
 | `verify.sh` 도장 | 4 테스트 | **Stop 훅**(빠른) · **push 훅**(`--full`) | 안 돌려 보고 청크를 닫거나 미는 것. 레인 지문이 `origin/main` 과 다르면 그 레인을 돌리고 도장을 찍는다 | 마무리 6차 2026-09-18 — 도장 없이 밀려다 막혔다 |
 | gitleaks | 4 테스트 | **CI 만** | 커밋에 들어간 시크릿. 이력 전체를 본다 | `G2` 2026-09-25 — 실행 때 만든 `ghp_` 키를 로컬 gitleaks(Docker `v8.18.4`, 기본 규칙 — CI 와 같은 설정)가 잡았다. CI 잡 자체는 안 부쉈다. 탐침 `gitleaks` |
-| `main` 가지 보호 | 4 테스트 | GitHub | 필수 검사 일곱이 초록이 아닌 머지. **주인도 막는다** — `enforce_admins` 가 켜져 있다(`G6`) | `G2` 2026-09-25 — 부수는 대신 `gh api` 로 읽었다. 필수 일곱은 표와 같다. `G6` 2026-09-26 — `enforce_admins` 를 켜고 `gh api …/protection` 으로 `true` 를 읽었다. 이 아래 첫 머지는 마무리 15차 PR 이다 |
+| `main` 가지 보호 | 4 테스트 | GitHub | 필수 검사 여덟이 초록이 아닌 머지. **주인도 막는다** — `enforce_admins` 가 켜져 있다(`G6`) | `G2` 2026-09-25 — 부수는 대신 `gh api` 로 읽었다. 필수 일곱은 표와 같다. `G6` 2026-09-26 — `enforce_admins` 를 켜고 `gh api …/protection` 으로 `true` 를 읽었다. 이 아래 첫 머지는 마무리 15차 PR 이다 |
 | Dependabot 경보 | **5 문서** | GitHub | 알려 주기만 한다. **막지 않는다** — Gradle 쪽은 이것뿐이다 | 게이트가 아니다. **`P10` 이 켰다**(2026-09-19) — 표에 적힌 채로 저장소 설정이 꺼져 있었다 |
 | 독립 리뷰 에이전트 | 5 문서 | **마무리** | 같은 눈의 맹점. 대화를 안 주고 diff 만 준다 | 게이트가 아니다 — 마무리 9차에 지적 열둘 중 오탐 0 |
 
 **「부순 날」이 빈 줄은 아직 증거가 없는 것이다**(아래 「게이트는 부순 증거가 있어야 닫힌다」). 걸려 있는 것과 도는 것은 다르다.
 
 **여기 없는 것**: SpotBugs. SpotBugs 는 `JdbcClient` 를 몰라 SQL 조립을 못 봐서 안 들였다(`stack.md`) — 그 자리는 detekt 와
-CodeQL 이 나눠 든다. E2E 는 아래 「CI 잡과 필수 검사」의 `e2e` 잡이다(`46b`, 필수 아님).
+CodeQL 이 나눠 든다. E2E 는 아래 「CI 잡과 필수 검사」의 `e2e` 잡이다(`46b`, 필수 — `G12`).
 
 **`컴파일`·`나머지 테스트` 두 줄은 일부러 부술 이유가 없다.** 그 둘은 **매일 실패 사례를 낸다** —
 오타를 치면 컴파일이 막고, 코드를 잘못 고치면 테스트가 빨개진다.
@@ -104,7 +104,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | `ci.yml` | `backend` | 필수 | 빌드·테스트 두 레인·detekt |
 | `ci.yml` | `frontend` | 필수 | `next build`·lint·test. `frontend/` 가 있을 때만 돈다 — 그 전에는 `steps.has` 가 건너뛰어도 잡은 초록이다 |
 | `ci.yml` | `audit` | 아니다 | `npm audit --omit=dev --audit-level=high` — 런타임 의존성만. 필수로 걸면 남의 권고 하나에 머지가 선다(`B0-5`, 사용자 결정 (가)). **SessionStart 훅이 `main` 의 마지막 실행을 찍는다**(`I9-5`) — 빨가면 잡 이름과 「무엇부터」 1순위를 「현재 상태」 뒤에 붙인다. 그 전에는 머지 뒤 `main` 을 읽는 자리가 없어 2026-10-11 `main` 이 Next critical 로 빨간 채였다(점검 9차). Dependabot PR 은 버전표 때문에 혼자 빨갛다(`stack.md`) |
-| `ci.yml` | `e2e` | 아니다 | 가입→선점→(관문)→결제 한 바퀴를 Playwright 로(`46b`). 백엔드는 잡 안의 jar + compose 셋. 사용자 결정 (가) — 흔들림을 재기 전이라 필수로 안 건다. 열 번 연속 초록이면 `G12` 가 올린다 |
+| `ci.yml` | `e2e` | 필수 | 가입→선점→(관문)→결제 한 바퀴를 Playwright 로(`46b`). 백엔드는 잡 안의 jar + compose 셋. `G12`(2026-10-23) — 마지막 빨강(2026-10-11) 뒤 19회 연속 초록이라 올렸다. `cancelled` 둘은 `concurrency.cancel-in-progress` 라 안 셌다(사용자 결정) |
 | `ci.yml` | `secrets` | 필수 | gitleaks |
 | `ci.yml` | `docs` | 필수 | `doc-lint.sh` |
 | `codeql.yml` | `analyze` | **필수 — 언어 셋 다**(`P10`) | 문맥 이름이 `analyze (java-kotlin, manual)`·`analyze (javascript-typescript, none)`·`analyze (actions, none)` 이다. **push 에서만 돌지만 보호는 이름으로 맞추고 이벤트를 안 가려서** 그 실행이 자리를 채운다 — `46a` 가 그렇게 적었고 `P10` 뒤 첫 PR 이 실측이다 |

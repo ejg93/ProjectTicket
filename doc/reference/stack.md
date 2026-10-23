@@ -409,7 +409,7 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 ### 필수 검사는 이름으로 붙지 이벤트를 안 가린다
 
 가지 보호의 필수 검사는 `{context, app_id}` 로 맞춘다. `push` 와 `pull_request` 를 둘 다 걸면 같은 커밋을 두 번 검사하고 `concurrency` 가 못 막는다(그룹 키 `github.ref` 가 다르다).
-필수 검사 넷이 전부 `ci.yml`(`backend`·`frontend`·`secrets`·`docs`)에 있다 — 그 파일의 트리거를 건드릴 때 이 문단을 본다. fork 에서 온 PR 은 base 에 push 가 안 돌므로 바깥 PR 을 받기 시작하면 `pull_request:` 를 되돌린다.
+필수 검사 다섯이 전부 `ci.yml`(`backend`·`frontend`·`secrets`·`docs`·`e2e`)에 있다 — 그 파일의 트리거를 건드릴 때 이 문단을 본다. fork 에서 온 PR 은 base 에 push 가 안 돌므로 바깥 PR 을 받기 시작하면 `pull_request:` 를 되돌린다.
 
 ### `main` 가지 보호는 admin 을 기본으로 안 막는다
 
