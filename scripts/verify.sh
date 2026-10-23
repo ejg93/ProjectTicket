@@ -22,16 +22,23 @@ case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) export JAVA_HOME="C:/Program Files/J
 
 git rev-parse -q --verify origin/main >/dev/null || { echo "origin/main 이 없다 — 기준이 없어서 못 잰다"; exit 1; }
 
-# `--full` 의 컨테이너 레인이 남긴 Testcontainers 컨테이너를 끝에 지운다 — 초록·빨강 무관(`G20`, 사용자 결정 (가)).
-# 재사용(`~/.testcontainers.properties`)으로 판마다 일곱이 남는다. 라벨이 같아 ProjectShop 것도 같이 지워진다 — 결정대로다.
+# `--full` 의 컨테이너 레인이 남긴 Testcontainers 컨테이너를 지운다 — 재사용(`~/.testcontainers.properties`)으로 판마다 남는다(`G20`).
+# **이 저장소 것만** 지운다(`G24`, 사용자 결정 (다)) — `org.testcontainers=true` 로 지우면 같은 Docker 를 쓰는 ProjectShop 의
+# 돌고 있는 시험이 Connection refused 로 무너졌다. 라벨은 `PostgresTestBase.Containers.OWNER_LABEL` 과 같아야 한다.
+OWNER_LABEL=projectticket
 tc_cleanup=0; tmp=; fperr=
+tc_remove() {  # 지운 수를 낸다
+  local ids; ids=$(docker ps -aq --filter "label=$OWNER_LABEL=true" 2>/dev/null)
+  [ -n "$ids" ] || { echo 0; return 0; }
+  # shellcheck disable=SC2086 # id 목록을 낱낱으로 넘긴다
+  docker rm -f $ids >/dev/null 2>&1
+  echo "$ids" | wc -l | tr -d ' '
+}
 cleanup() {
   rm -f "$tmp" "$fperr"
-  [ "$tc_cleanup" = 1 ] || return 0
-  local ids; ids=$(docker ps -aq --filter label=org.testcontainers=true 2>/dev/null)
-  [ -n "$ids" ] || return 0
-  # shellcheck disable=SC2086 # id 목록을 낱낱으로 넘긴다
-  docker rm -f $ids >/dev/null 2>&1 && echo "== Testcontainers 컨테이너 $(echo "$ids" | wc -l | tr -d ' ')개를 지웠다"
+  # 빨강으로 일찍 끝나도 지운다 — 초록 길은 `build` 직후에 이미 지웠다
+  [ "$tc_cleanup" = 1 ] && tc_remove >/dev/null
+  return 0
 }
 
 # 작업 트리(커밋 안 된 것 포함)의 트리 해시. 임시 인덱스라 진짜 인덱스를 안 건드린다.
@@ -85,7 +92,15 @@ if changed backend && [ -d backend ]; then
       docker_up || { echo "Docker 가 안 떴다. 느린 레인은 컨테이너를 띄운다 — Docker Desktop 을 켜고 다시 돌린다."; exit 1; }
       echo "== backend 지문이 origin/main 과 다르다 → ./gradlew build (두 레인)"
       tc_cleanup=1
-      (cd backend && ./gradlew build -q) || ok=0
+      if (cd backend && ./gradlew build -q); then
+        # 컨테이너 레인이 돌았으면 우리 라벨이 하나 이상 있다 — 0 이면 라벨이 갈려 정리가 조용히 빈다(`G24`).
+        # 빌드가 빨가면 시험 전에 섰을 수 있어 이 판정을 안 한다(정리는 EXIT trap 이 한다)
+        removed=$(tc_remove)
+        if [ "$removed" -gt 0 ]; then echo "== 이 저장소의 Testcontainers 컨테이너 ${removed}개를 지웠다"
+        else echo "이 저장소 라벨($OWNER_LABEL=true)의 컨테이너가 없다 — PostgresTestBase 의 OWNER_LABEL 과 갈렸다"; ok=0; fi
+      else
+        ok=0
+      fi
     elif [ -n "$(git diff-tree -r --name-only --diff-filter=A origin/main "$tree" -- backend/src/main/resources/db/migration)" ]; then
       # 새 `V*` 가 있으면 컨테이너 레인도 같이 돈다. 빠른 레인만 돌리면 열거형·길이 대조(`integrationTest`)가
       # 번들 끝 `--full` 에서 처음 빨개진다 — ProjectShop 번들 A 가 그랬다(`B0`).
