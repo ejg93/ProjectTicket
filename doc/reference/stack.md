@@ -454,7 +454,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ### detekt 타입 해석이 오래 쓴 데몬에서 「diagnostic collector has been interrupted」로 선다
 
-`gradle.properties` 에 `jvmargs` 가 없어 데몬은 기본 힙(512MB)이다. `gate-probe.sh all`(빌드 37판)을 같은 데몬에서 돌린 뒤 `detektTest` 가 그 문구로 서고 `backend/java_pid*.hprof`(434MB)를 떨궜다(마무리 24차). 코드 탓이 아니다 — `./gradlew --stop` 뒤 초록. CI 는 판마다 새 데몬이라 안 걸린다. `*.hprof` 는 `.gitignore` 에 있다.
+`gradle.properties` 에 `jvmargs` 가 없어 데몬은 기본 힙(512MB)이다. `gate-probe.sh all`(빌드 37판)을 같은 데몬에서 돌린 뒤 `detektTest` 가 그 문구로 서고 `backend/java_pid*.hprof`(434MB)를 떨궜다(마무리 24차). 코드 탓이 아니다 — `./gradlew --stop` 뒤 초록. CI 는 판마다 새 데몬이라 안 걸린다. `*.hprof` 는 `.gitignore` 에 있다. `G20` 이 `backend/gradle.properties` 로 힙을 2g 로 올렸다.
 
 ### CodeQL 의 Kotlin 추출기는 컴파일러 안에서 돈다 — 데몬 힙이 같이 터진다
 
@@ -488,6 +488,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 ### Docker 를 ProjectShop 과 나눠 쓴다
 
 이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다.
+`verify.sh --full` 은 끝에 Testcontainers 컨테이너(라벨 `org.testcontainers=true`)를 전부 지운다 — 재사용으로 판마다 일곱이 남아서다. **ProjectShop 것도 같은 라벨이라 같이 지워진다**(`G20`, 사용자 결정).
 
 **2026-10-18 ProjectShop 세션과 합의한 규칙 셋:**
 

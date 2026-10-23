@@ -22,8 +22,20 @@ case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) export JAVA_HOME="C:/Program Files/J
 
 git rev-parse -q --verify origin/main >/dev/null || { echo "origin/main 이 없다 — 기준이 없어서 못 잰다"; exit 1; }
 
+# `--full` 의 컨테이너 레인이 남긴 Testcontainers 컨테이너를 끝에 지운다 — 초록·빨강 무관(`G20`, 사용자 결정 (가)).
+# 재사용(`~/.testcontainers.properties`)으로 판마다 일곱이 남는다. 라벨이 같아 ProjectShop 것도 같이 지워진다 — 결정대로다.
+tc_cleanup=0
+cleanup() {
+  rm -f "$tmp"
+  [ "$tc_cleanup" = 1 ] || return 0
+  local ids; ids=$(docker ps -aq --filter label=org.testcontainers=true 2>/dev/null)
+  [ -n "$ids" ] || return 0
+  # shellcheck disable=SC2086 # id 목록을 낱낱으로 넘긴다
+  docker rm -f $ids >/dev/null 2>&1 && echo "== Testcontainers 컨테이너 $(echo "$ids" | wc -l | tr -d ' ')개를 지웠다"
+}
+
 # 작업 트리(커밋 안 된 것 포함)의 트리 해시. 임시 인덱스라 진짜 인덱스를 안 건드린다.
-tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
+tmp=$(mktemp); trap cleanup EXIT
 GIT_INDEX_FILE="$tmp" git read-tree HEAD
 GIT_INDEX_FILE="$tmp" git add -A . 2>/dev/null
 tree=$(GIT_INDEX_FILE="$tmp" git write-tree)
@@ -62,6 +74,7 @@ if changed backend && [ -d backend ]; then
       # Docker 를 먼저 본다. 안 떠 있으면 컨테이너 레인이 전부 FAILED 로 뜨고 진짜 원인은 XML 리포트를 파야 나온다.
       docker_up || { echo "Docker 가 안 떴다. 느린 레인은 컨테이너를 띄운다 — Docker Desktop 을 켜고 다시 돌린다."; exit 1; }
       echo "== backend 지문이 origin/main 과 다르다 → ./gradlew build (두 레인)"
+      tc_cleanup=1
       (cd backend && ./gradlew build -q) || ok=0
     elif [ -n "$(git diff-tree -r --name-only --diff-filter=A origin/main "$tree" -- backend/src/main/resources/db/migration)" ]; then
       # 새 `V*` 가 있으면 컨테이너 레인도 같이 돈다. 빠른 레인만 돌리면 열거형·길이 대조(`integrationTest`)가
