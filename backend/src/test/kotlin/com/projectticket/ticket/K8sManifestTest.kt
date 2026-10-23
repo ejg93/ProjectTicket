@@ -89,7 +89,51 @@ class K8sManifestTest {
         assertThat(Files.readString(root.resolve("frontend/Dockerfile")))
             .describedAs("frontend/Dockerfile 이 BACKEND_ORIGIN 을 빌드 인자로 안 받는다 — 프록시가 localhost:8080 으로 굳는다")
             .contains("ARG BACKEND_ORIGIN")
-        assertThat(up).describedAs("k8s-up.sh 가 화면을 앱 Service 주소로 안 굽는다").contains("--build-arg BACKEND_ORIGIN=http://app:8080")
+        assertThat(up).describedAs("k8s-up.sh 가 화면을 앱 Service 주소로 안 굽는다").contains("--build-arg BACKEND_ORIGIN=${appOrigin()}")
+
+        val webImage = captured(regex = Regex("""WEB_IMAGE=(\S+)"""), text = up, what = "scripts/k8s-up.sh 의 WEB_IMAGE=")
+        assertThat(web).describedAs("화면 매니페스트의 이미지가 k8s-up.sh 가 굽는 태그와 다르다").contains("image: $webImage")
+    }
+
+    /**
+     * 스크립트에 박힌 앱 주소·화면 포트가 **차트·kind 설정에서 읽은 값**과 같은가(`I10-2`).
+     * 리터럴끼리 견주면 차트의 포트를 바꿔도 스크립트 넷이 옛 주소로 남는다 — 부하 판이 「연결 거부」로 서야 드러난다.
+     */
+    @Test
+    fun the_scripts_reach_what_the_chart_serves() {
+        val origin = appOrigin()
+        listOf("scripts/k8s-hpa-test.sh", "scripts/k8s-rollout-test.sh").forEach { script ->
+            assertThat(Files.readString(root.resolve(script)))
+                .describedAs("$script 의 k6 가 앱 Service($origin)로 안 간다")
+                .contains("""value: "$origin"""")
+        }
+
+        val smoke = Files.readString(root.resolve("scripts/k8s-smoke.sh"))
+        val port = origin.substringAfterLast(':')
+        assertThat(smoke).describedAs("k8s-smoke.sh 의 port-forward 가 앱 Service 포트($port)를 안 가리킨다").contains("""svc/app "${'$'}PORT:$port"""")
+
+        val kind = Files.readString(root.resolve("k8s/kind.yaml"))
+        val hostPort = captured(regex = Regex("""hostPort: (\d+)"""), text = kind, what = "k8s/kind.yaml 의 hostPort")
+        val containerPort = captured(regex = Regex("""containerPort: (\d+)"""), text = kind, what = "k8s/kind.yaml 의 containerPort")
+        assertThat(smoke).describedAs("k8s-smoke.sh 가 kind 가 연 화면 포트($hostPort)를 안 부른다").contains("localhost:$hostPort")
+        assertThat(docOf(kind = "Service", name = "web"))
+            .describedAs("kind 의 extraPortMappings 가 화면 Service 의 nodePort 와 다르다 — 호스트에서 화면이 안 열린다")
+            .contains("nodePort: $containerPort")
+    }
+
+    /** 스냅샷의 앱 Service 에서 읽은 클러스터 안 주소 — `http://app:<port>` */
+    private fun appOrigin(): String =
+        "http://app:" + captured(
+            regex = Regex("""(?m)^\s+- port: (\d+)$"""),
+            text = docOf(kind = "Service", name = "app"),
+            what = "스냅샷 앱 Service 의 port",
+        )
+
+    /** 정규식 첫 묶음. 못 읽으면 무엇을 못 읽었는지 말하고 선다 */
+    private fun captured(regex: Regex, text: String, what: String): String {
+        val found = regex.find(text)?.run { groupValues[1] }
+        assertThat(found).describedAs("$what 를 못 읽었다").isNotNull()
+        return checkNotNull(found) { "바로 위 단언이 null 을 막는다" }
     }
 
     private fun docOf(kind: String, name: String): String =
