@@ -15,8 +15,16 @@ import { describe, expect, it } from "vitest";
 const SRC = join(process.cwd(), "src");
 const TOKENS = join(SRC, "app", "globals.css");
 
-/** `#fff`·`#ffffff`·`#000`·`#000000` — 대소문자 무관, 뒤에 16진 글자가 더 오면 다른 색이다 */
-const PURE_BLACK_OR_WHITE = /#(?:fff|ffffff|000|000000)(?![0-9a-f])/gi;
+/**
+ * `#fff`·`#ffffff`·`#000`·`#000000` — 대소문자 무관, 뒤에 16진 글자가 더 오면 다른 색이다.
+ * **`g` 를 안 둔다** — 줄마다 `.test` 를 부르는데 `g` 는 `lastIndex` 를 남겨서 맞은 다음 줄을 그 자리부터 본다(`I10-3`).
+ */
+const PURE_BLACK_OR_WHITE = /#(?:fff|ffffff|000|000000)(?![0-9a-f])/i;
+
+/** 순수 흰·검이 든 줄 — `줄번호: 내용` */
+function pureLines(css: string): string[] {
+  return css.split("\n").flatMap((line, i) => (PURE_BLACK_OR_WHITE.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+}
 
 /** 색 리터럴 — `#` 뒤 16진 3·4·6·8자리. 컴포넌트에 있으면 토큰을 안 쓴 것이다 */
 const HEX_COLOR = /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![0-9a-z])/gi;
@@ -44,9 +52,13 @@ describe("색은 토큰이고 순수 흰·검이 없다", () => {
     expect(screens.length).toBeGreaterThan(MIN_SCREENS);
   });
 
+  it("연속한 두 줄의 순수 흰을 둘 다 잡는다", () => {
+    // `g` 가 있으면 첫 줄에서 맞은 자리(lastIndex)부터 둘째 줄을 봐서 하나만 센다
+    expect(pureLines("a: #fff;\nb: #fff;")).toHaveLength(2);
+  });
+
   it("토큰 파일에 순수 흰·검이 없다", () => {
-    const css = readFileSync(TOKENS, "utf8");
-    const lines = css.split("\n").flatMap((line, i) => (PURE_BLACK_OR_WHITE.test(line) ? [`${i + 1}: ${line.trim()}`] : []));
+    const lines = pureLines(readFileSync(TOKENS, "utf8"));
     expect(lines, "순수 #000000·#ffffff 를 안 쓴다 — 가까운 값으로 토큰을 만든다").toEqual([]);
   });
 
