@@ -118,7 +118,8 @@ echo "== 본판 시작 $(date -u +%s)"
       line=$(MSYS_NO_PATHCONV=1 kubectl -n "$NS" exec "$name" -c app -- grep -m1 "$STARTED" /app/logs/ticket.log 2>/dev/null || true)
       echo "$name $start $since ${line%% *} $(grep -o 'in [0-9.]* seconds (process running for [0-9.]*)' <<<"$line")" >> "$out/started.log"
     done <<<"$pods"
-    kubectl -n "$NS" top pods -l app=app --no-headers 2>/dev/null | sed 's/^/top /'
+    # 이 서브셸도 `pipefail` 이다 — metrics-server 가 아직이면 `top` 이 실패해 표본 고리가 통째로 죽는다
+    kubectl -n "$NS" top pods -l app=app --no-headers 2>/dev/null | sed 's/^/top /' || true
     sleep 5
   done
 ) > "$out/samples.log" &
@@ -133,7 +134,10 @@ for _ in $(seq 1 240); do
 done
 
 kubectl -n "$NS" logs job/k6-hpa -c k6 > "$out/k6.log" || true
-# 표본 고리가 못 건진 파드만 보충한다 — 줄을 못 건진 채 적힌 파드(끝 칸이 빈 것)와 판 막판에 뜬 파드
+# 표본 고리가 못 건진 파드만 보충한다 — 줄을 못 건진 채 적힌 파드(끝 칸이 빈 것)와 판 막판에 뜬 파드.
+# 표본 고리를 먼저 끝낸다 — 둘이 같이 `started.log` 에 쓰면 막판에 Ready 된 파드가 두 줄이 된다
+kill "$sampler" 2>/dev/null || true
+wait "$sampler" 2>/dev/null || true
 for p in $(kubectl -n "$NS" get pods -l app=app -o jsonpath='{.items[*].metadata.name}'); do
   grep -q "^$p .*)$" "$out/started.log" 2>/dev/null && continue
   line=$(MSYS_NO_PATHCONV=1 kubectl -n "$NS" exec "$p" -c app -- grep -m1 "$STARTED" /app/logs/ticket.log 2>/dev/null || true)

@@ -31,3 +31,6 @@ load/results/
 
 # Gradle 작업 캐시. 기계마다 다르고 빌드 산출물이다
 .gradle/
+
+# Gradle 데몬이 OOM 때 떨군다(기본 jvmargs 에 HeapDumpOnOutOfMemoryError) — 수백 MB 라 섞이면 안 된다
+*.hprof

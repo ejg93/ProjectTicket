@@ -452,6 +452,10 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 `eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
 Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
+### detekt 타입 해석이 오래 쓴 데몬에서 「diagnostic collector has been interrupted」로 선다
+
+`gradle.properties` 에 `jvmargs` 가 없어 데몬은 기본 힙(512MB)이다. `gate-probe.sh all`(빌드 37판)을 같은 데몬에서 돌린 뒤 `detektTest` 가 그 문구로 서고 `backend/java_pid*.hprof`(434MB)를 떨궜다(마무리 24차). 코드 탓이 아니다 — `./gradlew --stop` 뒤 초록. CI 는 판마다 새 데몬이라 안 걸린다. `*.hprof` 는 `.gitignore` 에 있다.
+
 ### CodeQL 의 Kotlin 추출기는 컴파일러 안에서 돈다 — 데몬 힙이 같이 터진다
 
 `build-mode: manual` 로 `./gradlew classes testClasses` 를 돌리면 추출기가 별도 프로세스가 아니라
@@ -520,8 +524,8 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 |---|---|
 | 기동 줄 | `Started TicketApplicationKt in N seconds` — **`Kt` 가 붙는다**(`main` 이 최상위 함수라 클래스가 `TicketApplicationKt`). `Started TicketApplication in` 으로 찾으면 늘 0건이다(`load-5` 가 그래서 못 건졌다, `53a`) |
 | 부하 중 `kubectl logs` | 요청 로그가 kubelet 의 로그 파일(10Mi)을 몇 초 만에 돌려 써서 기동 줄이 남지 않는다. 컨테이너 안 FILE 로그 `/app/logs/ticket.log`(하루 단위)를 `kubectl exec … grep` 으로 읽는다 |
-| readiness `initialDelaySeconds` 와 startupProbe | 개념 문서는 「startupProbe 가 성공한 뒤부터 센다」고 읽힌다. **실측은 컨테이너 시작부터 세는 쪽이다** — 지연 20초를 두고도 Ready 26~31초(`load-5`)였고 JVM 기동만 17~34초다(`load-6`). 지연은 기동과 겹쳐 기동이 그보다 짧을 때만 바닥으로 보인다 |
-| CDS 학습 실행(`backend/Dockerfile`) | DB·Redis·Kafka 없이 refresh 까지 가려면 다섯을 끈다 — Flyway · Hikari 첫 연결(`initialization-fail-timeout=-1`) · Kafka 소비자(`listener.auto-startup`) · **Kafka 토픽 생성(`admin.auto-create`) — 안 끄면 실패는 안 해도 시간 초과까지 30초 넘게 기다린다** · Spring Session 의 `CONFIG SET`(`spring.session.data.redis.configure-action=none` — Boot 4 는 `data` 가 낀다). `onRefresh` 로 끝나면 `Started` 줄이 안 찍힌다 |
+| readiness `initialDelaySeconds` 와 startupProbe | 개념 문서는 「startupProbe 가 성공한 뒤부터 센다」고 읽힌다. **실측은 컨테이너 시작부터 세는 쪽이다** — 지연 20초를 두고도 Ready 26~31초(`load-5`)였고 JVM 기동만 18.7~34.3초다(`load-6`). 지연은 기동과 겹쳐 기동이 그보다 짧을 때만 바닥으로 보인다 |
+| CDS 학습 실행(`backend/Dockerfile`) | DB·Redis·Kafka 없이 refresh 까지 가려면 다섯을 끈다 — Flyway · Hikari 첫 연결(`initialization-fail-timeout=-1`) · Kafka 소비자(`listener.auto-startup`) · **Kafka 토픽 생성(`admin.auto-create`) — 안 끄면 실패는 안 해도 시간 초과까지 30초 넘게 기다린다** · Spring Session 의 `CONFIG SET`(`spring.session.data.redis.configure-action=none` — Boot 4 는 `data` 가 낀다). `onRefresh` 로 끝나면 `Started` 줄이 안 찍힌다. **`-Xshare:on` 만으로는 확인이 안 된다** — 동적(top) 아카이브는 못 써도 갈 수 있어서 `-Xlog:class+load` 의 `source: shared objects file (top)` 을 센다(쓰면 1만 줄 넘게, 안 쓰면 0). 파드 실행은 `-Xshare:auto` 라 아카이브가 조용히 꺼져도 안 선다 — 신호는 기동 초(`load-6`) |
 
 ## 데이터 접근은 `JdbcClient` 다
 
