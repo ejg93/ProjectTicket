@@ -35,7 +35,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 `scripts/docker-up.sh` 가 
 | **새 `V*` 가 있었으면** | 번들 끝 | **빈 클러스터**로 — `docker run -d --rm --name ticket-check-db -e POSTGRES_USER=ticket -e POSTGRES_PASSWORD=… -e POSTGRES_DB=ticket_check -p 5499:5432 postgres:17-alpine` 뒤 `.env` 를 읽고 `POSTGRES_DB=ticket_check POSTGRES_PORT=5499 ./gradlew bootRun --args='--spring.profiles.active=local'`, `curl localhost:8080/api/health`. 끝나면 앱 프로세스(`TicketApplication`)와 컨테이너를 끈다. `ticket-db` 안에 둘째 DB 를 만들면 `V20` 의 `create role` 이 「이미 있다」로 선다 — 역할은 클러스터 단위다(`stack.md`) | `applied_migrations` 가 파일 수와 같다. 테스트만으로는 기동 경로를 안 지난다 |
 | 화면을 건드렸으면 | 청크 | `npx tsc --noEmit && npm run lint && npm test`(= `verify.sh`) | 초록. lint 는 `--cache` 라 둘째부터 바뀐 파일만 |
 | 화면을 건드렸으면 | 번들 끝 | `cd frontend && npm run build && npm run lint && npm test`(= `verify.sh --full`) | 초록 |
-| 예매·대기열 화면을 건드렸으면 | 번들 끝 — **`46b` 뒤에만.** `verify.sh --full` 이 Playwright 와 `e2e` 스크립트가 있을 때만 돈다 | 백엔드 `local` 로 띄운 뒤 `npm run e2e` | 통과. Playwright 는 있는데 백엔드가 안 떠 있으면 빨갛다 |
+| 예매·대기열 화면을 건드렸으면 | 번들 끝 — `verify.sh --full` 이 Playwright 와 `e2e` 스크립트가 있으면 돈다 | `BACKEND_ORIGIN`(기본 8080)에 백엔드가 떠 있으면 `npm run e2e`, 없으면 `scripts/e2e-local.sh` 가 빈 DB(5499)에 8090 으로 띄운다(`G19`) — 손으로는 `bash scripts/e2e-local.sh` | 통과. Playwright 가 없으면 빨갛다(`G21`) |
 | 컨테이너 설정을 건드렸으면 | 청크 | `docker compose config --quiet && docker compose up -d` | `ticket-db`·`ticket-redis` healthy |
 | k8s 를 건드렸으면 | 청크 | `bash scripts/k8s-smoke.sh`(청크 36 부터) | `/api/health` 200 |
 | **문서를 고쳤으면** | — | 안 돌려도 된다 — 훅이 편집 직후에 `doc-lint.sh <그 파일>` 을 돌린다(범위 모드, 1초 안). 전체는 `bash scripts/doc-lint.sh`(16초) — 마무리·CI | 통과하면 아무 말 없음 |

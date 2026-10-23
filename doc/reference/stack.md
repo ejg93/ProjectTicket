@@ -495,13 +495,14 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 | 규칙 | 무엇 |
 |---|---|
 | 무거운 판 앞에 본다 | 부하·k8s 판(`49` · `52` 꼴)을 시작하기 직전에 `docker stats --no-stream` 으로 VM 사용량을 본다. 남은 메모리가 그 판의 필요량보다 적으면 시작하지 않고 기다린다 |
-| 상대 컨테이너는 안 내린다 | 상대 저장소의 컨테이너를 `stop`·`rm` 하지 않는다. `wsl --shutdown`·Docker 재시작이 필요하면 먼저 상대 세션에 메시지를 보낸다 |
+| 상대 컨테이너는 안 내린다 | 상대 저장소의 컨테이너를 `stop`·`rm` 하지 않는다. `wsl --shutdown`·Docker 재시작이 필요하면 먼저 상대 세션에 메시지를 보낸다 **예외 하나**: `verify.sh --full` 은 끝에 Testcontainers 컨테이너를 라벨로 전부 지운다 — 상대 것도(`G20`, 사용자 결정) |
 | 포트를 나눈다 | 아래 표. 겹치는 둘은 같은 날 한쪽이 기다린다 |
 
 | 포트 | ProjectTicket | ProjectShop |
 |---|---|---|
 | 5432 · 6379 · 9092 | — | Postgres · Redis · Kafka(상주) |
 | 5433 · 6380 · 9094 | Postgres · Redis · Kafka(`.env`) | — |
+| 8090 · 5499 | e2e 백엔드 · 빈 DB(`scripts/e2e-local.sh`, `G19`) | — |
 | 9090 | Prometheus | — |
 | 9091 | — | Prometheus(`observe` 프로필) |
 | **8081 · 3001** | **nginx · Grafana(compose `app` 스택)** | **부하 백엔드 · Grafana(`load`·`observe` 프로필)** |

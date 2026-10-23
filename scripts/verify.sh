@@ -111,15 +111,21 @@ if changed frontend && [ -d frontend ]; then
     ran=1; lv_frontend=$level
     if [ "$level" = full ]; then
       echo "== frontend 지문이 origin/main 과 다르다 → next build · lint · test"
+      # e2e 의 백엔드: `BACKEND_ORIGIN`(기본 8080)에 떠 있으면 그것, 없으면 `e2e-local.sh` 가 띄운다(`G19`).
+      # 화면의 `/api` 프록시 목적지는 빌드 때 굳어서 **빌드 전에** 정한다 — 늦게 정하면 남의 8080 으로 간다(마무리 24차).
+      has_e2e=0; e2e_local=0
+      [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json && has_e2e=1
+      if [ $has_e2e = 1 ] && ! curl -sf "${BACKEND_ORIGIN:-http://localhost:8080}/api/health" >/dev/null; then
+        e2e_local=1; export BACKEND_ORIGIN="http://localhost:${E2E_PORT:-8090}"
+      fi
       { (cd frontend && npm run build >/dev/null && npm run lint) && vitest_run; } || ok=0
-      # e2e 는 실물이 있을 때만 — Playwright 와 `e2e` 스크립트(`46b`). 있으면 백엔드가 떠 있어야 한다.
-      # 화면과 같은 주소를 본다 — 8080 을 남이 쥐면 백엔드를 다른 포트로 띄우고 `BACKEND_ORIGIN` 을 준다(마무리 24차)
-      if [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json; then
-        if curl -sf "${BACKEND_ORIGIN:-http://localhost:8080}/api/health" >/dev/null; then
-          echo "== Playwright 있음 → npm run e2e"
-          (cd frontend && npm run e2e) || ok=0
+      if [ $has_e2e = 1 ]; then
+        if [ $e2e_local = 1 ]; then
+          echo "== Playwright 있음, 백엔드 없음 → scripts/e2e-local.sh(빈 DB · $BACKEND_ORIGIN)"
+          E2E_BUILT=1 bash scripts/e2e-local.sh || ok=0
         else
-          echo "Playwright 가 있는데 백엔드가 안 떠 있다 — local 로 띄우고 다시 돌린다(/verify)."; ok=0
+          echo "== Playwright 있음 → npm run e2e(${BACKEND_ORIGIN:-http://localhost:8080})"
+          (cd frontend && npm run e2e) || ok=0
         fi
       else
         # `46b` 전에는 건너뛰었다. 지금 건너뛰면 e2e 없이 full 도장이 찍힌다(`G21`).
