@@ -9,6 +9,8 @@
 # 끝나면(초록·빨강 무관) 앱 프로세스와 `ticket-check-db` 를 내린다. compose 의 redis·kafka 는 둔다 — 다른 레인이 쓴다.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
+# 이 환경의 기본 JDK 는 11 이라 Gradle 이 안 뜬다(CLAUDE.md). 손으로 돌릴 때를 위해 `verify.sh` 와 같은 자리를 둔다(마무리 25차).
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) export JAVA_HOME="C:/Program Files/Java/jdk-25" ;; esac
 
 PORT=${E2E_PORT:-8090}
 DB_PORT=${E2E_DB_PORT:-5499}

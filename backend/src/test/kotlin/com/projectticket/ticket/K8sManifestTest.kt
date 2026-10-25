@@ -102,10 +102,12 @@ class K8sManifestTest {
     @Test
     fun the_scripts_reach_what_the_chart_serves() {
         val origin = appOrigin()
+        // `contains` 는 한 줄만 맞아도 초록이다 — hpa 는 `BASE_URL` 이 둘(미리 로그인 · 본판)이라 전부 견준다(마무리 25차).
+        val baseUrl = Regex("""name: BASE_URL, value: "([^"]*)"""")
         listOf("scripts/k8s-hpa-test.sh", "scripts/k8s-rollout-test.sh").forEach { script ->
-            assertThat(Files.readString(root.resolve(script)))
-                .describedAs("$script 의 k6 가 앱 Service($origin)로 안 간다")
-                .contains("""value: "$origin"""")
+            val urls = baseUrl.findAll(Files.readString(root.resolve(script))).map { it.groupValues[1] }.toList()
+            assertThat(urls).describedAs("$script 에서 BASE_URL 을 못 읽었다").isNotEmpty
+            assertThat(urls).describedAs("$script 의 k6 가 앱 Service($origin)로 안 간다").containsOnly(origin)
         }
 
         val smoke = Files.readString(root.resolve("scripts/k8s-smoke.sh"))

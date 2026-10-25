@@ -33,7 +33,7 @@ lane() {
 lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md .github/workflows/ci.yml .github/workflows/codeql.yml .github/workflows/claude-review.yml doc/reference/quality-gates.md doc/reference/state-machines.md doc/reference/testing-strategy.md frontend/src/components/seat-map.tsx frontend/src/app k8s scripts/k8s-up.sh frontend/Dockerfile frontend/package.json load/README.md scripts/k8s-rollout-test.sh scripts/k8s-hpa-test.sh scripts/k8s-smoke.sh docker/prometheus docker/grafana
 lane frontend frontend/src frontend/package.json frontend/package-lock.json frontend/tsconfig.json \
               frontend/next.config.ts frontend/eslint.config.mjs frontend/vitest.config.mts frontend/vitest.setup.ts \
-              frontend/e2e frontend/playwright.config.ts \
+              frontend/e2e frontend/playwright.config.ts scripts/e2e-local.sh \
               doc/reference/api-guidelines.md doc/reference/screen-rules.md
 # 검증 도구 자체(`B0-2`). 이 레인이 없으면 verify.sh·훅을 고쳐도 도장이 안 바뀌어 아무 검사도 안 돈다.
 lane tools    scripts .claude/settings.json k8s/chart

@@ -95,8 +95,11 @@ if changed backend && [ -d backend ]; then
       if (cd backend && ./gradlew build -q); then
         # 컨테이너 레인이 돌았으면 우리 라벨이 하나 이상 있다 — 0 이면 라벨이 갈려 정리가 조용히 빈다(`G24`).
         # 빌드가 빨가면 시험 전에 섰을 수 있어 이 판정을 안 한다(정리는 EXIT trap 이 한다)
+        # 재사용이 꺼진 기계는 Ryuk 이 먼저 치워 늘 0 이다 — 그때는 판정 대신 한 줄만(마무리 25차, `stack.md` 「재사용」).
         removed=$(tc_remove)
         if [ "$removed" -gt 0 ]; then echo "== 이 저장소의 Testcontainers 컨테이너 ${removed}개를 지웠다"
+        elif ! grep -qs '^testcontainers.reuse.enable=true' "$HOME/.testcontainers.properties"; then
+          echo "== Testcontainers 재사용이 꺼져 있다 — 라벨 판정을 건너뛴다"
         else echo "이 저장소 라벨($OWNER_LABEL=true)의 컨테이너가 없다 — PostgresTestBase 의 OWNER_LABEL 과 갈렸다"; ok=0; fi
       else
         ok=0
@@ -126,11 +129,12 @@ if changed frontend && [ -d frontend ]; then
     ran=1; lv_frontend=$level
     if [ "$level" = full ]; then
       echo "== frontend 지문이 origin/main 과 다르다 → next build · lint · test"
-      # e2e 의 백엔드: `BACKEND_ORIGIN`(기본 8080)에 떠 있으면 그것, 없으면 `e2e-local.sh` 가 띄운다(`G19`).
+      # e2e 의 백엔드: `BACKEND_ORIGIN` 을 줬고 거기 떠 있으면 그것, 아니면 `e2e-local.sh` 가 띄운다(`G19`).
+      # 8080 을 스스로 찾지 않는다 — 다른 저장소 백엔드도 `/api/health` 로 200 을 준다(`I10-3` 의 3000 과 같은 까닭, 마무리 25차).
       # 화면의 `/api` 프록시 목적지는 빌드 때 굳어서 **빌드 전에** 정한다 — 늦게 정하면 남의 8080 으로 간다(마무리 24차).
       has_e2e=0; e2e_local=0
       [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json && has_e2e=1
-      if [ $has_e2e = 1 ] && ! curl -sf "${BACKEND_ORIGIN:-http://localhost:8080}/api/health" >/dev/null; then
+      if [ $has_e2e = 1 ] && { [ -z "${BACKEND_ORIGIN:-}" ] || ! curl -sf "$BACKEND_ORIGIN/api/health" >/dev/null; }; then
         e2e_local=1; export BACKEND_ORIGIN="http://localhost:${E2E_PORT:-8090}"
       fi
       { (cd frontend && npm run build >/dev/null && npm run lint) && vitest_run; } || ok=0
@@ -139,7 +143,7 @@ if changed frontend && [ -d frontend ]; then
           echo "== Playwright 있음, 백엔드 없음 → scripts/e2e-local.sh(빈 DB · $BACKEND_ORIGIN)"
           E2E_BUILT=1 bash scripts/e2e-local.sh || ok=0
         else
-          echo "== Playwright 있음 → npm run e2e(${BACKEND_ORIGIN:-http://localhost:8080})"
+          echo "== Playwright 있음 → npm run e2e($BACKEND_ORIGIN)"
           (cd frontend && npm run e2e) || ok=0
         fi
       else

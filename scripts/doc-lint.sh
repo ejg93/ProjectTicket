@@ -9,8 +9,9 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-# 추적된 스킬만 — 로컬에 깔고 `.git/info/exclude` 로 뺀 외부 스킬은 이 저장소 글이 아니다(마무리 25차).
-mapfile -t skill_files < <(git ls-files '.claude/skills/*/SKILL.md')
+# 로컬에 깔고 `.git/info/exclude` 로 뺀 외부 스킬은 이 저장소 글이 아니다(마무리 25차).
+# `--others` 로 아직 안 더한 새 스킬은 넣는다 — 추적된 것만 보면 막 쓴 스킬이 조용히 빠진다.
+mapfile -t skill_files < <(git ls-files --cached --others --exclude-standard '.claude/skills/*/SKILL.md')
 
 title_check_files=(CLAUDE.md backend/CLAUDE.md PLAN.md PROGRESS.md "${skill_files[@]}" doc/reference/*.md)
 dup_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md "${skill_files[@]}" doc/reference/*.md)
