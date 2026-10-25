@@ -8,11 +8,13 @@ cd "$(dirname "$0")/.." || exit 1
 tree=${1:-HEAD}
 # 「경로 해시」 줄(없으면 `-`)을 인자 순서대로 모아 해시한다. `git ls-tree` 한 번으로 — 경로마다 `rev-parse` 를 부르면
 # 윈도에서 레인 셋에 4~5초가 들고, 이것을 부르는 훅(commit·push·Stop)이 매번 두 번씩 낸다(`G1` 실측).
+# 트리에 없는 경로는 `-` 로 세고 stderr 에 `없음: <경로>` 를 낸다(`G21`) — 옮긴 파일이 지문에서 소리 없이 빠지지 않게.
+# 판정은 부르는 쪽이 한다: 작업 트리면 빨강(`verify.sh`), `origin/main` 이면 새 파일이라 당연하다.
 lane() {
   local name=$1; shift
   git ls-tree "$tree" -- "$@" 2>/dev/null \
     | awk -F'\t' -v paths="$*" 'BEGIN{n=split(paths, p, " ")} {split($1, m, " "); h[$2]=m[3]}
-        END{for (i = 1; i <= n; i++) printf "%s %s\n", p[i], (p[i] in h ? h[p[i]] : "-")}' \
+        END{for (i = 1; i <= n; i++) { if (!(p[i] in h)) print "없음: " p[i] > "/dev/stderr"; printf "%s %s\n", p[i], (p[i] in h ? h[p[i]] : "-") }}' \
     | git hash-object --stdin | sed "s/^/$name /"
 }
 # `backend/config` 는 detekt 설정이다(`backend/config/detekt/detekt.yml`). **빌드 결과를 바꾼다** —
@@ -27,11 +29,11 @@ lane() {
 # `testing-strategy.md` 는 `TestConventionTest`(G7d), frontend 의 `api-guidelines.md` 는 `error-types.test.ts`(G7c)가 읽는다(마무리 12차).
 # `seat-map.tsx` 는 `SeatLimitConsistencyTest`(41-1)가 읽는다 — frontend 파일인데 backend 레인에도 둔다. frontend 의 `screen-rules.md` 는 `screen-map.test.ts`(39-1). `frontend/src/app` 은 `ScreenLengthTest`(G9)가 폼의 `maxLength` 를 읽는다 — `ls-tree` 가 글롭을 못 받아 폴더째 둔다.
 # `k8s` 와 `scripts/k8s-up.sh`·`frontend/Dockerfile` 은 `K8sManifestTest`(36·36a)가 읽는다 — 스크립트는 tools 레인에도 있다.
-# `frontend/package.json` 은 `StackVersionConsistencyTest` 가 판을 읽는다(`I9-3`) — frontend 레인에도 있다. `load/README.md`·`scripts/k8s-rollout-test.sh` 도 같은 시험이 k6 판을 읽는다(마무리 20차). `docker/prometheus`·`docker/grafana` 는 `ComposeContractTest` 가 읽는다(`35h`).
-lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md .github/workflows/ci.yml .github/workflows/codeql.yml .github/workflows/claude-review.yml doc/reference/quality-gates.md doc/reference/state-machines.md doc/reference/testing-strategy.md frontend/src/components/seat-map.tsx frontend/src/app k8s scripts/k8s-up.sh frontend/Dockerfile frontend/package.json load/README.md scripts/k8s-rollout-test.sh docker/prometheus docker/grafana
+# `frontend/package.json` 은 `StackVersionConsistencyTest` 가 판을 읽는다(`I9-3`) — frontend 레인에도 있다. `load/README.md`·`scripts/k8s-rollout-test.sh` 도 같은 시험이 k6 판을 읽는다(마무리 20차). `scripts/k8s-hpa-test.sh`·`scripts/k8s-smoke.sh` 는 k6 판과 앱 주소·화면 포트를 읽는다(`I10-2`). `docker/prometheus`·`docker/grafana` 는 `ComposeContractTest` 가 읽는다(`35h`).
+lane backend  backend/src backend/config backend/build.gradle.kts backend/settings.gradle.kts backend/gradle backend/gradlew backend/gradle.properties backend/Dockerfile docker-compose.yml docker/nginx doc/reference/api-guidelines.md doc/reference/observability-rules.md doc/reference/stack.md doc/reference/event-catalog.md .github/workflows/ci.yml .github/workflows/codeql.yml .github/workflows/claude-review.yml doc/reference/quality-gates.md doc/reference/state-machines.md doc/reference/testing-strategy.md frontend/src/components/seat-map.tsx frontend/src/app k8s scripts/k8s-up.sh frontend/Dockerfile frontend/package.json load/README.md scripts/k8s-rollout-test.sh scripts/k8s-hpa-test.sh scripts/k8s-smoke.sh docker/prometheus docker/grafana
 lane frontend frontend/src frontend/package.json frontend/package-lock.json frontend/tsconfig.json \
               frontend/next.config.ts frontend/eslint.config.mjs frontend/vitest.config.mts frontend/vitest.setup.ts \
-              frontend/e2e frontend/playwright.config.ts \
+              frontend/e2e frontend/playwright.config.ts scripts/e2e-local.sh \
               doc/reference/api-guidelines.md doc/reference/screen-rules.md
 # 검증 도구 자체(`B0-2`). 이 레인이 없으면 verify.sh·훅을 고쳐도 도장이 안 바뀌어 아무 검사도 안 돈다.
 lane tools    scripts .claude/settings.json k8s/chart

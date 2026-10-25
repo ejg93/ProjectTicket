@@ -98,6 +98,7 @@ class StackVersionConsistencyTest {
         val image = "grafana/k6:${tableVersion("k6")}"
         assertThat(Files.readString(root.resolve("load/README.md"))).contains(image).doesNotContain("grafana/k6 run")
         assertThat(Files.readString(root.resolve("scripts/k8s-rollout-test.sh"))).contains(image)
+        assertThat(Files.readString(root.resolve("scripts/k8s-hpa-test.sh"))).contains(image)
     }
 
     @Test

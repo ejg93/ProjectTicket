@@ -16,7 +16,9 @@ export default defineConfig({
   webServer: {
     command: "npm run start",
     url: "http://localhost:3000/login",
-    reuseExistingServer: !process.env.CI,
+    // 3000 에 떠 있는 서버에 붙지 않는다 — 남의 서버로 시험을 돌면 초록이어도 우리 화면이 아니다(`I10-3`, 마무리 24차의 8080 과 같은 꼴).
+    // 막혀 있으면 Playwright 가 「already used」로 선다. CI 와 같다.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

@@ -46,6 +46,8 @@ JAVA_HOME="C:/Program Files/Java/jdk-25" ./gradlew bootRun
 curl localhost:8080/api/health
 ```
 
+e2e 는 `bash scripts/e2e-local.sh` — 빈 DB(5499)에 백엔드를 8090 으로 띄워 CI `e2e` 잡과 같은 꼴로 돈다(`G19`). `verify.sh --full` 은 `BACKEND_ORIGIN` 을 안 주면 이것을 부른다(8080 의 남의 백엔드에 안 붙는다).
+
 ## k8s 로 띄우기
 
 로컬 kind 클러스터에 앱 셋과 Postgres·Redis·Kafka 를 차트(`k8s/chart`)로 올린다(`36`·`37`). 화면(`36a`)은 `http://localhost:3300`. kind 0.33.0 · Helm 4.3.0 · kubectl 이 있어야 한다.

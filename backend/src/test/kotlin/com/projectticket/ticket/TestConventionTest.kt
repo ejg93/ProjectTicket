@@ -88,6 +88,8 @@ class TestConventionTest {
         val docTasks = lanes.mapNotNull { GRADLEW.find(it[2])?.run { groupValues[1] } }.toSet()
         val docTags = lanes.flatMap { row -> BACKTICKED.findAll(row[4]).map { it.groupValues[1] } }.toSet()
         assertThat(docTasks).describedAs("testing-strategy.md 「| 레인 |」 표에서 명령을 못 읽었다").isNotEmpty()
+        // 태그 열을 못 읽으면 아래 `docTags - buildTags` 가 빈 채 초록이다(`I10-1`)
+        assertThat(docTags).describedAs("testing-strategy.md 「| 레인 |」 표에서 태그를 못 읽었다 — 태그 칸 꼴이 바뀌었다").isNotEmpty()
 
         val registered = REGISTERED.findAll(build).map { it.groupValues[2] to it.groupValues[1] }.toMap()
         val buildTags = TAG_CALL.findAll(build).flatMap { QUOTED.findAll(it.groupValues[1]).map { q -> q.groupValues[1] } }.toSet()

@@ -1,0 +1,16 @@
+# 게이트: EventCatalogTest 표제 확인(I10-1)
+# 명령: cd backend && ./gradlew test --tests '*EventCatalogTest' --no-daemon --build-cache -q; r=$?; cat build/test-results/test/*EventCatalogTest.xml 2>/dev/null; exit $r
+# 문구: 카탈로그 표제를 못 찾았다
+diff --git a/doc/reference/event-catalog.md b/doc/reference/event-catalog.md
+index f55505b..a818ab5 100644
+--- a/doc/reference/event-catalog.md
++++ b/doc/reference/event-catalog.md
+@@ -39,7 +39,7 @@
+ | 필드는 snake_case, 시각은 UTC `Z`, 금액은 정수 원 | `D5` 「값의 형식」과 같다 |
+ | 페이로드 `data class` 는 발행하는 패키지가 든다 | 소비자가 발행자의 타입을 import 한다 — 계약이 한 자리에 있다 |
+ 
+-## 카탈로그
++## 사건 목록
+ 
+ 소비자가 있는 사건만이다. 「누가 받나」가 비면 이 표에 못 든다.
+ 

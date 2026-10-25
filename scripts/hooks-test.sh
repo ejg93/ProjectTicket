@@ -17,6 +17,10 @@ cp -r scripts "$fx/"
 cp .claude/settings.json "$fx/.claude/"
 cp .claude/skills/verify/SKILL.md "$fx/.claude/skills/verify/"
 cp CLAUDE.md PLAN.md PROGRESS.md "$fx/"
+# `doc-lint` 전체 실행의 목록 파일 — 없으면 「파일 없음」으로 선다(`G22`)
+mkdir -p "$fx/backend" "$fx/doc"
+cp backend/CLAUDE.md "$fx/backend/"
+cp -r doc/reference "$fx/doc/"
 # `core.autocrlf` 를 끈다 — 켜진 환경에서 `restore` 가 셸 파일을 CRLF 로 되살리면 뒤 경우가 문법으로 죽는다.
 g() { git -C "$fx" -c core.autocrlf=false -c user.name=hooks-test -c user.email=hooks-test@localhost -c commit.gpgsign=false "$@"; }
 g init -q
@@ -48,7 +52,7 @@ lint() {  # 이름 기대exit 앞머리 파일…
 cmd() { printf '{"tool_input":{"command":"%s"}}' "$1"; }
 edit() { printf '{"tool_input":{"file_path":"%s"}}' "$1"; }
 stamp() {  # 단계 — 지금 작업 트리의 지문 전부를 그 단계로 찍는다
-  (cd "$fx" && bash scripts/verify-fingerprint.sh HEAD | sed "s/\$/ $1/") > "$fx/.git/verify-stamp"
+  (cd "$fx" && bash scripts/verify-fingerprint.sh HEAD 2>/dev/null | sed "s/\$/ $1/") > "$fx/.git/verify-stamp"
 }
 restore() { g checkout -q -- . && g clean -qfd; }
 
@@ -133,6 +137,31 @@ restore
 printf '\xff\xfe\n' >> "$fx/.claude/skills/verify/SKILL.md"
 lint 'UTF-8'        1 '[UTF-8 깨짐]' .claude/skills/verify/SKILL.md
 restore
+
+# ── 조용한 건너뜀(`G22`). 목록의 파일을 지우면 전체 실행이 선다 — 예전에는 말없이 빠졌다
+rm "$fx/backend/CLAUDE.md"
+lint '목록 파일 없음' 1 '[파일 없음]'
+restore
+sed -i 's/^## 현재 상태$/## 현재 상태(옛)/' "$fx/PROGRESS.md"
+lint '앵커 없음'    1 '[앵커 없음]' PROGRESS.md
+restore
+
+# ── 도장이 공허하게 찍히는 길(`G21`). 지문이 비면 「같다」로 읽혀 세 레인 full 도장 · 훅 통과였다
+vs() {  # 이름 기대exit 앞머리 — fixture 에서 verify.sh 를 돈다
+  local out rc; out=$(cd "$fx" && bash scripts/verify.sh 2>&1); rc=$?
+  check "$1" "$2" "$3" "$rc" "$out"
+}
+# fixture 에는 backend·frontend 가 없다 — 지문 목록의 경로가 작업 트리에 없는 꼴 그대로다
+vs   'verify 없는 경로'     1 '지문 목록의 경로가 작업 트리에 없다'
+printf '#!/usr/bin/env bash\nexit 1\n' > "$fx/scripts/verify-fingerprint.sh"
+vs   'verify 지문 없음'     1 '지문을 못 냈다'
+hook 'commit 지문 없음'     commit-guard     "$(cmd 'git commit -m x')"           2 '지문을 못 냈다'
+hook 'stop 지문 없음'       stop-stamp       '{"stop_hook_active":false}'         2 '지문을 못 냈다'
+restore
+# node 가 없으면 훅이 입력을 못 읽는다 — 예전에는 빈 문자열로 「해당 없음」 exit 0 이었다. node 는 /usr/bin 밖에 있다
+out=$(cd "$fx" && cmd 'git commit -m x' | PATH=/usr/bin:/bin CLAUDE_PROJECT_DIR="$fx" bash "$fx/scripts/hooks/commit-guard.sh" 2>&1); rc=$?
+check 'node 없음'           2 'node 가 없다' "$rc" "$out"
+hook 'JSON 아님'            commit-guard     'not json'                           2 '훅 입력이 JSON 이 아니다'
 
 [ "$fails" -eq 0 ] && { echo "훅·린트 시험 $n 경우 초록"; exit 0; }
 echo "훅·린트 시험 $n 경우 중 $fails 빨강"; exit 1

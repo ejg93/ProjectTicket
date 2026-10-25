@@ -23,7 +23,11 @@ class ComposeContractTest {
 
     private val root: Path = Path.of("..").toAbsolutePath().normalize()
     private val compose = Files.readString(root.resolve("docker-compose.yml"))
+    /** 주석은 걷어낸다 — 「`curl` 이 없다」를 설명하는 주석이 「깐다」 검사를 채우면 안 된다(`I10-1`) */
     private val dockerfile = Files.readString(root.resolve("backend/Dockerfile"))
+        .lines()
+        .filterNot { it.trimStart().startsWith("#") }
+        .joinToString("\n")
     private val prometheus = Files.readString(root.resolve("docker/prometheus/prometheus.yml"))
         .lines()
         .filterNot { it.trimStart().startsWith("#") }

@@ -42,3 +42,18 @@
 | 부하 중 `kubectl logs` 는 기동 줄을 몇 초 만에 잃는다 | 정보 — `stack.md` · 스크립트가 `kubectl exec` 로 `/app/logs/ticket.log` 를 읽는다 |
 | readiness 지연의 기준 시각이 문서 문장과 실측이 어긋난다 | 정보 — `stack.md` |
 | CDS 학습 실행이 DB 없이 뜨려면 다섯을 꺼야 한다(설계는 셋) | 정보 — `stack.md` · `backend/Dockerfile` 주석 |
+
+## `54` 판 — k8s 문턱으로
+
+`D13` 「k8s 3~6대」 칸(폴링 p95 ≤ 350 · 이긴 선점 p95 ≤ 680)을 `k8s-hpa-test.sh` 가 k6 에 넘긴 두 판. CDS 이미지(`53b`) 그대로.
+
+| 무엇 | 첫 판(11:46 UTC) | 둘째 판(12:23 UTC) |
+|---|---|---|
+| k6 Job | `SuccessCriteriaMet` | `SuccessCriteriaMet` |
+| 폴링 p95 · 이긴 선점 p95 | 153 · 258ms | 226 · 446ms |
+| 5xx · 진입 | 0 · 10,000 | 0(요청 960,797) · 10,000 |
+| 늘어난 파드 생성 → Ready · JVM 기동 | 20~21초 · 13.6~14.7초 | 22~27초 · 16.7~20.1초 |
+| 스크립트 exit | 1 — 미리 로그인 때 늘었다가 줄던 파드 하나의 기동 줄을 못 건짐(종료 중인 컨테이너에 `exec` 가 안 붙는다) | 1 — 판정 둘은 통과, EXIT `trap` 의 `kill` 이 `set -e` 아래서 실패 |
+
+둘 다 스크립트 쪽 결함이라 판 뒤에 고쳤다 — 표본 고리가 종료 중인 파드(`deletionTimestamp`)를 건너뛰고, `trap` 의 `kill` 에 `|| true`. 셋째 판은 안 쳤다(아래 이력).
+

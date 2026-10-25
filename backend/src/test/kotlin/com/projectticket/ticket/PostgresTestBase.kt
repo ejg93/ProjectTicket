@@ -120,7 +120,7 @@ abstract class PostgresTestBase {
         @Bean
         @ServiceConnection
         fun postgres(): PostgreSQLContainer =
-            PostgreSQLContainer("postgres:17-alpine").withReuse(true)
+            PostgreSQLContainer("postgres:17-alpine").withReuse(true).withLabel(OWNER_LABEL, "true")
 
         /**
          * 테스트에서만 bcrypt 비용을 4 로 낮춘다. 운영은 그대로 10 이다(`SecurityConfig`).
@@ -132,7 +132,7 @@ abstract class PostgresTestBase {
          */
         @Bean
         @ServiceConnection
-        fun kafka(): KafkaContainer = KafkaContainer("apache/kafka:4.3.1").withReuse(true)
+        fun kafka(): KafkaContainer = KafkaContainer("apache/kafka:4.3.1").withReuse(true).withLabel(OWNER_LABEL, "true")
 
         /**
          * 세션 저장소(ADR 0004). `@ServiceConnection(name = "redis")` 가 호스트·포트를 꽂는다 — 이름을 적어야 한다.
@@ -145,11 +145,21 @@ abstract class PostgresTestBase {
             GenericContainer<Nothing>("redis:7-alpine").apply {
                 withExposedPorts(6379)
                 withReuse(true)
+                withLabel(OWNER_LABEL, "true")
             }
 
         @Bean
         @Primary
         fun testPasswordEncoder(): PasswordEncoder =
             DelegatingPasswordEncoder("bcrypt", mapOf("bcrypt" to BCryptPasswordEncoder(4)))
+
+        private companion object {
+            /**
+             * 이 저장소가 띄운 컨테이너의 표시. `verify.sh --full` 이 끝에 이 라벨만 지운다(`G24`) —
+             * `org.testcontainers=true` 로 지우면 같은 Docker 를 쓰는 ProjectShop 의 돌고 있는 시험까지 끊었다.
+             * 이름을 바꾸면 `verify.sh` 의 `OWNER_LABEL` 도 같이 — 갈리면 `--full` 이 「지운 것이 0」으로 빨갛다.
+             */
+            const val OWNER_LABEL = "projectticket"
+        }
     }
 }

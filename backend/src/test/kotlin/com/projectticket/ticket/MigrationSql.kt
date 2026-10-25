@@ -16,6 +16,25 @@ import kotlin.streams.asSequence
 object MigrationSql {
     private val VERSION = Regex("""^V(\d+)""")
 
+    /** `constraint 이름 check (칸 in ('a', 'b'))`. `cancelled_by is null or …` 꼴도 받는다 */
+    private val CHECK_IN = Regex("""constraint\s+(\w+)\s+check\s*\(\s*(?:\w+\s+is\s+null\s+or\s+)?\w+\s+in\s*\(([^)]*)\)""")
+    private val DROP = Regex("""drop\s+constraint\s+(?:if\s+exists\s+)?(\w+)""")
+    private val VALUE = Regex("""'([^']*)'""")
+
+    /**
+     * 제약 이름 → 닫아 둔 값 목록. 판 순서로 읽고 `drop constraint` 를 반영해 **마지막 판만** 남긴다.
+     * 파일 하나를 박아 읽으면 뒤 판이 제약을 다시 걸었을 때 낡은 목록을 본다(`I10-1` — `EventCatalogTest` 가 `V13` 을 박았었다).
+     * [EnumConstraintTest]·`EventCatalogTest` 가 같이 쓴다.
+     */
+    fun closedValueSets(root: Path): Map<String, List<String>> = buildMap {
+        inOrder(root).forEach { sql ->
+            DROP.findAll(sql).forEach { remove(it.groupValues[1]) }
+            CHECK_IN.findAll(sql).forEach { match ->
+                put(match.groupValues[1], VALUE.findAll(match.groupValues[2]).map { it.groupValues[1] }.toList())
+            }
+        }
+    }
+
     /** `V2` 가 `V10` 보다 먼저다. 이름순으로 읽으면 `V10` 이 앞에 와서 `drop` 반영이 뒤집힌다 */
     fun inOrder(root: Path): List<String> =
         Files.walk(root.resolve("backend/src/main/resources/db/migration")).use { paths ->

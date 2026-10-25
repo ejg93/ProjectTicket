@@ -22,13 +22,42 @@ case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) export JAVA_HOME="C:/Program Files/J
 
 git rev-parse -q --verify origin/main >/dev/null || { echo "origin/main 이 없다 — 기준이 없어서 못 잰다"; exit 1; }
 
+# `--full` 의 컨테이너 레인이 남긴 Testcontainers 컨테이너를 지운다 — 재사용(`~/.testcontainers.properties`)으로 판마다 남는다(`G20`).
+# **이 저장소 것만** 지운다(`G24`, 사용자 결정 (다)) — `org.testcontainers=true` 로 지우면 같은 Docker 를 쓰는 ProjectShop 의
+# 돌고 있는 시험이 Connection refused 로 무너졌다. 라벨은 `PostgresTestBase.Containers.OWNER_LABEL` 과 같아야 한다.
+OWNER_LABEL=projectticket
+tc_cleanup=0; tmp=; fperr=
+tc_remove() {  # 지운 수를 낸다
+  local ids; ids=$(docker ps -aq --filter "label=$OWNER_LABEL=true" 2>/dev/null)
+  [ -n "$ids" ] || { echo 0; return 0; }
+  # shellcheck disable=SC2086 # id 목록을 낱낱으로 넘긴다
+  docker rm -f $ids >/dev/null 2>&1
+  echo "$ids" | wc -l | tr -d ' '
+}
+cleanup() {
+  rm -f "$tmp" "$fperr"
+  # 빨강으로 일찍 끝나도 지운다 — 초록 길은 `build` 직후에 이미 지웠다
+  [ "$tc_cleanup" = 1 ] && tc_remove >/dev/null
+  return 0
+}
+
 # 작업 트리(커밋 안 된 것 포함)의 트리 해시. 임시 인덱스라 진짜 인덱스를 안 건드린다.
-tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
+tmp=$(mktemp); trap cleanup EXIT
 GIT_INDEX_FILE="$tmp" git read-tree HEAD
 GIT_INDEX_FILE="$tmp" git add -A . 2>/dev/null
 tree=$(GIT_INDEX_FILE="$tmp" git write-tree)
 
-fp_work=$(bash scripts/verify-fingerprint.sh "$tree"); fp_main=$(bash scripts/verify-fingerprint.sh origin/main)
+fperr=$(mktemp)
+fp_work=$(bash scripts/verify-fingerprint.sh "$tree" 2>"$fperr"); fp_main=$(bash scripts/verify-fingerprint.sh origin/main 2>/dev/null)
+# 지문이 비면 아래 `changed()` 가 빈 줄 둘을 「같다」로 읽어 「돌릴 것이 없다」 → 세 레인 full 도장이 된다(`G21`).
+for fp in "$fp_work" "$fp_main"; do
+  [ "$(printf '%s\n' "$fp" | grep -cE '^(backend|frontend|tools) [0-9a-f]+$')" -eq 3 ] \
+    || { echo "지문을 못 냈다 — scripts/verify-fingerprint.sh 가 레인 셋을 안 냈다: ${fp:-(빈 출력)}"; exit 1; }
+done
+if [ -s "$fperr" ]; then
+  echo "지문 목록의 경로가 작업 트리에 없다 — 옮기거나 지웠으면 scripts/verify-fingerprint.sh 의 목록도 고친다:"
+  sed 's/^/    /' "$fperr"; exit 1
+fi
 changed() { [ "$(echo "$fp_work" | grep "^$1 ")" != "$(echo "$fp_main" | grep "^$1 ")" ]; }
 fp_of() { echo "$fp_work" | grep "^$1 " | cut -d' ' -f2; }
 st="$(git rev-parse --git-dir)/verify-stamp"
@@ -62,7 +91,19 @@ if changed backend && [ -d backend ]; then
       # Docker 를 먼저 본다. 안 떠 있으면 컨테이너 레인이 전부 FAILED 로 뜨고 진짜 원인은 XML 리포트를 파야 나온다.
       docker_up || { echo "Docker 가 안 떴다. 느린 레인은 컨테이너를 띄운다 — Docker Desktop 을 켜고 다시 돌린다."; exit 1; }
       echo "== backend 지문이 origin/main 과 다르다 → ./gradlew build (두 레인)"
-      (cd backend && ./gradlew build -q) || ok=0
+      tc_cleanup=1
+      if (cd backend && ./gradlew build -q); then
+        # 컨테이너 레인이 돌았으면 우리 라벨이 하나 이상 있다 — 0 이면 라벨이 갈려 정리가 조용히 빈다(`G24`).
+        # 빌드가 빨가면 시험 전에 섰을 수 있어 이 판정을 안 한다(정리는 EXIT trap 이 한다)
+        # 재사용이 꺼진 기계는 Ryuk 이 먼저 치워 늘 0 이다 — 그때는 판정 대신 한 줄만(마무리 25차, `stack.md` 「재사용」).
+        removed=$(tc_remove)
+        if [ "$removed" -gt 0 ]; then echo "== 이 저장소의 Testcontainers 컨테이너 ${removed}개를 지웠다"
+        elif ! grep -qs '^testcontainers.reuse.enable=true' "$HOME/.testcontainers.properties"; then
+          echo "== Testcontainers 재사용이 꺼져 있다 — 라벨 판정을 건너뛴다"
+        else echo "이 저장소 라벨($OWNER_LABEL=true)의 컨테이너가 없다 — PostgresTestBase 의 OWNER_LABEL 과 갈렸다"; ok=0; fi
+      else
+        ok=0
+      fi
     elif [ -n "$(git diff-tree -r --name-only --diff-filter=A origin/main "$tree" -- backend/src/main/resources/db/migration)" ]; then
       # 새 `V*` 가 있으면 컨테이너 레인도 같이 돈다. 빠른 레인만 돌리면 열거형·길이 대조(`integrationTest`)가
       # 번들 끝 `--full` 에서 처음 빨개진다 — ProjectShop 번들 A 가 그랬다(`B0`).
@@ -88,18 +129,26 @@ if changed frontend && [ -d frontend ]; then
     ran=1; lv_frontend=$level
     if [ "$level" = full ]; then
       echo "== frontend 지문이 origin/main 과 다르다 → next build · lint · test"
+      # e2e 의 백엔드: `BACKEND_ORIGIN` 을 줬고 거기 떠 있으면 그것, 아니면 `e2e-local.sh` 가 띄운다(`G19`).
+      # 8080 을 스스로 찾지 않는다 — 다른 저장소 백엔드도 `/api/health` 로 200 을 준다(`I10-3` 의 3000 과 같은 까닭, 마무리 25차).
+      # 화면의 `/api` 프록시 목적지는 빌드 때 굳어서 **빌드 전에** 정한다 — 늦게 정하면 남의 8080 으로 간다(마무리 24차).
+      has_e2e=0; e2e_local=0
+      [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json && has_e2e=1
+      if [ $has_e2e = 1 ] && { [ -z "${BACKEND_ORIGIN:-}" ] || ! curl -sf "$BACKEND_ORIGIN/api/health" >/dev/null; }; then
+        e2e_local=1; export BACKEND_ORIGIN="http://localhost:${E2E_PORT:-8090}"
+      fi
       { (cd frontend && npm run build >/dev/null && npm run lint) && vitest_run; } || ok=0
-      # e2e 는 실물이 있을 때만 — Playwright 와 `e2e` 스크립트(`46b`). 있으면 백엔드가 떠 있어야 한다.
-      # 화면과 같은 주소를 본다 — 8080 을 남이 쥐면 백엔드를 다른 포트로 띄우고 `BACKEND_ORIGIN` 을 준다(마무리 24차)
-      if [ -x frontend/node_modules/.bin/playwright ] && grep -q '"e2e"' frontend/package.json; then
-        if curl -sf "${BACKEND_ORIGIN:-http://localhost:8080}/api/health" >/dev/null; then
-          echo "== Playwright 있음 → npm run e2e"
-          (cd frontend && npm run e2e) || ok=0
+      if [ $has_e2e = 1 ]; then
+        if [ $e2e_local = 1 ]; then
+          echo "== Playwright 있음, 백엔드 없음 → scripts/e2e-local.sh(빈 DB · $BACKEND_ORIGIN)"
+          E2E_BUILT=1 bash scripts/e2e-local.sh || ok=0
         else
-          echo "Playwright 가 있는데 백엔드가 안 떠 있다 — local 로 띄우고 다시 돌린다(/verify)."; ok=0
+          echo "== Playwright 있음 → npm run e2e($BACKEND_ORIGIN)"
+          (cd frontend && npm run e2e) || ok=0
         fi
       else
-        echo "== e2e 건너뜀 — Playwright 가 없다(46b 가 들인다)"
+        # `46b` 전에는 건너뛰었다. 지금 건너뛰면 e2e 없이 full 도장이 찍힌다(`G21`).
+        echo "Playwright 나 \"e2e\" 스크립트가 없다 — cd frontend && npm ci 뒤 다시 돌린다"; ok=0
       fi
     else
       echo "== frontend 지문이 origin/main 과 다르다 → tsc --noEmit · lint · test"

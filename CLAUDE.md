@@ -163,6 +163,9 @@ ProjectShop 의 Java 를 포팅할 때는 **옮기면서 Kotlin 답게 고치고
 
 **backend 명령은 `JAVA_HOME="C:/Program Files/Java/jdk-25"` 를 앞에 붙인다.** 이 환경의 기본이 JDK 11 이라 Gradle 이 안 뜬다. 안 붙이면 훅이 막는다.
 
+**로컬 compose DB 를 다시 만드는 명령 둘은 확인 없이 친다**(2026-10-25 사용자 결정). 기본 compose 파일의 `docker compose down -v`(`README.md`·`stack.md`)와 부하 시험 볼륨을 비우는 `docker volume rm projectticket_db-load-data projectticket_redis-load-data`(`load/README.md`)다. `docker-compose-patterns` 의 「지우기 전에 확인」은 이 둘에만 안 건다.
+`-f load/compose.fresh.yml` 을 붙인 `down -v` 는 예외가 아니다 — 원래 볼륨까지 지운다. 다른 삭제(`prune`·`rm -f`·위에 없는 `volume rm`)는 `docker-compose-patterns`·`docker-destructive-guardrails` 를 그대로 따른다.
+
 ## 토큰 절약
 
 **낭비와 소모는 다르다.** 같은 파일을 두 번 읽는 건 낭비, 청크를 하나 더 하는 건 소모.

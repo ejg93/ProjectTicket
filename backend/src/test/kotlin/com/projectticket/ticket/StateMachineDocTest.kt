@@ -49,6 +49,10 @@ class StateMachineDocTest {
             .flatMap { FUNCTION_NAME.findAll(it).map { match -> match.groupValues[1] } }
             .toSet()
 
+        // 트리거를 하나도 못 읽으면 아래 `isSubsetOf` 가 빈 집합으로 초록이다(`I10-1`)
+        assertThat(inMigrations)
+            .describedAs("마이그레이션에서 전이 트리거를 하나도 못 읽었다 — 함수 이름 꼴이 바뀌었으면 FUNCTION_NAME 도 고친다")
+            .isNotEmpty()
         // 전이 트리거를 새로 만들었으면 **문서에 표가 서야 한다.** 여기서 멈추는 것이 그 자리다.
         assertThat(inMigrations)
             .describedAs("전이 트리거가 생겼는데 `state-machines.md` 에 전이표가 없다")

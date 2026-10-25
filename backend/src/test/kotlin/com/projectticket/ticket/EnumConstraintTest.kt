@@ -67,29 +67,21 @@ class EnumConstraintTest {
         SUBSETS.forEach { (constraint, codes) ->
             // 일부러 좁힌 목록이다. **같아야 하는 것이 아니라 안을 벗어나면 안 되는 것** —
             // 벗어난 값은 사건 이름을 고치면서 한쪽만 고친 흔적이다.
+            // 값을 하나도 못 읽으면 `containsAll` 이 빈 목록으로 초록이다(`I10-1`)
+            assertThat(live.getValue(constraint)).describedAs("`$constraint` 의 값을 못 읽었다").isNotEmpty()
             assertThat(codes)
                 .describedAs("`$constraint` 에 열거형 밖의 값이 있다")
                 .containsAll(live.getValue(constraint))
         }
     }
 
-    /** 제약 이름 → 닫아 둔 값 집합. `drop` 을 반영해 **마지막 판만** 남긴다 */
-    private fun liveConstraints(): Map<String, List<String>> = buildMap {
-        MigrationSql.inOrder(root).forEach { sql ->
-            DROP.findAll(sql).forEach { remove(it.groupValues[1]) }
-            CHECK_IN.findAll(sql).forEach { match ->
-                val values = VALUE.findAll(match.groupValues[2]).map { it.groupValues[1] }.toList()
-                put(match.groupValues[1], values)
-            }
-        }
+    /** 제약 이름 → 닫아 둔 값 집합. `drop` 을 반영해 **마지막 판만** 남긴다([MigrationSql.closedValueSets]) */
+    private fun liveConstraints(): Map<String, List<String>> = MigrationSql.closedValueSets(root).also {
+        // 하나도 못 읽으면 「짝이 없다」를 보는 시험이 빈 맵으로 초록이다(`I10-1`)
+        assertThat(it).describedAs("마이그레이션에서 닫힌 값 목록을 하나도 못 읽었다 — MigrationSql.CHECK_IN 꼴을 본다").isNotEmpty()
     }
 
     private companion object {
-        /** `constraint 이름 check (칸 in ('a', 'b'))`. `cancelled_by is null or …` 꼴도 받는다 */
-        val CHECK_IN = Regex("""constraint\s+(\w+)\s+check\s*\(\s*(?:\w+\s+is\s+null\s+or\s+)?\w+\s+in\s*\(([^)]*)\)""")
-        val DROP = Regex("""drop\s+constraint\s+(?:if\s+exists\s+)?(\w+)""")
-        val VALUE = Regex("""'([^']*)'""")
-
         /** 열거형이 거울인 제약. 새 열거형이 생기면 여기 행이 는다 */
         val MIRRORED: Map<String, List<String>> = mapOf(
             "account_role_check" to AccountRole.entries.map { it.code },

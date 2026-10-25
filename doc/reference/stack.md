@@ -454,7 +454,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ### detekt 타입 해석이 오래 쓴 데몬에서 「diagnostic collector has been interrupted」로 선다
 
-`gradle.properties` 에 `jvmargs` 가 없어 데몬은 기본 힙(512MB)이다. `gate-probe.sh all`(빌드 37판)을 같은 데몬에서 돌린 뒤 `detektTest` 가 그 문구로 서고 `backend/java_pid*.hprof`(434MB)를 떨궜다(마무리 24차). 코드 탓이 아니다 — `./gradlew --stop` 뒤 초록. CI 는 판마다 새 데몬이라 안 걸린다. `*.hprof` 는 `.gitignore` 에 있다.
+`gradle.properties` 에 `jvmargs` 가 없어 데몬은 기본 힙(512MB)이다. `gate-probe.sh all`(빌드 37판)을 같은 데몬에서 돌린 뒤 `detektTest` 가 그 문구로 서고 `backend/java_pid*.hprof`(434MB)를 떨궜다(마무리 24차). 코드 탓이 아니다 — `./gradlew --stop` 뒤 초록. CI 는 판마다 새 데몬이라 안 걸린다. `*.hprof` 는 `.gitignore` 에 있다. `G20` 이 `backend/gradle.properties` 로 힙을 2g 로 올렸다.
 
 ### CodeQL 의 Kotlin 추출기는 컴파일러 안에서 돈다 — 데몬 힙이 같이 터진다
 
@@ -488,19 +488,21 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 ### Docker 를 ProjectShop 과 나눠 쓴다
 
 이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다.
+`verify.sh --full` 은 컨테이너 레인 뒤에 **이 저장소의** Testcontainers 컨테이너(라벨 `projectticket=true`, `PostgresTestBase` 가 붙인다)를 지운다 — 재사용으로 판마다 남아서다(`G20`). 처음(`G20`)에는 `org.testcontainers=true` 로 지워서 ProjectShop 의 돌고 있는 `--full` 이 Connection refused 로 무너졌다 — `G24` 가 우리 라벨로 좁혔다(사용자 결정).
 
 **2026-10-18 ProjectShop 세션과 합의한 규칙 셋:**
 
 | 규칙 | 무엇 |
 |---|---|
 | 무거운 판 앞에 본다 | 부하·k8s 판(`49` · `52` 꼴)을 시작하기 직전에 `docker stats --no-stream` 으로 VM 사용량을 본다. 남은 메모리가 그 판의 필요량보다 적으면 시작하지 않고 기다린다 |
-| 상대 컨테이너는 안 내린다 | 상대 저장소의 컨테이너를 `stop`·`rm` 하지 않는다. `wsl --shutdown`·Docker 재시작이 필요하면 먼저 상대 세션에 메시지를 보낸다 |
+| 상대 컨테이너는 안 내린다 | 상대 저장소의 컨테이너를 `stop`·`rm` 하지 않는다. `wsl --shutdown`·Docker 재시작이 필요하면 먼저 상대 세션에 메시지를 보낸다. `verify.sh --full` 의 정리도 우리 라벨만 본다(`G24`) |
 | 포트를 나눈다 | 아래 표. 겹치는 둘은 같은 날 한쪽이 기다린다 |
 
 | 포트 | ProjectTicket | ProjectShop |
 |---|---|---|
 | 5432 · 6379 · 9092 | — | Postgres · Redis · Kafka(상주) |
 | 5433 · 6380 · 9094 | Postgres · Redis · Kafka(`.env`) | — |
+| 8090 · 5499 | e2e 백엔드 · 빈 DB(`scripts/e2e-local.sh`, `G19`) | — |
 | 9090 | Prometheus | — |
 | 9091 | — | Prometheus(`observe` 프로필) |
 | **8081 · 3001** | **nginx · Grafana(compose `app` 스택)** | **부하 백엔드 · Grafana(`load`·`observe` 프로필)** |
