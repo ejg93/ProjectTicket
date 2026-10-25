@@ -9,7 +9,8 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-skill_files=(.claude/skills/*/SKILL.md)
+# 추적된 스킬만 — 로컬에 깔고 `.git/info/exclude` 로 뺀 외부 스킬은 이 저장소 글이 아니다(마무리 25차).
+mapfile -t skill_files < <(git ls-files '.claude/skills/*/SKILL.md')
 
 title_check_files=(CLAUDE.md backend/CLAUDE.md PLAN.md PROGRESS.md "${skill_files[@]}" doc/reference/*.md)
 dup_check_files=(CLAUDE.md PLAN.md PROGRESS.md backend/CLAUDE.md "${skill_files[@]}" doc/reference/*.md)
