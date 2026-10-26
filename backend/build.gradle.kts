@@ -12,7 +12,7 @@ plugins {
 	// 정적 분석(47). ProjectShop 의 SpotBugs 자리다 — 그쪽은 Java 바이트코드를 보고 이쪽은 Kotlin 소스를 본다.
 	// **2.0 알파를 쓴다**: 1.23.8 은 묶인 IntelliJ 유틸이 JDK 25 의 `25.0.1` 을 못 읽어 그냥 선다(`stack.md`).
 	id("dev.detekt") version "2.0.0-alpha.6"
-	id("org.springframework.boot") version "4.1.1"
+	id("org.springframework.boot") version "4.1.2"
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
