@@ -8,6 +8,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /**
  * 승인이 늦어 좌석을 못 준 결제에 환불 행이 생기나(`17b` ⓑ의 닫힘 조건).
@@ -48,7 +51,29 @@ class RefundSweeperTest : PostgresTestBase() {
         assertThat(refund.reason).isEqualTo("payment_late")
         assertThat(refund.feeAmount).isZero()
         assertThat(refund.refundAmount).isEqualTo(154_000)
+        // 구간을 안 타도 「언제 무른 것인가」는 실값이다 — 0 은 구간표에서 당일이라 섞으면 안 된다(`D6` 「환불 행」, `I11-3`).
+        assertThat(refund.daysBefore).isEqualTo(kstDaysBeforeStart())
         // 행만 만들고 끝나면 돈이 안 돌아간다. 같은 회에 PG 까지 보낸다.
+        assertThat(refund.status).isEqualTo("done")
+    }
+
+    @Test
+    fun an_approval_arriving_after_the_performance_was_cancelled_gets_a_full_refund_row() {
+        // 회차 취소(17a)가 `paying` 을 `cancelled` 로 옮긴 뒤 승인이 도착한 모양. 회차 취소의 환불은 그 시점에 승인된 결제만 봐서
+        // 이 승인은 어느 길도 안 돌려줬다(`I11-3`).
+        val reservationId = fixture.hold(accountId = buyer, performanceId = performanceId, section = "F1-A", seatNumber = 1)
+        jdbc.sql(
+            "update reservation set status = 'cancelled', cancelled_at = now(), cancelled_by = 'organizer' where reservation_id = :id",
+        ).param("id", reservationId).update()
+        approve(reservationId)
+
+        assertThat(sweeper.sweep()).isEqualTo(1)
+
+        val refund = refundOf(reservationId)
+        assertThat(refund.reason).isEqualTo("payment_late")
+        assertThat(refund.feeAmount).isZero()
+        assertThat(refund.refundAmount).isEqualTo(154_000)
+        assertThat(refund.daysBefore).isEqualTo(kstDaysBeforeStart())
         assertThat(refund.status).isEqualTo("done")
     }
 
@@ -94,18 +119,27 @@ class RefundSweeperTest : PostgresTestBase() {
     private fun refundOf(reservationId: Long): Row =
         jdbc.sql(
             """
-            select rf.reason, rf.fee_amount, rf.refund_amount, rf.status
+            select rf.reason, rf.fee_amount, rf.refund_amount, rf.days_before, rf.status
               from refund rf join payment p on p.payment_id = rf.payment_id
              where p.reservation_id = :id
             """,
         ).param("id", reservationId).query(Row::class.java).single()
 
+    /** SQL 식을 다시 쓰지 않고 Kotlin 으로 따로 센다 — 같은 식을 두 번 쓰면 둘이 같이 틀려도 초록이다 */
+    private fun kstDaysBeforeStart(): Int {
+        val startsAt = jdbc.sql("select starts_at from performance where performance_id = :id")
+            .param("id", performanceId).query(OffsetDateTime::class.java).single()
+        val now = jdbc.sql("select now()").query(OffsetDateTime::class.java).single()
+        return ChronoUnit.DAYS.between(now.atZoneSameInstant(KST).toLocalDate(), startsAt.atZoneSameInstant(KST).toLocalDate()).toInt()
+    }
+
     private fun refundCount(): Long =
         jdbc.sql("select count(*) from refund").query(Long::class.java).single()
 
-    data class Row(val reason: String, val feeAmount: Int, val refundAmount: Int, val status: String)
+    data class Row(val reason: String, val feeAmount: Int, val refundAmount: Int, val daysBefore: Int, val status: String)
 
     private companion object {
         const val PREFIX = "late-refund-"
+        val KST: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }

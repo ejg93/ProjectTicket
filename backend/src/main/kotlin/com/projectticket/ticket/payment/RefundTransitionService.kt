@@ -160,6 +160,12 @@ class RefundTransitionService(
      *
      * 관객 잘못이 아니라 전액이다(`D6`) — 율 0·수수료 0. 스윕이 이 행을 PG 로 보낸다.
      *
+     * **대상은 `expired` 와 `cancelled` 둘이다**(`I11-3`). 회차 취소(17a)가 `paying` 예매를 `cancelled` 로 옮긴 뒤 승인이 도착하면
+     * 확정이 0행이라 승인만 남는다 — 회차 취소의 환불은 그 시점에 승인된 결제만 봐서 이 돈을 아무도 안 돌려줬다.
+     * 관객이 무른 `cancelled` 는 그 트랜잭션이 환불 행을 이미 만들어 `not exists` 가 거른다.
+     *
+     * `days_before` 는 회차 취소와 같은 KST 달력일 차다(`D6` 「환불 행」) — 0 은 구간표에서 「당일」이라 섞으면 안 된다.
+     *
      * **`not exists` 로 멱등이다.** 두 번 돌아도 둘째는 0행이고, 뚫려도 결제당 하나라는 유일 제약이 받는다.
      */
     @Transactional
@@ -167,11 +173,15 @@ class RefundTransitionService(
         jdbc.sql(
             """
             insert into refund (payment_id, reason, days_before, tier_rate, fee_amount, refund_amount)
-            select p.payment_id, :reason, 0, 0, 0, p.amount
+            select p.payment_id,
+                   :reason,
+                   greatest(0, (pf.starts_at at time zone 'Asia/Seoul')::date - (now() at time zone 'Asia/Seoul')::date),
+                   0, 0, p.amount
               from payment p
               join reservation r on r.reservation_id = p.reservation_id
+              join performance pf on pf.performance_id = r.performance_id
              where p.status = :approved
-               and r.status = :expired
+               and r.status in (:expired, :cancelled)
                and not exists (select 1 from refund rf where rf.payment_id = p.payment_id)
             returning refund_id
             """,
@@ -179,6 +189,7 @@ class RefundTransitionService(
             .param("reason", REASON_PAYMENT_LATE)
             .param("approved", PaymentStatus.APPROVED.code)
             .param("expired", ReservationStatus.EXPIRED.code)
+            .param("cancelled", ReservationStatus.CANCELLED.code)
             .query(Long::class.java)
             .list()
             .filterNotNull()
