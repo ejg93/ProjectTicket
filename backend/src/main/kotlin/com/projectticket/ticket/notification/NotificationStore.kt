@@ -175,12 +175,15 @@ class NotificationStore(private val jdbc: JdbcClient) {
     /**
      * 보낼 것을 고른다. `for update skip locked` 로 **한 회에 같은 행을 둘이 안 집는다** — 다만 이 트랜잭션이 끝나면 락이 풀린다.
      * 발송과 표시가 다른 트랜잭션이라 그 사이에 남이 같은 행을 집으면 **같은 메일이 두 번 나갈 수 있다**([NotificationSweeper] 가 그 대가를 든다).
+     *
+     * **탈퇴했으면 이메일을 안 넘긴다**(`D11` 「받는 사람」, `I11-4`). 탈퇴는 `deleted_at` 만 찍고 이메일은 30일 뒤 파기가 비워서,
+     * 이메일만 보면 그 30일 동안 메일이 나갔다. 비워 넘기면 스윕의 「탈퇴 — 건너뜀」 길을 그대로 탄다.
      */
     @Transactional
     fun takePending(batchSize: Int): List<Pending> =
         jdbc.sql(
             """
-            select n.notification_id, n.subject, n.body, a.email
+            select n.notification_id, n.subject, n.body, case when a.deleted_at is null then a.email end as email
               from notification n join account a on a.account_id = n.account_id
              where n.status = 'pending'
              order by n.notification_id
@@ -216,7 +219,7 @@ class NotificationStore(private val jdbc: JdbcClient) {
             .param("id", notificationId)
             .update()
 
-    /** [email] 은 탈퇴한 계정이면 null 이다 — 파기가 컬럼을 비운다 */
+    /** [email] 은 탈퇴한 계정이면 null 이다 — 파기 전이면 [takePending] 이 비우고, 파기 뒤면 컬럼이 비어 있다 */
     data class Pending(val notificationId: Long, val subject: String, val body: String, val email: String?)
 
     data class Line(val title: String, val startsAt: OffsetDateTime)

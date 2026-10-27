@@ -1,0 +1,5 @@
+# gitleaks 제외 — 검출 하나씩, 지문으로만 뺀다(`quality-gates.md` 「제외를 늘릴 때」). 규칙·경로째 빼지 않는다.
+#
+# 오탐: 시험용 멱등키(UUIDv4 리터럴)를 `generic-api-key` 로 잡았다. 비밀이 아니라 폐기할 값이 없다.
+# 그 시험은 `UUID.randomUUID()` 로 바꿨다 — 이 지문은 이미 밀린 커밋 하나의 것이다(마무리 26차).
+305b4024189def42d34bb6c8d9fe4e9e4014a0c5:backend/src/test/kotlin/com/projectticket/ticket/idempotency/IdempotencyLockTimeoutTest.kt:generic-api-key:37

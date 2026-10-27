@@ -2,11 +2,14 @@ package com.projectticket.ticket.event
 
 import com.projectticket.ticket.PostgresTestBase
 import com.projectticket.ticket.Snapshot
+import com.projectticket.ticket.auth.AccountRole
+import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import tools.jackson.databind.ObjectMapper
@@ -65,14 +68,55 @@ class EventListTest : PostgresTestBase() {
     }
 
     @Test
-    fun an_event_without_open_performances_still_answers() {
-        fixture.performance(eventId, hallId)
+    fun an_event_whose_performances_closed_still_answers() {
+        val performanceId = openedPerformance()
+        jdbc.sql("update performance set status = 'closed' where performance_id = :id").param("id", performanceId).update()
 
         // 목록에는 안 보이지만 주소는 있다. 404 로 답하면 「없는 공연」과 「지금 살 것이 없는 공연」이 같아진다.
         mockMvc.get("/api/events/$eventId").andExpect {
             status { isOk() }
             jsonPath("$.performances") { isEmpty() }
         }
+    }
+
+    @Test
+    fun an_event_with_only_draft_performances_is_hidden_from_outsiders() {
+        fixture.performance(eventId, hallId)
+
+        // 한 번도 공개 안 된 공연은 밖에서 보면 없는 공연이다 — 번호가 순번이라 훑으면 제목·기획사가 드러난다(`D5`, `I11-10`).
+        mockMvc.get("/api/events/$eventId").andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:event-not-found") }
+        }
+        mockMvc.get("/api/events/$eventId") { with(user(audience())) }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun an_event_with_only_draft_performances_answers_its_organizer() {
+        fixture.performance(eventId, hallId)
+
+        mockMvc.get("/api/events/$eventId") { with(user(organizerMember())) }.andExpect {
+            status { isOk() }
+            jsonPath("$.performances") { isEmpty() }
+        }
+    }
+
+    private fun audience(): TicketUser {
+        val email = "outsider@test.local"
+        return TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
+    }
+
+    /** 기획사 역할 계정 + 이 공연의 기획사 소속 */
+    private fun organizerMember(): TicketUser {
+        val email = "insider@test.local"
+        val accountId = jdbc.sql(
+            "insert into account (email, password_hash, display_name, role) values (:email, 'x', '담당자', 'organizer') returning account_id",
+        ).param("email", email).query(Long::class.java).single()
+        jdbc.sql("insert into organizer_member (organizer_id, account_id) select organizer_id, :account from event where event_id = :event")
+            .param("account", accountId)
+            .param("event", eventId)
+            .update()
+        return TicketUser(id = accountId, email = email, role = AccountRole.ORGANIZER, passwordHash = null, active = true)
     }
 
     @Test

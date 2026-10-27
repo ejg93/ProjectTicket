@@ -48,6 +48,15 @@ class CsrfCookieTest : PostgresTestBase() {
         assertThat(response.getHeader(HttpHeaders.SET_COOKIE))
             .describedAs("첫 GET 이 쿠키를 내려야 SPA 가 다음 POST 에 실을 수 있다. 이때 CsrfFilter 가 든 저장소: %s", repositoriesInUse())
             .contains("XSRF-TOKEN=")
+        // 속성은 세션 쿠키와 같다(`D9` 「쿠키」, `I11-8`). 기본 저장소는 `SameSite` 를 안 붙이고 `Secure` 를 요청이 https 인지로 정한다.
+        // **쿠키 객체로 본다** — Servlet 6 이라 저장소가 `Cookie.setAttribute("SameSite")` 로 싣는데, MockMvc 는 그 속성을
+        // `Set-Cookie` 글자에 안 옮긴다(Tomcat 은 옮긴다, `stack.md`). 글자로 단언하면 고쳐도 빨갛다.
+        val issued = checkNotNull(response.getCookie("XSRF-TOKEN"))
+        assertThat(issued.getAttribute("SameSite")).isEqualTo("Lax")
+        assertThat(issued.secure).isFalse()
+        // https 요청이어도 `Secure` 는 설정(`SESSION_COOKIE_SECURE`, 로컬 기본 false)이 정한다 — 기본 저장소면 여기서 붙는다.
+        val overHttps = mvc.get("/api/health") { secure = true }.andExpect { status { isOk() } }.andReturn().response
+        assertThat(checkNotNull(overHttps.getCookie("XSRF-TOKEN")).secure).isFalse()
 
         val token = checkNotNull(response.getCookie("XSRF-TOKEN")).value
 

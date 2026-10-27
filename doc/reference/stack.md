@@ -258,6 +258,12 @@ Spring Security 가 이 리포트(spring-security#12813)를 의도된 동작으�
 `CookieCsrfTokenRepository.withHttpOnlyFalse()` 만 걸면 쿠키가 안 나간다. 토큰이 지연 생성이라 **아무도 안 읽으면 안 나가고**, `XorCsrfTokenRequestAttributeHandler` 는 쿠키의 평문을 헤더로 되돌려 보내면 거부한다.
 `SecurityConfig` 가 토큰을 한 번 읽는 필터를 두고, 헤더로 온 값은 평문으로 비교한다.
 
+### MockMvc 의 `Set-Cookie` 글자에는 `SameSite` 가 안 나온다
+
+Servlet 6 컨테이너면 `CookieCsrfTokenRepository` 가 `SameSite` 를 헤더 글자가 아니라 `Cookie.setAttribute("SameSite", …)` 로 싣는다(Spring Security 7.1.2 `saveToken`).
+`MockHttpServletResponse` 는 그 속성을 `Set-Cookie` 글자로 옮기지 않아서, 커스터마이저가 제대로 걸려도 `getHeader("Set-Cookie")` 에는 `SameSite` 가 없다.
+**`getCookie(name).getAttribute("SameSite")` 로 단언한다**(`CsrfCookieTest`, `I11-8`). 세션 쿠키(`DefaultCookieSerializer`)는 헤더 글자로 쓰므로 글자로 보인다.
+
 ### MockMvc 로 실제 로그인을 하면 다음 테스트 클래스가 인증된 채로 시작한다
 
 컨트롤러가 `SecurityContextHolder.setContext()` 를 부르면 그 값이 스레드에 남고, MockMvc 는 테스트들이 스레드를 나눠 쓴다. **기동한 서버에서는 안 난다.**

@@ -92,18 +92,23 @@ if changed backend && [ -d backend ]; then
       docker_up || { echo "Docker 가 안 떴다. 느린 레인은 컨테이너를 띄운다 — Docker Desktop 을 켜고 다시 돌린다."; exit 1; }
       echo "== backend 지문이 origin/main 과 다르다 → ./gradlew build (두 레인)"
       tc_cleanup=1
+      # 컨테이너 레인이 이번에 돌았는지 가르는 표시. `integrationTest` 가 UP-TO-DATE 면 컨테이너가 0 인 것이 맞다(마무리 26차).
+      it_mark=$(mktemp)
       if (cd backend && ./gradlew build -q); then
         # 컨테이너 레인이 돌았으면 우리 라벨이 하나 이상 있다 — 0 이면 라벨이 갈려 정리가 조용히 빈다(`G24`).
         # 빌드가 빨가면 시험 전에 섰을 수 있어 이 판정을 안 한다(정리는 EXIT trap 이 한다)
         # 재사용이 꺼진 기계는 Ryuk 이 먼저 치워 늘 0 이다 — 그때는 판정 대신 한 줄만(마무리 25차, `stack.md` 「재사용」).
         removed=$(tc_remove)
         if [ "$removed" -gt 0 ]; then echo "== 이 저장소의 Testcontainers 컨테이너 ${removed}개를 지웠다"
+        elif [ -z "$(find backend/build/test-results/integrationTest -name '*.xml' -newer "$it_mark" 2>/dev/null | head -1)" ]; then
+          echo "== 컨테이너 레인이 캐시로 끝났다(이번에 돈 시험 0) — 라벨 판정을 건너뛴다"
         elif ! grep -qs '^testcontainers.reuse.enable=true' "$HOME/.testcontainers.properties"; then
           echo "== Testcontainers 재사용이 꺼져 있다 — 라벨 판정을 건너뛴다"
         else echo "이 저장소 라벨($OWNER_LABEL=true)의 컨테이너가 없다 — PostgresTestBase 의 OWNER_LABEL 과 갈렸다"; ok=0; fi
       else
         ok=0
       fi
+      rm -f "$it_mark"
     elif [ -n "$(git diff-tree -r --name-only --diff-filter=A origin/main "$tree" -- backend/src/main/resources/db/migration)" ]; then
       # 새 `V*` 가 있으면 컨테이너 레인도 같이 돈다. 빠른 레인만 돌리면 열거형·길이 대조(`integrationTest`)가
       # 번들 끝 `--full` 에서 처음 빨개진다 — ProjectShop 번들 A 가 그랬다(`B0`).

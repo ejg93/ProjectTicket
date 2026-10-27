@@ -71,14 +71,15 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     }
 
     @Test
-    fun closing_schedules_a_settlement_at_the_policy_delay() {
+    fun closing_schedules_a_settlement_the_policy_delay_after_the_show() {
+        // 관람 8일 전에 판매를 닫는다. 마감 기준이면 관람 하루 전에 정산되고, 그 뒤 관객 취소(관람 전날까지)가 정산서에 안 든다(`I11-7`).
         closeWithEvent()
 
         val row = settlementRow()
         assertThat(row.status).isEqualTo("scheduled")
         assertThat(row.amount).isZero()
-        // D+7 이 박제된다 — 정책을 고쳐도 예약된 정산이 안 흔들린다.
-        assertThat(daysUntilSettle()).isEqualTo(7)
+        // 관람 + D+7 이 박제된다 — 정책을 고쳐도 예약된 정산이 안 흔들린다.
+        assertThat(settleAfterShow()).isEqualTo("7 days")
         assertThat(lineCount()).describedAs("예약 시점에는 항목이 없다").isZero()
     }
 
@@ -136,10 +137,28 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         settleNow()
 
         // 취소된 회차도 정산서가 선다 — 항목이 전부 0 이고 「이 회차는 취소돼서 0 이다」가 기록으로 남는다(`D21` 「회차 취소」).
-        // 분기가 없다: 매출은 `reserved` 만 세고 취소 수수료는 `audience` 만 세므로 계산이 저절로 0 이다.
+        // 분기가 없다: 매출은 `reserved` 만 세고 취소 수수료는 `audience` 만 센다. 먼저 무른 예매가 없으면 계산이 저절로 0 이다.
         assertThat(settlementRow().amount).isZero()
         assertThat(lineOf("sale")).isZero()
         assertThat(lineOf("cancel_fee")).isZero()
+    }
+
+    @Test
+    fun a_cancel_fee_paid_before_the_performance_was_cancelled_stays_with_the_organizer() {
+        // 관객이 먼저 규정대로 무르고 수수료를 냈다. 그 뒤 회차가 취소돼도 그 돈은 기획사 몫이다(2026-10-27 사용자, `I11-7`).
+        reserve(fixture.account("${PREFIX}buyer@test.local"), seats = 1)
+        val early = reserve(fixture.account("${PREFIX}early@test.local"), seats = 1, from = 1)
+        refunds.request(accountId = accountOf(early), reservationId = early, expectedRefund = quote.expectedRefundOf(reservationId = early, accountId = accountOf(early)))
+        cancelService.cancel(performanceId, actorAccountId = null)
+        deliver()
+
+        settleNow()
+
+        assertThat(lineOf("sale")).isZero()
+        assertThat(lineOf("platform_fee")).isZero()
+        // 관람일 8일 전 취소 → 10% 수수료 15,400
+        assertThat(lineOf("cancel_fee")).isEqualTo(15_400)
+        assertThat(settlementRow().amount).isEqualTo(15_400)
     }
 
     @Test
@@ -221,10 +240,10 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     private fun settlementCount(): Long =
         jdbc.sql("select count(*) from settlement where performance_id = :id").param("id", performanceId).query(Long::class.java).single()
 
-    private fun daysUntilSettle(): Int =
-        jdbc.sql("select (settle_at::date - now()::date) from settlement where performance_id = :id")
+    private fun settleAfterShow(): String =
+        jdbc.sql("select (s.settle_at - p.starts_at)::text from settlement s join performance p on p.performance_id = s.performance_id where s.performance_id = :id")
             .param("id", performanceId)
-            .query(Int::class.java)
+            .query(String::class.java)
             .single()
 
     private fun lineOf(kind: String): Int =

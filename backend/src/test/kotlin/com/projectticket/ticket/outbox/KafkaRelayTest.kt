@@ -29,6 +29,7 @@ class KafkaRelayTest : ConcurrencyTestBase() {
 
     @Autowired lateinit var relay: OutboxRelay
     @Autowired lateinit var spy: Spy
+    @Autowired lateinit var json: ObjectMapper
 
     @BeforeEach
     fun clearSpy() {
@@ -48,6 +49,10 @@ class KafkaRelayTest : ConcurrencyTestBase() {
         }
         assertThat(delivered.envelope.type).isEqualTo(EventType.RESERVATION_RESERVED)
         assertThat(delivered.envelope.aggregateType).isEqualTo(AggregateType.RESERVATION)
+        // 되읽은 enum 은 글자가 달라도 같다 — 바깥 소비자가 보는 것은 원문이다(`D11` 「봉투」, `I11-5`).
+        val raw = json.readTree(delivered.raw)
+        assertThat(raw["type"].asString()).isEqualTo("reservation.reserved")
+        assertThat(raw["aggregate_type"].asString()).isEqualTo("reservation")
         assertThat(delivered.envelope.payload["reservation_id"]).isEqualTo(AGGREGATE.toInt())
         // 키가 곧 파티션이다. 키가 없거나 다른 값이면 한 예매의 사건이 흩어져 순서가 깨진다(`D11`).
         assertThat(delivered.key).isEqualTo(AGGREGATE.toString())
@@ -96,7 +101,7 @@ class KafkaRelayTest : ConcurrencyTestBase() {
             @Header(KafkaHeaders.RECEIVED_KEY) key: String?,
             @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String,
         ) {
-            received += Delivered(json.readValue(message, OutboxRelay.Envelope::class.java), key, topic)
+            received += Delivered(envelope = json.readValue(message, OutboxRelay.Envelope::class.java), key = key, topic = topic, raw = message)
         }
 
         @KafkaListener(topics = [EventTopics.RESERVATION], groupId = "kafka-relay-test-b")
@@ -105,7 +110,7 @@ class KafkaRelayTest : ConcurrencyTestBase() {
         }
     }
 
-    data class Delivered(val envelope: OutboxRelay.Envelope, val key: String?, val topic: String)
+    data class Delivered(val envelope: OutboxRelay.Envelope, val key: String?, val topic: String, val raw: String)
 
     private companion object {
         /** 다른 테스트의 사건과 안 섞이게 이 테스트만의 집합체 id 를 쓴다 */

@@ -69,11 +69,15 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
      *
      * 같은 키의 뒤 요청은 앞이 끝날 때까지 유일 인덱스에서 기다린다. 앞이 커밋되면 재생을 읽고, 롤백되면 자기가 처리한다 —
      * 대기가 알아서 옳은 답을 낸다. 다만 앞이 길면 뒤가 붙잡히므로 `lock_timeout` 으로 끊고 409 를 준다(`D4` 2초).
+     *
+     * **2초는 이 insert 에만 건다**(`I11-1`). `set local` 은 트랜잭션 끝까지 남아서, 되돌리지 않으면 같은 트랜잭션의
+     * 좌석 `for update` 까지 2초에 끊기고 그 55P03 은 409 도 재시도도 아닌 500 으로 나갔다. 실패했을 때는 안 되돌린다 —
+     * 어보트된 트랜잭션은 어떤 문장도 안 받고, 어차피 롤백된다.
      */
     private fun claim(accountId: Long, key: String, hash: String): Boolean {
         // SET 은 값 바인딩이 안 되는 자리다. 상수라 이어 붙여도 되고, 들어갈 값을 우리가 정한다.
         jdbc.sql("set local lock_timeout = $LOCK_TIMEOUT_MS").update()
-        return try {
+        val claimed = try {
             jdbc.sql(
                 """
                 insert into idempotency_key (account_id, key_value, request_hash)
@@ -89,6 +93,8 @@ class IdempotencyService(private val jdbc: JdbcClient, private val json: ObjectM
             // 앞 요청이 아직 커밋을 안 했다. 진행 중이라는 뜻이지만 그 행은 우리에게 안 보인다.
             throw TicketException(ErrorCode.IDEMPOTENCY_IN_PROGRESS)
         }
+        jdbc.sql("set local lock_timeout = default").update()
+        return claimed
     }
 
     private fun <T : Any> replay(accountId: Long, key: String, hash: String, responseType: Class<T>): T {

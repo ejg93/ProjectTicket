@@ -195,6 +195,8 @@ tasks.test {
 		rootProject.file("../.github/workflows/codeql.yml"),
 		rootProject.file("../.github/workflows/claude-review.yml"),
 		rootProject.file("../doc/reference/quality-gates.md"),
+		// `CodeQlSinkModelTest`(G23)가 CodeQL 싱크 모델을 글자로 읽는다.
+		fileTree("../.github/codeql"),
 		// `K8sManifestTest`(36)가 매니페스트와 이미지를 굽는 스크립트를 글자로 읽는다.
 		fileTree("../k8s"),
 		rootProject.file("../scripts/k8s-up.sh"),

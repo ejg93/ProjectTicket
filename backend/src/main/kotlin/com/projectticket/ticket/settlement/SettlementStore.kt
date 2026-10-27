@@ -24,10 +24,13 @@ class SettlementStore(private val jdbc: JdbcClient) {
     /**
      * 회차 종료·취소 사건을 정산 예약으로. **금액 0, 항목 없음** — 집계는 `settle_at` 뒤다.
      *
-     * **취소된 회차도 정산서를 만든다**(`D21` 「회차 취소」) — 항목이 전부 0 이고, 「이 회차는 취소돼서 0 이다」가 기록으로 남는다.
-     * 매출은 `reserved` 만 세고 취소 수수료는 `audience` 만 세므로(`settle`) 계산이 저절로 0 이다 — 분기가 없다.
+     * **취소된 회차도 정산서를 만든다**(`D21` 「회차 취소」) — 매출·플랫폼 수수료가 0 이고, 「이 회차는 취소돼서 0 이다」가 기록으로 남는다.
+     * 매출은 `reserved` 만 세고 취소 수수료는 `audience` 만 세므로(`settle`) 분기가 없다 — 회차 취소 **전에** 관객이 먼저 무른 예매의
+     * 취소 수수료는 남는다. 관객이 규정대로 낸 돈이라 기획사 몫이다(2026-10-27 사용자, `I11-7`).
      *
-     * `settle_at` 은 봉투의 `occurred_at` 기준이다 — **사건이 일어난 시각**이라 종료든 취소든 같은 뜻이고, 릴레이가 늦어도 안 흔들린다.
+     * `settle_at` 은 **사건 시각과 관람 시각 중 늦은 쪽** + 지급 지연이다(`I11-7`). 판매 마감은 관람보다 한참 앞일 수 있고(기획사가 정한다),
+     * 관객 취소는 관람 전날까지 된다 — 마감 기준으로 세면 관람 전에 정산되고 그 뒤 환불이 정산서에 안 든다.
+     * 사건 시각은 봉투의 `occurred_at` 이라 릴레이가 늦어도 안 흔들린다.
      *
      * 두 번 받아도 `settlement_performance_id_key` 가 둘째를 0행으로 끝낸다(`D11` 멱등). 예약 표를 따로 안 둔 이유가 이것이다 —
      * 정산서의 유일 제약이 그 일을 이미 한다.
@@ -39,7 +42,8 @@ class SettlementStore(private val jdbc: JdbcClient) {
         jdbc.sql(
             """
             insert into settlement (performance_id, settlement_policy_id, settle_at)
-            select p.performance_id, p.settlement_policy_id, :occurredAt::timestamptz + make_interval(days => sp.payout_delay_days)
+            select p.performance_id, p.settlement_policy_id,
+                   greatest(:occurredAt::timestamptz, p.starts_at) + make_interval(days => sp.payout_delay_days)
               from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id
              where p.performance_id = :performance
             on conflict (performance_id) do nothing
