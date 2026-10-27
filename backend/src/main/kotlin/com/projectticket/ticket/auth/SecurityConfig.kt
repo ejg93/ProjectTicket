@@ -166,9 +166,22 @@ class SecurityConfig {
         return serializer
     }
 
-    /** 빈으로 두는 이유는 로그인(토큰 회전)·로그아웃(쿠키 삭제)도 같은 저장소를 봐야 해서다 */
+    /**
+     * 빈으로 두는 이유는 로그인(토큰 회전)·로그아웃(쿠키 삭제)도 같은 저장소를 봐야 해서다.
+     *
+     * `SameSite`·`Secure` 는 세션 쿠키와 같은 값을 같은 자리(`server.servlet.session.cookie`)에서 읽는다(`D9` 「쿠키」, `I11-8`).
+     * 기본값으로 두면 `SameSite` 가 아예 없고 `Secure` 는 설정이 아니라 요청이 https 인지를 따른다.
+     */
     @Bean
-    fun csrfTokenRepository(): CsrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse()
+    fun csrfTokenRepository(server: ServerProperties): CsrfTokenRepository {
+        val cookie = server.servlet.session.cookie
+        return CookieCsrfTokenRepository.withHttpOnlyFalse().apply {
+            setCookieCustomizer { builder ->
+                cookie.sameSite?.let { builder.sameSite(it.attributeValue()) }
+                cookie.secure?.let { builder.secure(it) }
+            }
+        }
+    }
 
     /** `{bcrypt}` 접두가 붙는 위임 인코더. 알고리즘을 바꿔도 저장된 해시가 그대로 검증된다 */
     @Bean
