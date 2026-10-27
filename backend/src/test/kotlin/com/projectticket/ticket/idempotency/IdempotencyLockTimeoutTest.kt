@@ -6,6 +6,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.util.UUID
 
 /**
  * 멱등키의 2초 대기 한도가 **키를 잡는 insert 에만** 걸리나(`D4` 「멱등키」, `I11-1`).
@@ -23,7 +24,7 @@ class IdempotencyLockTimeoutTest : PostgresTestBase() {
         val accountId = EventFixture(jdbc).account("lock-timeout@test.local")
         val before = currentLockTimeout()
 
-        val inside = idempotency.run(accountId = accountId, key = KEY, request = mapOf("x" to 1), responseType = String::class.java) {
+        val inside = idempotency.run(accountId = accountId, key = UUID.randomUUID().toString(), request = mapOf("x" to 1), responseType = String::class.java) {
             currentLockTimeout()
         }
 
@@ -32,8 +33,4 @@ class IdempotencyLockTimeoutTest : PostgresTestBase() {
     }
 
     private fun currentLockTimeout(): String = jdbc.sql("show lock_timeout").query(String::class.java).single()
-
-    private companion object {
-        const val KEY = "6c1f0a2e-4b3d-4e5f-8a7b-9c0d1e2f3a4b"
-    }
 }

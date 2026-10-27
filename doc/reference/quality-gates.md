@@ -172,7 +172,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | **CodeQL** | **새 경보 0건** | `46a-1` 첫 측정(run `35443023092`): `java-kotlin` 규칙 76개·결과 0, `actions` 규칙 17개·결과 0, `javascript-typescript` 는 `39` 에서 켜 결과 0. **0 이 문턱이다 — 다만 0 이 「없다」가 아니라 「안 봤다」인 자리가 하나 있다.** 기본 질의는 `JdbcClient.sql()` 을 SQL 싱크로 모른다(ProjectShop `2e-4` 가 `JdbcTemplate` 은 잡고 `JdbcClient` 는 안 잡는 것을 같은 실행에서 쟀다). 이 저장소의 데이터 접근이 전부 `JdbcClient` 고 `EventQuery` 가 `order by` 를 문자열로 붙이므로, **싱크 목록을 늘린다(`46c`)**. `46c` 뒤 첫 측정(탐침 run `36158775415`): 우리 코드의 경보 **0** — 확장 뒤의 0 이라 이제 「봤다」의 0 이다. 모델이 가리키는 메서드가 클래스패스에 있는지는 `CodeQlSinkModelTest` 가 매번 잰다(`G23`) |
 | 테스트 | 실패 0 | — |
 | `npm audit` | **런타임 의존성 high 이상 0건** — 개발 도구는 이미지에 안 실린다(`I9-1`) | `39` 첫 측정 0(전 등급). 처음 나오는 것부터 처분한다 |
-| gitleaks | 검출 0 | 아직 안 나왔다 |
+| gitleaks | 검출 0 | 마무리 26차에 첫 검출 — 시험용 UUID 를 `generic-api-key` 로 잡은 오탐 하나. 지문 하나만 `.gitleaksignore` 로 뺐다 |
 | CI 전체 | 초록 | 빨가면 다음 청크보다 먼저 친다(`CLAUDE.md`) |
 | dependabot 갱신 PR | **사람이 CI 초록을 보고 머지한다** | 아직 한 건도 안 왔다(`dependabot.yml` 은 월요일 주 1회, minor·patch 를 묶는다). 자동 머지 워크플로는 **안 둔다** — 부르는 것이 0건이다(`CLAUDE.md` 「대전제」 3). 첫 몇 회차에서 사람이 한 것이 초록을 보고 누른 것뿐이면 그때 뺀다 |
 
@@ -213,7 +213,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 
 | 근거 | 뜻 | 이 저장소의 예 |
 |---|---|---|
-| 오탐 | 검출기가 틀렸다 | 아직 없다 |
+| 오탐 | 검출기가 틀렸다 | gitleaks `generic-api-key` 가 시험의 UUIDv4 리터럴을 잡았다(마무리 26차) — `.gitleaksignore` 에 **그 검출의 지문 하나만**, 시험은 리터럴을 걷었다 |
 | 구조적 | 우리가 고른 설계에서 반드시 난다 | `TooGenericExceptionCaught` — 경계에서 `RuntimeException` 을 잡는 것이 `D14` 「예외」다. 규칙을 통째로 껐고 잡은 자리마다 왜 잡는지 주석이 있다 |
 | 도달 불가 | 그 경로가 안 돈다 | 아직 없다 |
 
