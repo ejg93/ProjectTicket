@@ -154,6 +154,22 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun a_withdrawn_account_is_skipped_before_its_email_is_purged() {
+        // 탈퇴는 `deleted_at` 만 찍고 이메일은 30일 뒤 파기가 비운다(`AccountPurgeBatch`). 그 사이에도 안 보낸다(`D11` 「받는 사람」, `I11-4`).
+        val leaving = fixture.account("${PREFIX}just-left@test.local")
+        insertPending(leaving)
+        jdbc.sql("update account set deleted_at = now() where account_id = :id").param("id", leaving).update()
+
+        assertThat(sweeper.sweep()).isZero()
+
+        val row = jdbc.sql("select status, failure_reason from notification where account_id = :id")
+            .param("id", leaving)
+            .query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }
+            .single()
+        assertThat(row).isEqualTo("skipped" to "withdrawn_account")
+    }
+
+    @Test
     fun a_sent_mail_cannot_be_rewritten() {
         val reservationId = reserved(startsInDays = 8)
         deliver()
