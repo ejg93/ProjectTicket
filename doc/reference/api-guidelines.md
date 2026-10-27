@@ -34,7 +34,7 @@
 | `GET /api/consent-items` | 동의 항목 | 공개 | 있다 |
 | `GET /api/consent-items/{code}` | 항목 하나의 지금 판과 본문 — 약관은 `body`(마크다운), 개인정보는 정형 넷. 목록은 본문을 안 싣는다 | 공개 | 39-1 |
 | `GET /api/policies/{code}` | 공개하는 방침 문서의 지금 판 — `code`·`title`·`version`·`effective_at`·`body`(마크다운). 지금은 `privacy_policy`(제30조) 하나. 동의 항목과 표가 다르다 — 동의를 안 받는다 | 공개 | 39-3a |
-| `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함) | 공개 | 있다(`40a`) |
+| `GET /api/events` · `GET /api/events/{id}` | 공연 목록·상세(회차 포함). **공개된 회차가 한 번도 없는(전부 `draft`) 공연의 상세는 그 기획사 사람에게만 답하고 남·비로그인에게는 404 `event-not-found`**(`I11-10`) | 공개 | 있다(`40a`) |
 | `GET /api/performances/{id}` | 회차 하나 + 공연 머리 + 등급 + `status`. 회차 등록 201 의 `Location` 이 이것을 가리킨다(11). **`draft` 는 그 기획사 사람에게만 답하고 남·비로그인에게는 404** — 아래 「기획사의 공연·회차 404」 | 공개(`draft` 제외) | 40c |
 | `GET /api/performances/{id}/seats` | 좌석 현황 전체(`D20`) | 공개 | 10 |
 | `GET /api/performances/{id}/seats/changes?since=` | 바뀐 좌석(`D20`) | 공개 | 10a |

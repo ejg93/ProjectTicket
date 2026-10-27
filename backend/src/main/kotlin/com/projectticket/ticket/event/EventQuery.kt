@@ -62,10 +62,21 @@ class EventQuery(private val jdbc: JdbcClient) {
     }
 
     /**
+     * 공개된 적이 있는 회차(`draft` 가 아닌 것)가 하나라도 있나. 없으면 밖에서 보면 없는 공연이다([EventController], `I11-10`).
+     * 없는 공연도 `false` 다 — 부르는 쪽이 둘을 한 이름(404)으로 낸다.
+     */
+    fun hasPublicPerformance(eventId: Long): Boolean =
+        jdbc.sql("select exists (select 1 from performance where event_id = :id and status <> :draft)")
+            .param("id", eventId)
+            .param("draft", PerformanceStatus.DRAFT.code)
+            .query(Boolean::class.java)
+            .single()
+
+    /**
      * 공연 하나와 **판매 중인 회차**.
      *
-     * 회차가 하나도 안 열린 공연은 404 가 아니라 빈 목록이다 — 공연은 있는데 지금 살 것이 없는 것이라
-     * 「없는 주소」와 뜻이 다르다(`D5` 「null 과 생략」).
+     * 공개된 적은 있는데 지금 판매 중인 회차가 없는 공연은 404 가 아니라 빈 목록이다 — 공연은 있는데 지금 살 것이 없는 것이라
+     * 「없는 주소」와 뜻이 다르다(`D5` 「null 과 생략」). 한 번도 공개 안 된 공연은 [EventController] 가 먼저 거른다.
      */
     fun detail(eventId: Long): EventDetail {
         val event = jdbc.sql(
