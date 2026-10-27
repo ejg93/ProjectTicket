@@ -23,7 +23,7 @@ class IdempotencyLockTimeoutTest : PostgresTestBase() {
         val accountId = EventFixture(jdbc).account("lock-timeout@test.local")
         val before = currentLockTimeout()
 
-        val inside = idempotency.run(accountId, KEY, request = mapOf("x" to 1), responseType = String::class.java) {
+        val inside = idempotency.run(accountId = accountId, key = KEY, request = mapOf("x" to 1), responseType = String::class.java) {
             currentLockTimeout()
         }
 

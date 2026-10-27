@@ -128,7 +128,9 @@ class RefundSweeperTest : PostgresTestBase() {
     /** SQL 식을 다시 쓰지 않고 Kotlin 으로 따로 센다 — 같은 식을 두 번 쓰면 둘이 같이 틀려도 초록이다 */
     private fun kstDaysBeforeStart(): Int {
         val startsAt = jdbc.sql("select starts_at from performance where performance_id = :id")
-            .param("id", performanceId).query(OffsetDateTime::class.java).single()
+            .param("id", performanceId)
+            .query(OffsetDateTime::class.java)
+            .single()
         val now = jdbc.sql("select now()").query(OffsetDateTime::class.java).single()
         return ChronoUnit.DAYS.between(now.atZoneSameInstant(KST).toLocalDate(), startsAt.atZoneSameInstant(KST).toLocalDate()).toInt()
     }

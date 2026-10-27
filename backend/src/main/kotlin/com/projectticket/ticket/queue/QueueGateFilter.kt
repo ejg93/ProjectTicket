@@ -54,19 +54,7 @@ class QueueGateFilter(
         }
 
         if (admitted == null) {
-            // 판매 중이 아닌 회차는 줄이 없어서 토큰을 받을 길이 없다. 그런 요청은 관문이 아니라 선점 서비스가 답한다(409·410).
-            // **DB 를 보는 것은 이 실패 경로뿐**이다 — 토큰이 맞으면 관문은 Redis 만 보고 지나간다.
-            if (!queue.isGated(performanceId)) return chain.doFilter(request, response)
-
-            // 헤더가 없으면 위에서 Redis 를 한 번도 안 봤다. 순번을 읽다가 Redis 가 죽은 것이 드러나면 429 가 아니라 503 이다 —
-            // 429 는 「줄에 서면 된다」인데 줄 자체가 없다(`D12` 「장애」, `I11-2`).
-            val properties = try {
-                waitingProperties(performanceId, user.id)
-            } catch (e: RuntimeException) {
-                return closeGate(request, response, e)
-            }
-            // 헤더가 없거나 만료·위조된 토큰이다. 둘을 안 가른다 — 가르면 「그 토큰은 있었다」를 알려 주는 것이다(`D9`).
-            return reject(request = request, response = response, code = ErrorCode.ADMISSION_REQUIRED, properties = properties)
+            return withoutAdmission(request = request, response = response, chain = chain, performanceId = performanceId, accountId = user.id)
         }
         if (admitted.accountId != user.id || admitted.performanceId != performanceId) {
             return reject(request, response, ErrorCode.ADMISSION_MISMATCH)
@@ -92,6 +80,28 @@ class QueueGateFilter(
         problems.write(request = request, response = response, code = code, properties = properties, headers = headers)
     }
 
+    /** 헤더가 없거나 만료·위조된 토큰이다. 둘을 안 가른다 — 가르면 「그 토큰은 있었다」를 알려 주는 것이다(`D9`) */
+    private fun withoutAdmission(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        chain: FilterChain,
+        performanceId: Long,
+        accountId: Long,
+    ) {
+        // 판매 중이 아닌 회차는 줄이 없어서 토큰을 받을 길이 없다. 그런 요청은 관문이 아니라 선점 서비스가 답한다(409·410).
+        // **DB 를 보는 것은 이 실패 경로뿐**이다 — 토큰이 맞으면 관문은 Redis 만 보고 지나간다.
+        if (!queue.isGated(performanceId)) return chain.doFilter(request, response)
+
+        // 헤더가 없으면 앞에서 Redis 를 한 번도 안 봤다. 순번을 읽다가 Redis 가 죽은 것이 드러나면 429 가 아니라 503 이다 —
+        // 429 는 「줄에 서면 된다」인데 줄 자체가 없다(`D12` 「장애」, `I11-2`).
+        val properties = try {
+            waitingProperties(performanceId, accountId)
+        } catch (e: RuntimeException) {
+            return closeGate(request, response, e)
+        }
+        reject(request = request, response = response, code = ErrorCode.ADMISSION_REQUIRED, properties = properties)
+    }
+
     /** Redis 가 죽었다. **관문을 닫는다** — 열어 두면 대기열이 막으려던 폭발이 그대로 DB 로 간다(`D12`) */
     private fun closeGate(request: HttpServletRequest, response: HttpServletResponse, cause: RuntimeException) {
         logger.warn("대기열 관문이 Redis 를 못 본다 — 선점을 막는다 이유=${cause.javaClass.simpleName}")
@@ -103,11 +113,10 @@ class QueueGateFilter(
      * 「줄에 없다」(우리 답)만 삼킨다 — 그 밖의 예외는 Redis 가 죽은 것이라 부르는 쪽이 503 으로 바꾼다(`I11-2`).
      */
     private fun waitingProperties(performanceId: Long, accountId: Long): Map<String, Any> {
-        val position = try {
-            queue.position(performanceId, accountId)
-        } catch (e: TicketException) {
-            return emptyMap()
-        }
+        val position = runCatching { queue.position(performanceId, accountId) }
+            .onFailure { if (it !is TicketException) throw it }
+            .getOrNull()
+            ?: return emptyMap()
         return buildMap {
             position.rank?.let { put("rank", it) }
             position.etaSeconds?.let { put("eta_seconds", it) }

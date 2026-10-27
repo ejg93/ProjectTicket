@@ -34,11 +34,14 @@ class CodeQlSinkModelTest {
             .isNotEmpty()
 
         rows.forEach { (file, row) ->
-            val (pkg, type, method, signature) = row.destructured
+            val (pkg, type, method) = row.destructured
+            val signature = row.groupValues[SIGNATURE]
             val owner = runCatching { Class.forName("$pkg.$type") }.getOrNull()
             assertThat(owner).describedAs("%s — `%s.%s` 가 클래스패스에 없다. 판이 올라 옮겨졌으면 모델을 고친다", file, pkg, type).isNotNull()
 
-            val parameters = signature.removeSurrounding("(", ")").split(',').map { it.trim() }.filter { it.isNotEmpty() }.map(::classOf)
+            val parameters = signature.removeSurrounding(prefix = "(", suffix = ")")
+                .split(',')
+                .mapNotNull { it.trim().takeIf(String::isNotEmpty)?.let(::classOf) }
             val found = runCatching { checkNotNull(owner).getMethod(method, *parameters.toTypedArray()) }.getOrNull()
             assertThat(found).describedAs("%s — `%s.%s%s` 가 없다. 인자가 바뀌었으면 시그니처 칸을 고친다", file, type, method, signature).isNotNull()
         }
@@ -49,6 +52,7 @@ class CodeQlSinkModelTest {
 
     private companion object {
         /** `- ["패키지", "타입", 하위타입, "메서드", "(시그니처)", …]` — 앞 다섯 칸만 본다 */
+        const val SIGNATURE = 4
         val ROW = Regex("""^\s*-\s*\["([\w.]+)",\s*"(\w+)",\s*(?:true|false),\s*"(\w+)",\s*"(\([^"]*\))"""")
     }
 }

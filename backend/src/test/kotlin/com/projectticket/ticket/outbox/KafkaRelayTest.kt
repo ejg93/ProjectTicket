@@ -101,7 +101,7 @@ class KafkaRelayTest : ConcurrencyTestBase() {
             @Header(KafkaHeaders.RECEIVED_KEY) key: String?,
             @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String,
         ) {
-            received += Delivered(json.readValue(message, OutboxRelay.Envelope::class.java), key, topic, message)
+            received += Delivered(envelope = json.readValue(message, OutboxRelay.Envelope::class.java), key = key, topic = topic, raw = message)
         }
 
         @KafkaListener(topics = [EventTopics.RESERVATION], groupId = "kafka-relay-test-b")

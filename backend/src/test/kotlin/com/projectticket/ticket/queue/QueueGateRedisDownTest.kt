@@ -11,8 +11,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.anyLong
-import org.mockito.Mockito.anyString
+import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.springframework.data.redis.RedisConnectionFailureException
@@ -51,7 +51,9 @@ class QueueGateRedisDownTest {
     }
 
     @AfterEach
-    fun signOut() = SecurityContextHolder.clearContext()
+    fun signOut() {
+        SecurityContextHolder.clearContext()
+    }
 
     @Test
     fun without_a_token_a_dead_redis_closes_the_gate() {

@@ -175,12 +175,14 @@ class SecurityConfig {
     @Bean
     fun csrfTokenRepository(server: ServerProperties): CsrfTokenRepository {
         val cookie = server.servlet.session.cookie
-        return CookieCsrfTokenRepository.withHttpOnlyFalse().apply {
-            setCookieCustomizer { builder ->
-                cookie.sameSite?.let { builder.sameSite(it.attributeValue()) }
-                cookie.secure?.let { builder.secure(it) }
-            }
+        val sameSite = cookie.sameSite?.attributeValue()
+        val secure = cookie.secure
+        val repository = CookieCsrfTokenRepository.withHttpOnlyFalse()
+        repository.setCookieCustomizer { builder ->
+            if (sameSite != null) builder.sameSite(sameSite)
+            if (secure != null) builder.secure(secure)
         }
+        return repository
     }
 
     /** `{bcrypt}` 접두가 붙는 위임 인코더. 알고리즘을 바꿔도 저장된 해시가 그대로 검증된다 */
