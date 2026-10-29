@@ -167,7 +167,8 @@ update performance_seat set status = 'available', held_until = null, reservation
 | 락을 지나나 | 스케줄러 | 왜 |
 |---|---|---|
 | 지난다 | `hold-sweeper`·`performance-closer`·`admission-scheduler`·`queue-sweeper` | 위 이유 — 겹치면 스캔과 로그가 두 벌이다 |
-| 안 지난다 | `RefundSweeper`·`SettlementSweeper`·`NotificationSweeper` | 승자를 하나로 만드는 것이 따로 있다 — 환불은 조건부 UPDATE, 정산은 `skip locked` 와 조건부 UPDATE, 알림은 `skip locked` 와 at-least-once(`D11`) |
+| 안 지난다 | `RefundSweeper`·`SettlementSweeper`·`NotificationSweeper`·`OutboxRelay` | 승자를 하나로 만드는 것이 따로 있다 — 환불은 조건부 UPDATE, 정산은 `skip locked` 와 조건부 UPDATE, 알림·발행은 `skip locked` 와 at-least-once(`D11`) |
+| 안 지난다 | `OutboxCleaner`·`IdempotencyCleaner`·`AccountPurgeBatch` | 두 번 돌아도 지울 것·비울 것이 이미 없다 — 보존 기한 `delete` 와 `email is not null` 조건 |
 
 ## 재시도 — 다시 해서 달라지는 것만
 

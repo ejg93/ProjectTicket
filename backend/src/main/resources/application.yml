@@ -81,7 +81,7 @@ management:
   endpoints:
     web:
       exposure:
-        # `prometheus` 는 수집기만 읽는다. 로컬은 그대로 열어 두고, 밖에 나갈 때는 망으로 가른다(`D9`).
+        # `prometheus` 는 수집기만 읽는다. 망 분리는 안 한다 — nginx 도 넘긴다(`D9` 「노출면」).
         include: health,prometheus
   endpoint:
     health:

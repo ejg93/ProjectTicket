@@ -77,9 +77,9 @@ class ReservationLogTest : PostgresTestBase() {
 
     private fun capture(type: Class<*>): ListAppender<ILoggingEvent> {
         val logger = LoggerFactory.getLogger(type) as Logger
-        return ListAppender<ILoggingEvent>().apply { start() }.also {
-            logger.addAppender(it)
-            attached += logger to it
+        return ListAppender<ILoggingEvent>().apply { start() }.also { appender ->
+            logger.addAppender(appender)
+            attached += logger to appender
         }
     }
 
