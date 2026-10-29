@@ -143,16 +143,19 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 
 ```sql
 -- 스윕 (14). 둘 다 조건부라 두 번 돌아도 둘째는 0행이다
-update reservation set status = 'expired', expired_at = now()
- where status = 'held' and held_until < now();
+update reservation set status = 'expired', expired_at = now(), paying_until = null, cancelled_by = 'expired'
+ where status = 'held' and held_until < now()
+    or status = 'paying' and paying_until < now()
+returning reservation_id;
 
 update performance_seat set status = 'available', held_until = null, reservation_id = null
- where status = 'held' and held_until < now()
-   and reservation_id in (select reservation_id from reservation where status = 'expired' …);
+ where status = 'held' and reservation_id in (:첫 문장이 돌려준 id);
 ```
 
+좌석은 **만료된 예매의 id 로 고른다**(`HoldSweeper`). `performance_seat.held_until < now()` 로 고르면 `paying` 예매의 좌석(아직 `held`, 시각은 지남)까지 풀린다.
+
 **결제 승인도 조건부다** — `where status = 'paying' and paying_until >= now()`. 0행이면 승인을 받았어도 좌석을 못 주는 것이고,
-그때는 `payment_late` 사건을 감사에 남기고(16) **되돌리는 것은 환불 행이다**(17b, `D6` 「사유별」) — PG 취소를 트랜잭션 안에서 부르지 않으려는 것이고, 되돌리는 통로가 둘이면 이중 반환이다.
+그때는 감사에 `payment.late` 를 남기고(16) **되돌리는 것은 환불 행이다**(사유 `payment_late`, 17b, `D6` 「사유별」) — PG 취소를 트랜잭션 안에서 부르지 않으려는 것이고, 되돌리는 통로가 둘이면 이중 반환이다.
 
 ## 스케줄러 — 인스턴스 여럿에서 하나만
 
@@ -160,6 +163,11 @@ update performance_seat set status = 'available', held_until = null, reservation
 같은 행을 두 번 스캔하는 비용이 있고, 로그가 두 벌 남으면 「몇 개를 만료시켰나」를 세는 사람이 헷갈린다.
 락을 못 잡으면 그 회차는 건너뛴다. 기다리지 않는다. **락은 겹침만 막고 횟수는 안 막는다** — 일이 끝나면 놓아서 대마다 제 주기로 돈다.
 횟수가 뜻을 갖는 입장은 속도를 락이 아니라 입장 스크립트의 예산 창(`queue:{id}:admit_window`)이 지킨다(`35f`, `D12`).
+
+| 락을 지나나 | 스케줄러 | 왜 |
+|---|---|---|
+| 지난다 | `hold-sweeper`·`performance-closer`·`admission-scheduler`·`queue-sweeper` | 위 이유 — 겹치면 스캔과 로그가 두 벌이다 |
+| 안 지난다 | `RefundSweeper`·`SettlementSweeper`·`NotificationSweeper` | 승자를 하나로 만드는 것이 따로 있다 — 환불은 조건부 UPDATE, 정산은 `skip locked` 와 조건부 UPDATE, 알림은 `skip locked` 와 at-least-once(`D11`) |
 
 ## 재시도 — 다시 해서 달라지는 것만
 
