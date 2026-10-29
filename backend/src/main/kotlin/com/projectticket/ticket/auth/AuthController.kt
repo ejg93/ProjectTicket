@@ -10,7 +10,6 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
-import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -24,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 
 @RestController
 // 협력자 일곱은 컨테이너가 넣는다 — 가르면 로그인 반쪽만 드는 클래스가 생긴다(`G8`).
@@ -53,7 +53,8 @@ class AuthController(
                 actorIp = http.remoteAddr,
             ),
         )
-        return ResponseEntity.status(HttpStatus.CREATED).body(SignupResponse(accountId))
+        // 만든 계정은 자기 것만 읽는 `/api/me` 로 본다 — `/api/accounts/{id}` 는 없다(`D5` 「201 이면 `Location`」, `I11-11`).
+        return ResponseEntity.created(URI.create("/api/me")).body(SignupResponse(accountId))
     }
 
     /**

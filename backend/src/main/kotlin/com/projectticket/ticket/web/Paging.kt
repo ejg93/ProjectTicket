@@ -27,6 +27,19 @@ class Paging(page: Int = 0, size: Int = DEFAULT_SIZE, val sort: String? = null) 
 
     val offset: Int get() = page * size
 
+    /**
+     * 정렬이 고정인 목록이 부른다. `sort` 가 오면 400 이다(`D5` 「목록 조회」, `I11-11`) —
+     * 조용히 버리면 부른 쪽은 정렬된 줄 알고 화면을 그린다.
+     */
+    fun requireFixedOrder() {
+        if (sort == null) return
+        throw TicketException(
+            ErrorCode.VALIDATION_FAILED,
+            "이 목록은 정렬이 고정이다: sort=$sort",
+            mapOf("errors" to listOf(mapOf("field" to "sort", "message" to "정렬할 수 없는 목록이다"))),
+        )
+    }
+
     companion object {
         const val DEFAULT_SIZE = 20
         const val MAX_SIZE = 100

@@ -204,8 +204,11 @@
 | 자원 | 정렬 가능 | 기본 |
 |---|---|---|
 | 공연 목록 | `starts_at`(첫 회차), `created_at` | `starts_at,asc` |
-| 내 예매 | 없음 | `created_at,desc` 고정 |
+| 내 예매 | 없음 — 주면 400 | `created_at,desc` 고정 |
+| 기획사의 내 공연 | 없음 — 주면 400 | `created_at,desc` 고정 |
 | 정산 | `performance_starts_at` | `performance_starts_at,desc` |
+
+정렬이 고정인 목록은 `Paging.requireFixedOrder()` 를 부른다 — `sort` 를 조용히 버리면 부른 쪽은 정렬된 줄 안다.
 
 **셋을 컨트롤러가 직접 안 받는다.** `Paging` 하나로 받고 `*Query` 에도 그대로 넘긴다 — 상한 보정이 그 타입의 생성자에 있어서 타입이 있다는 것 자체가 「상한을 거쳤다」는 뜻이다.
 `sort` 는 `OrderBy` 타입이 든다. 정렬 필드는 값이 아니라 식별자라 바인딩이 안 되므로 허용 목록으로만 받는다(`D14` 「SQL」).

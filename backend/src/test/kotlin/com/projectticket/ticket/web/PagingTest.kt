@@ -53,6 +53,14 @@ class PagingTest {
             .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.VALIDATION_FAILED) }
     }
 
+    @Test
+    fun a_fixed_order_list_rejects_sort_instead_of_ignoring_it() {
+        // 조용히 버리면 `?sort=x` 를 보낸 쪽은 정렬된 줄 안다(`D5`, `I11-11`)
+        assertThatThrownBy { Paging(sort = "created_at,asc").requireFixedOrder() }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.VALIDATION_FAILED) }
+        Paging().requireFixedOrder()
+    }
+
     private companion object {
         val ALLOWED = mapOf("starts_at" to "p.starts_at", "title" to "p.title")
     }

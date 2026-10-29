@@ -104,6 +104,18 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun a_reservation_cancelled_before_delivery_gets_no_confirmation_mail() {
+        val reservationId = reserved(startsInDays = 8)
+        refunds.request(accountId, reservationId, quote.expectedRefundOf(reservationId, accountId))
+
+        deliver()
+
+        // 표가 이긴다(`D11`) — 확정 사건이 늦게 와도 지금 취소된 예매에 「확정되었습니다」를 안 보낸다(`I11-11`).
+        assertThat(mailCount(reservationId)).isEqualTo(1)
+        assertThat(mailOf(reservationId, "reservation.cancelled").subject).isEqualTo("[예매 취소] 겨울 콘서트")
+    }
+
+    @Test
     fun sweeping_sends_pending_mail_and_marks_it() {
         val reservationId = reserved(startsInDays = 8)
         deliver()

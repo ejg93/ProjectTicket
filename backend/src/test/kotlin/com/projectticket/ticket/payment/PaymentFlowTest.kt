@@ -77,6 +77,14 @@ class PaymentFlowTest : PostgresTestBase() {
             jsonPath("$.decline_reason") { value("insufficient_funds") }
             jsonPath("$.reservation_status") { value("held") }
         }
+
+        // `paying → held` 도 전이다 — 감사에 선점과 같은 이름으로, `from` 을 달고 남는다(`D3` 「상태 이력」, `I11-11`).
+        assertThat(
+            jdbc.sql("select count(*) from audit_log where event_type = 'reservation.held' and target_id = :id and detail ->> 'from' = 'paying'")
+                .param("id", reservationId)
+                .query(Long::class.java)
+                .single(),
+        ).isEqualTo(1)
     }
 
     @Test

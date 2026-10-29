@@ -15,6 +15,7 @@ import java.time.OffsetDateTime
 class MyReservationQuery(private val jdbc: JdbcClient) {
 
     fun list(accountId: Long, paging: Paging): MyReservationPage {
+        paging.requireFixedOrder()
         val total = jdbc.sql("select count(*) from reservation where account_id = :account")
             .param("account", accountId)
             .query(Int::class.java)
