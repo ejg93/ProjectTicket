@@ -130,8 +130,8 @@ class StateMachineDocTest {
         }
 
     private companion object {
-        /** 전이표를 둔 상태기계. 결제·환불은 전이가 없다 — 행이 한 번 서고 끝이라 트리거도 없다 */
-        val MACHINES = listOf("reservation", "performance")
+        /** 전이표를 둔 상태기계. 결제는 전이가 없다 — 시도마다 행이 한 번 서고 끝이라 트리거도 없다 */
+        val MACHINES = listOf("reservation", "performance", "refund", "settlement")
 
         /** `old.status = 'held' and new.status in ('paying', …)` 또는 `… new.status = 'open'` */
         val ALLOWED = Regex("""old\.status\s*=\s*'(\w+)'\s+and\s+new\.status\s*(?:in\s*\(([^)]*)\)|=\s*'(\w+)')""")

@@ -37,7 +37,7 @@
 | `performance_id` | **유일.** 회차당 정산서는 하나다 |
 | `settlement_policy_id` | 회차에 박제된 것을 그대로 |
 | `amount` | 기획사 지급액 = Σ 항목. **0 이상**(check) |
-| `status` | `scheduled → pending → confirmed → paid`. **`scheduled` 는 사건을 받은 순간 예약된 것**이고 금액은 0 이다 — 집계는 `settle_at` 뒤에 돈다 |
+| `status` | `scheduled → pending → confirmed → paid`. **`scheduled` 는 사건을 받은 순간 예약된 것**이고 금액은 0 이다 — 집계는 `settle_at` 뒤에 돈다. 전이표·트리거는 `D3`(`state-machines.md`)가 단일 출처다 |
 | `settle_at` | 집계 예정 시각 = 늦은 쪽(종료·취소 사건, 관람 시각) + `payout_delay_days`. **박제** — 정책을 고쳐도 예약된 정산이 안 흔들린다 |
 | `settled_at` | 만든 시각 |
 
