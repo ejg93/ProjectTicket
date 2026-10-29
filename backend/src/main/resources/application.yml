@@ -70,6 +70,14 @@ management:
       # 1 이 아니면 안 뽑힌 요청의 로그에 추적 ID 가 비어서 그 요청만 못 따라간다.
       probability: 1.0
 
+  metrics:
+    distribution:
+      # 버킷이 없으면 Prometheus 에 sum·count·max 만 나가 `histogram_quantile` 패널이 빈다(`D10` 「지표」, `I11-9`).
+      percentiles-histogram:
+        seat.hold.latency: true
+        queue.wait_seconds: true
+        http.server.requests: true
+
   endpoints:
     web:
       exposure:
