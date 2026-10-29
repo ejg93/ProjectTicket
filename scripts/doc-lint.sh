@@ -124,7 +124,7 @@ elif [ "$plan_open_incomplete" -lt "$plan_open_incomplete_baseline" ]; then
   echo "[기준선 내릴 것] PLAN.md — 칸 빠진 행이 ${plan_open_incomplete}개로 줄었다. plan_open_incomplete_baseline 을 그 수로 내린다"
 fi
 
-# 설계 행(`/design`)의 형식(`B0-3`). 「번호 절차」가 있는 안 닫힌 행은 결정·실패 사다리도 있고, 닫힘이 ①~⑦ 하나를 가리킨다.
+# 설계 행(`CLAUDE.md` 「행 형식」)의 형식(`B0-3`). 「번호 절차」가 있는 안 닫힌 행은 결정·실패 사다리도 있고, 닫힘이 ①~⑦ 하나를 가리킨다.
 # 하나라도 빠지면 실행 세션(Opus)이 그 행에서 멈춘다 — 설계가 없애려는 것이 바로 그 멈춤이다.
 plan_design_incomplete=$(awk '/^## 청크 분할표/{on=1} /^## 이 계획을 고칠 때/{on=0} on && /^\| [^-|*][^|]*\|/{
     n=split($0,c,"|"); id=c[2]; gsub(/^ +| +$/,"",id); nm=c[3]; gsub(/^ +/,"",nm);
