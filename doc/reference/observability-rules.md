@@ -54,7 +54,7 @@
 | 레벨 | 무엇 | 예 |
 |---|---|---|
 | `ERROR` | 사람이 고쳐야 하는 것 | 500, 스케줄러 실패, DB·Redis 끊김 |
-| `WARN` | 지금은 도는데 이상한 것 | 교착 재시도, 승인이 늦어 좌석을 못 준 것(`payment_late`), Redis 강등 |
+| `WARN` | 지금은 도는데 이상한 것 | 교착 재시도, 승인이 늦어 좌석을 못 준 것(`payment.late`), Redis 강등, 관문 닫힘(Redis 가 죽어 503) |
 | `INFO` | 업무가 지나간 흔적 | 요청 한 줄, 선점·확정·만료, 4xx |
 | `DEBUG` | 개발 중에만 | 스윕이 훑은 행 수 0 |
 
@@ -102,7 +102,7 @@
 | `seat.hold.attempts` | 카운터 | `result`(`won`·`taken`·`rejected`) | 선점 시도와 결과 |
 | `seat.hold.latency` | 히스토그램 | | 선점 트랜잭션 ms |
 | `seat.sweep.expired` | 카운터 | | 스윕이 되돌린 좌석 |
-| `reservation.confirmed` · `reservation.cancelled` | 카운터 | `reason` | |
+| `reservation.confirmed` · `reservation.cancelled` | 카운터 | `cancelled` 만 `reason` | |
 | `queue.length` · `queue.active` | 게이지 | | 회차 합. 회차별은 로그로 |
 | `queue.admitted` | 카운터 | | |
 | `queue.wait_seconds` | 히스토그램 | | 진입→입장 |

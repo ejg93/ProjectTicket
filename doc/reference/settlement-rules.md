@@ -37,7 +37,7 @@
 | `performance_id` | **유일.** 회차당 정산서는 하나다 |
 | `settlement_policy_id` | 회차에 박제된 것을 그대로 |
 | `amount` | 기획사 지급액 = Σ 항목. **0 이상**(check) |
-| `status` | `scheduled → pending → confirmed → paid`. **`scheduled` 는 사건을 받은 순간 예약된 것**이고 금액은 0 이다 — 집계는 `settle_at` 뒤에 돈다 |
+| `status` | `scheduled → pending → confirmed → paid`. **`scheduled` 는 사건을 받은 순간 예약된 것**이고 금액은 0 이다 — 집계는 `settle_at` 뒤에 돈다. 전이표·트리거는 `D3`(`state-machines.md`)가 단일 출처다 |
 | `settle_at` | 집계 예정 시각 = 늦은 쪽(종료·취소 사건, 관람 시각) + `payout_delay_days`. **박제** — 정책을 고쳐도 예약된 정산이 안 흔들린다 |
 | `settled_at` | 만든 시각 |
 
@@ -101,7 +101,7 @@ amount         45,584,000
 | 누가 | 무엇 | 청크 |
 |---|---|---|
 | 기획사 | 자기 정산서 목록·항목 | 45 |
-| 관리자 | `confirmed`·`paid` 전이 | 45 와 같이 — 부르는 화면이 설 때 만든다 |
+| 관리자 | `confirmed`·`paid` 전이 | 관리자 화면이 설 때 만든다. 전이 트리거는 이미 받는다(`V25`) |
 | 관객 | 못 본다 | |
 
 ## 지금 안 하는 것

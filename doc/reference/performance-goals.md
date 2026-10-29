@@ -49,6 +49,8 @@
 
 ## 어떻게 재나
 
+**판정은 `open-rush.js` 와 k8s 판만 한다** — 그 둘만 k6 `thresholds` 에 이 문서의 칸을 건다. `seat-rush`·`seat-poll`·`queue-surge` 는 `p(95)>=0` 이라 요약용이다. 문서의 `≤ 350` 은 k6 에서 `p(95)<350` 으로 쓴다(밀리초 정수라 차가 없다).
+
 | 무엇 | 어디서 |
 |---|---|
 | 선점 p95·처리량·5xx | `load/seat-rush.js`(k6). 돌리는 법은 `load/README.md` |

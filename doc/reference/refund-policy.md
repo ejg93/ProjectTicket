@@ -53,7 +53,7 @@ refund_amount = payment.amount − fee_amount
 |---|---|---|---|
 | 관객 취소 | 구간표 | `available` 로 | `reservation.cancelled` |
 | 회차 취소(17a) | **0.** 전액 | 회차가 `cancelled` 라 안 판다 | `reservation.cancelled` + `performance.cancelled` |
-| 승인이 늦음(16) | 0. 전액. 관객은 좌석을 못 받았다. 예매가 `expired`(선점 만료) 든 `cancelled`(회차 취소 뒤 승인 도착, `I11-3`) 든 같다 | 이미 스윕이 풀었다 | `payment_late` |
+| 승인이 늦음(16) | 0. 전액. 관객은 좌석을 못 받았다. 예매가 `expired`(선점 만료) 든 `cancelled`(회차 취소 뒤 승인 도착, `I11-3`) 든 같다 | 이미 스윕이 풀었다 | `payment.late`(환불 사유는 `payment_late`) |
 
 **결제 전 만료(`held`·`paying → expired`)는 환불이 아니다.** 돈을 안 받았다. 결제 행이 `declined`·`failed` 로 끝나고 환불 행은 없다.
 

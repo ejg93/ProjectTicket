@@ -35,7 +35,8 @@ class ConsumerErrorHandling {
     @Bean
     fun kafkaErrorHandler(template: KafkaTemplate<String, String>): DefaultErrorHandler {
         val recoverer = DeadLetterPublishingRecoverer(template) { record, exception ->
-            log.warn(
+            // ERROR 다 — DLT 에 든 사건은 사람이 아웃박스로 다시 넣어야 끝난다(`D10` 「ERROR 는 사람이 고쳐야 하는 것」, `I11-12`).
+            log.error(
                 "소비를 포기하고 DLT 로 보낸다 topic={} partition={} offset={} 이유={}",
                 record.topic(),
                 record.partition(),

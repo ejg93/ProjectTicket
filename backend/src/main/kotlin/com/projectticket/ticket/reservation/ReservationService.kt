@@ -1,6 +1,7 @@
 package com.projectticket.ticket.reservation
 
 import com.projectticket.ticket.idempotency.IdempotencyService
+import org.slf4j.LoggerFactory
 import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Service
 import java.sql.SQLException
@@ -17,9 +18,10 @@ class ReservationService(
     private val seatHold: SeatHoldService,
     private val reservationQuery: ReservationQuery,
 ) {
+    private val log = LoggerFactory.getLogger(ReservationService::class.java)
 
     fun hold(accountId: Long, idempotencyKey: String, command: SeatHoldService.Command): ReservationQuery.Reservation =
-        retryOnceOnDeadlock {
+        retryOnceOnDeadlock(command.seatIds) {
             idempotency.run(accountId = accountId, key = idempotencyKey, request = command, responseType = ReservationQuery.Reservation::class.java) {
                 reservationQuery.get(seatHold.hold(accountId, command), accountId)
             }
@@ -31,11 +33,15 @@ class ReservationService(
      * **SQLSTATE 를 직접 본다.** Spring 은 Postgres 의 `40P01` 을 `DeadlockLoserDataAccessException` 이 아니라
      * 상위 타입으로 번역해서 예외 이름으로 잡으면 놓친다(`stack.md`).
      */
-    private fun <T> retryOnceOnDeadlock(work: () -> T): T =
+    private fun <T> retryOnceOnDeadlock(seatIds: List<Long>, work: () -> T): T =
         try {
             work()
         } catch (e: DataAccessException) {
-            if (sqlStateOf(e) in RETRYABLE_SQL_STATES) work() else throw e
+            val sqlState = sqlStateOf(e)
+            if (sqlState !in RETRYABLE_SQL_STATES) throw e
+            // 몇 번째·어느 좌석인가(`D10` 「무엇을 찍나」). 조용히 돌면 교착이 잦아져도 로그에 흔적이 없다.
+            log.warn("교착 재시도 1/1 sqlstate={} seat_ids={}", sqlState, seatIds)
+            work()
         }
 
     private fun sqlStateOf(e: Throwable): String? =

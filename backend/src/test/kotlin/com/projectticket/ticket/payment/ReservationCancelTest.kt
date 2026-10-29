@@ -164,6 +164,22 @@ class ReservationCancelTest : PostgresTestBase() {
     }
 
     @Test
+    fun done_refund_cannot_go_back_to_requested() {
+        val reservationId = reserved(startsInDays = 8)
+        cancel(reservationId).andExpect { status { isOk() } }
+
+        // 되돌린 환불은 「아직 안 나간 돈」으로 읽혀 한 번 더 나간다(`V25`, `I11-6`).
+        assertThatThrownBy {
+            jdbc.sql(
+                """
+                update refund set status = 'requested'
+                 where payment_id = (select payment_id from payment where reservation_id = :id)
+                """,
+            ).param("id", reservationId).update()
+        }.hasStackTraceContaining("할 수 없는 환불 상태 전이다")
+    }
+
+    @Test
     fun someone_elses_reservation_is_not_found() {
         cancel(reserved(startsInDays = 8), principal("stranger@test.local")).andExpect { status { isNotFound() } }
     }

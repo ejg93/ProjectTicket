@@ -53,7 +53,7 @@
 | `POST /api/organizer/events/{id}/performances` | 회차 등록 | 세션(기획사) | 11 |
 | `POST /api/organizer/performances/{id}/open` · `cancel` | 회차 오픈·취소 | 세션(기획사) | 11 (취소 서비스는 17a 가 세웠다) |
 | `GET /api/organizer/settlements?performanceId=` | 회차 하나의 정산서 — 상태·합계·항목(`sale`·`platform_fee`·`cancel_fee`·`adjustment`). 없는 회차·남의 회차·정산서가 아직 없는 회차는 한 이름 404 `performance-not-found` | 세션(기획사) | 27·45c |
-| `POST /api/admin/accounts/{id}/suspend` · `unsuspend` | 계정 정지·해제 | 세션(관리자) | 5b |
+| `POST /api/admin/accounts/{id}/suspend` · `resume` | 계정 정지·해제 | 세션(관리자) | 5b |
 | `DELETE /api/me` | 탈퇴. 본문 `{ "password" }` 로 **비밀번호를 다시 받는다** — 틀리면 로그인과 같은 401 `login-failed`, 로그인 실패 카운터를 같이 센다(`44c`) | 세션 | 5a·44c |
 
 **선점이 회차 아래에 있는 이유**: 대기열 관문(23)이 **회차 id 를 경로에서 읽는다.** 본문에 두면 필터가 JSON 을 파싱해야 하고, 그러면 본문 스트림을 두 번 읽는 문제가 따라온다.
@@ -78,7 +78,7 @@
 | 코드 | 언제 | 이 저장소의 예 |
 |---|---|---|
 | 200 | 조회·동작 성공 | 로그인, 취소 |
-| 201 | 생성. `Location` 에 새 자원 경로 | 가입, 선점, 결제 |
+| 201 | 생성. `Location` 에 새 자원 경로 | 가입(`/api/me`), 선점, 결제(결제가 성립시킨 예매를 가리킨다) |
 | 204 | 성공했고 본문이 없다 | 로그아웃, 대기열 이탈 |
 | 304 | 재검증 — 안 바뀌었다 | 좌석 현황(`If-None-Match`) |
 | 400 | 요청을 못 읽었거나 **입력칸 하나를 고치면 되는 위반**이다 — 형식이든 규칙이든(`validation-failed` + `errors[]`) | 깨진 JSON, `@Size` 위반, **모르는 열거값**, 등급 코드 중복 |
@@ -204,8 +204,10 @@
 | 자원 | 정렬 가능 | 기본 |
 |---|---|---|
 | 공연 목록 | `starts_at`(첫 회차), `created_at` | `starts_at,asc` |
-| 내 예매 | 없음 | `created_at,desc` 고정 |
-| 정산 | `performance_starts_at` | `performance_starts_at,desc` |
+| 내 예매 | 없음 — 주면 400 | `created_at,desc` 고정 |
+| 기획사의 내 공연 | 없음 — 주면 400 | `created_at,desc` 고정 |
+
+정렬이 고정인 목록은 `Paging.requireFixedOrder()` 를 부른다 — `sort` 를 조용히 버리면 부른 쪽은 정렬된 줄 안다.
 
 **셋을 컨트롤러가 직접 안 받는다.** `Paging` 하나로 받고 `*Query` 에도 그대로 넘긴다 — 상한 보정이 그 타입의 생성자에 있어서 타입이 있다는 것 자체가 「상한을 거쳤다」는 뜻이다.
 `sort` 는 `OrderBy` 타입이 든다. 정렬 필드는 값이 아니라 식별자라 바인딩이 안 되므로 허용 목록으로만 받는다(`D14` 「SQL」).

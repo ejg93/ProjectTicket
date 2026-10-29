@@ -40,7 +40,7 @@
 GET /api/performances/7/seats
 If-None-Match: "1842"
 
-→ 304 Not Modified        (버전이 그대로면. 본문 없음, Redis GET 한 번)
+→ 304 Not Modified        (버전이 그대로면. 본문 없음. DB 1회(회차 상태 — draft 는 404) + Redis GET 1회)
 → 200 + 새 스냅샷          (바뀌었으면)
 ```
 
@@ -57,7 +57,7 @@ If-None-Match: "1842"
 
 ## 버전과 스냅샷 — Redis
 
-**10 은 DB 대체값으로 시작했다** — `SeatQuery.version` 이 `performance_seat.updated_at` 의 최댓값(마이크로초)을 버전으로 쓴다. Redis 절반(아래)과 델타는 `10a` 다.
+**버전은 Redis 값이다**(`SeatVersions.current`). 키가 없을 때만 DB 의 `max(performance_seat.updated_at)`(마이크로초)으로 씨를 뿌린다(`SET NX`) — 10 이 쓰던 DB 대체값이 그 씨앗이다. Redis 절반(아래)과 델타는 `10a` 다.
 
 | 키 | 타입 | 무엇 |
 |---|---|---|
@@ -115,7 +115,7 @@ If-None-Match: "1842"
 | 항목 | 값 |
 |---|---|
 | 전체 스냅샷 | 2천 석 ≈ 60KB (gzip 뒤 ≈ 8KB) |
-| 304 응답 | Redis GET 1 회, 본문 없음 |
+| 304 응답 | DB 1 회(회차 상태) + Redis GET 1 회, 본문 없음. DB 를 빼지 않는 것은 설계 결정이다 — 폴링 p95 104ms(`49`) |
 | 델타 | XRANGE 1 회, 바뀐 좌석 수만큼 |
 | 폴링 1만 명 × 2초 | 초당 5천 요청, 그중 본문이 있는 것은 버전 변경 횟수 × 폴링 위상 |
 

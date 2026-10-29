@@ -42,7 +42,12 @@ class LoginFlowTest : PostgresTestBase() {
 
     @Test
     fun signup_login_me_logout() {
-        signUp(email = EMAIL, password = PASSWORD).andExpect { status { isCreated() }; jsonPath("$.account_id") { isNumber() } }
+        signUp(email = EMAIL, password = PASSWORD).andExpect {
+            status { isCreated() }
+            // `D5` 「201 이면 `Location`」 — 만든 계정은 `/api/me` 로 본다(`I11-11`)
+            header { string(name = "Location", value = "/api/me") }
+            jsonPath("$.account_id") { isNumber() }
+        }
 
         val logged = logIn(email = EMAIL, password = PASSWORD)
             .andExpect {

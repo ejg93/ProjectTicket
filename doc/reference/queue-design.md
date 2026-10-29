@@ -71,11 +71,12 @@ Tomcat 스레드 200 이 차고 그 뒤 9,800 명이 커넥션 대기에서 죽�
 Lua 스크립트 하나로 원자적으로 한다:
 
 ```
-1. ZREMRANGEBYSCORE active -inf now          -- 만료된 토큰을 정원에서 뺀다
-2. free = C - ZCARD active                   -- 빈자리
-3. n = min(free, 창에 남은 예산(≤ 100))      -- 이번에 들일 수. 예산은 admit_window(35f)
-4. members = ZPOPMIN queue n                 -- 줄 앞에서 뺀다
-5. 각 member 에 토큰 발급, active 에 ZADD(만료 시각), admit:{token}·by-account 저장
+1. left = 100 - admit_window.used             -- 창(5초)에 남은 예산. 0 이면 여기서 끝(35f)
+2. ZREMRANGEBYSCORE active -inf now          -- 만료된 토큰을 정원에서 뺀다
+3. free = C - ZCARD active                   -- 빈자리
+4. n = min(free, left, 넘겨받은 토큰 수)      -- 이번에 들일 수
+5. members = ZPOPMIN queue n                 -- 줄 앞에서 뺀다
+6. 각 member 에 토큰 발급, active 에 ZADD(만료 시각), admit:{token}·by-account 저장, 창의 used += n
 ```
 
 **Lua 라서 인스턴스 셋이 같이 돌아도 같은 사람을 두 번 안 들인다** — `ZPOPMIN` 이 원자다. **속도도 Lua 가 지킨다**(`35f`) —
@@ -112,7 +113,7 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 
 | 검사 | 실패 시 |
 |---|---|
-| 헤더가 있다 | 429 `admission-required`, 본문에 `rank`·`eta` |
+| 헤더가 있다 | 429 `admission-required`, 본문에 `rank`·`eta_seconds` |
 | `admit:{token}` 이 있다(만료 안 됨) | 429 `admission-required` |
 | 토큰의 `account_id` = 세션의 계정 | 403 `admission-mismatch` |
 | 토큰의 `performance_id` = 요청의 회차 | 403 `admission-mismatch` — 위와 안 가른다 |
@@ -132,7 +133,7 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 | 줄에서 제거 | 90초 하트비트 없음(ADR 0003) | 스케줄러가 `seen` 을 훑어 `ZREM`. 뒷사람이 당겨진다 |
 | 명시적 이탈 | `DELETE /api/queue/{perf}` | `ZREM` + 토큰 있으면 삭제 |
 | 토큰 만료 | 10분 | Redis TTL 이 지운다. `active` ZSET 은 다음 입장 때 1 단계가 정리 |
-| 회차 종료 | `closed`·`cancelled` 전이(16a·17a) | **회차로 훑을 수 있는 키 셋**(`queue:`·`:seen`·`:active`)을 삭제. `admit:{token}`·`admit:by-account:…` 는 회차로 못 훑어서 TTL 10분이 지운다 — 남아 있어도 선점이 회차 상태를 다시 봐서(13) 아무것도 못 한다. 지우는 것은 **커밋 뒤**다(21). 줄에 남은 사람은 폴링에서 410 `queue-closed` |
+| 회차 종료 | `closed`·`cancelled` 전이(16a·17a) | **회차로 훑을 수 있는 키 넷**(`queue:`·`:seen`·`:active`·`:admit_window`, `QueueKeys.ofPerformance`)을 삭제. `admit:{token}`·`admit:by-account:…` 는 회차로 못 훑어서 TTL 10분이 지운다 — 남아 있어도 선점이 회차 상태를 다시 봐서(13) 아무것도 못 한다. 지우는 것은 **커밋 뒤**다(21). 줄에 남은 사람은 폴링에서 410 `queue-closed` |
 
 ## 장애
 
@@ -140,11 +141,11 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 |---|---|---|
 | Redis 가 안 뜬다 | 관문이 **닫힌다** — 선점이 503 `queue-unavailable`. 토큰 헤더 유무와 무관하다(헤더가 없으면 순번을 읽다가 드러난다, `I11-2`) | 열어 두면 대기열이 지키려던 폭발이 그대로 DB 로 간다. 닫히면 아무도 못 사지만 아무것도 안 망가진다 |
 | Redis 가 비었다(재시작) | 줄이 사라진다. 사람들이 다시 진입하면 새 순번 | 날아가도 사고가 아닌 것만 Redis 에 둔다(`D2`). 잡힌 좌석은 DB 에 그대로다 |
-| 스케줄러가 멈춘다 | 줄이 안 준다. 폴링 응답의 `eta` 가 안 줄어든다 | 30 의 지표(`queue.admitted`)가 0 으로 떨어져 보인다 |
+| 스케줄러가 멈춘다 | 줄이 안 준다. 폴링 응답의 `eta_seconds` 가 안 줄어든다 | 30 의 지표(`queue.admitted`)가 0 으로 떨어져 보인다 |
 
 ## 지표 (30 이 든다)
 
-`queue.length{performance}` · `queue.active{performance}` · `queue.admitted` (카운터) · `queue.wait_seconds` (히스토그램, 진입→입장) · `queue.gate_rejected{reason}`
+`queue.length` · `queue.active`(둘 다 회차 합 — 회차별은 시계열이 무한히 는다, `D10`) · `queue.admitted` (카운터) · `queue.wait_seconds` (히스토그램, 진입→입장) · `queue.gate_rejected{reason}`
 
 ## 지금 안 하는 것
 

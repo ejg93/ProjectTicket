@@ -48,7 +48,7 @@
 | `reservation.reserved` | 결제 승인 반영(`PaymentTransitionService.confirm`) — 예매 `reserved`, 좌석 `reserved`, 발권과 같은 트랜잭션 | `reservation_id`·`account_id`·`performance_id`·`payment_id`·`total_amount`·`seat_count` | 26 확정 메일 · 27 정산 매출 |
 | `reservation.cancelled` | 관객 취소(`RefundTransitionService.request`) | `reservation_id`·`account_id`·`performance_id`·`refund_id`·`reason`(`audience`)·`fee_amount`·`refund_amount` | 26 취소 메일 · 27 취소 수수료 |
 | `performance.closed` | 판매 마감 자동 종료(16a) — `open → closed`, 남은 `held`·`paying` 만료와 같은 트랜잭션 | `performance_id`·`closed_at` | 27 정산서 생성(`payout_delay_days` 뒤) |
-| `performance.cancelled` | 기획사 회차 취소(17a) — 모든 예매 취소·전액 환불과 같은 트랜잭션 | `performance_id`·`cancelled_reservation_count` | 26 회차 취소 메일(예매자 전원 — 소비자가 표에서 읽는다) · 27 정산 없음 표시 |
+| `performance.cancelled` | 기획사 회차 취소(17a) — 모든 예매 취소·전액 환불과 같은 트랜잭션 | `performance_id`·`cancelled_reservation_count` | 26 회차 취소 메일(예매자 전원 — 소비자가 표에서 읽는다) · 27 0원 정산서(항목이 전부 0 — 「취소돼서 0」이 기록으로 남는다, `D21` 「회차 취소」) |
 
 **아직 안 내는 것**과 그 이유:
 
@@ -88,7 +88,7 @@
 | 소비자는 페이로드의 식별자로 **표를 다시 읽는다** | 사건은 「무슨 일이 났나」고 지금 상태는 표가 안다. 취소 메일이 나갈 때 예매가 이미 다른 상태면 표가 이긴다 |
 | 처리 실패는 **2초 간격 3회 재시도, 그래도 안 되면 `<토픽>.DLT`**(29) | 소비자 하나의 결함이 발행자를 멈추지 않는다. 오프셋은 DLT 로 보낸 뒤 넘어간다 — 안 넘기면 그 사건을 영원히 다시 읽는다 |
 | **소비자는 예외를 삼키지 않는다**(29 부터) | 삼키면 재시도도 DLT 도 안 돈다 — 그 사건이 조용히 사라진다. 28 까지는 삼키는 것이 맞았다(재시도할 자리가 없었다) |
-| DLT 에 쌓인 것을 다시 넣는 길은 **아웃박스다** | 사건 행이 DB 에 남아 있어 `published_at` 을 비우면 릴레이가 다시 보낸다. 사람이 쓰는 손잡이라 API 를 안 만든다 |
+| DLT 에 쌓인 것을 다시 넣는 길은 **아웃박스다** | 사건 행이 DB 에 남아 있는 동안(보존 7일, `OutboxCleaner`) `published_at` 을 비우면 릴레이가 다시 보낸다. 사람이 쓰는 손잡이라 API 를 안 만든다 |
 | 한 사건에 소비자가 둘이면 서로 모른다 | 알림이 죽어도 정산은 간다 |
 | **소비자 그룹은 소비자마다 하나**(`notification`·`settlement`) | 같은 그룹이면 사건 하나를 둘 중 하나만 받는다. 그룹이 갈려야 각자 받는다(ADR 0007) |
 

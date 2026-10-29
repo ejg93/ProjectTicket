@@ -16,6 +16,7 @@ class OrganizerEventQuery(private val jdbc: JdbcClient, private val membership: 
 
     /** 내가 속한 기획사들의 공연. 만든 시각 내림차순 고정 — 방금 등록한 것이 맨 위다 */
     fun list(accountId: Long, paging: Paging): OrganizerEventPage {
+        paging.requireFixedOrder()
         val total = jdbc.sql(
             """
             select count(*) from event e

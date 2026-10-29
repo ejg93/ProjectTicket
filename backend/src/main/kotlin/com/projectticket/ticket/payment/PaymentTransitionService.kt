@@ -220,6 +220,7 @@ class PaymentTransitionService(
             target = AuditLog.Target.of("reservation", reservationId),
             detail = mapOf("tickets_issued" to issued),
         )
+        log.info("예매 확정 reservation_id={} tickets={}", reservationId, issued)
         return ReservationStatus.RESERVED.code
     }
 
@@ -239,7 +240,17 @@ class PaymentTransitionService(
             .param("paying", ReservationStatus.PAYING.code)
             .param("id", reservationId)
             .update()
-        if (backToHeld == 1) return ReservationStatus.HELD.code
+        if (backToHeld == 1) {
+            // 선점(`SeatHoldService`)과 같은 이름이다 — `from` 이 둘을 가른다(`D3` 「상태 이력」, `I11-11`).
+            auditLog.record(
+                kind = AuditLog.Kind.OUTCOME,
+                eventType = "reservation.held",
+                actorAccountId = accountId,
+                target = AuditLog.Target.of("reservation", reservationId),
+                detail = mapOf("from" to ReservationStatus.PAYING.code),
+            )
+            return ReservationStatus.HELD.code
+        }
 
         val expired = jdbc.sql(
             """

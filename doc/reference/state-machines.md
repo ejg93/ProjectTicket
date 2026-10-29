@@ -89,6 +89,26 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 **환불액 계산은 `D6`(`refund-policy.md`) 이 정한다.** 관람일 기준 구간이고, 회차 취소(17a)는 구간과 무관하게 전액이다.
 
+### 전이표
+
+| 에서 | 로 | 조건 | 어디서 |
+|---|---|---|---|
+| — | `requested` | 결제당 하나(`refund_payment_id_key`) | 17·17a |
+| `requested` | `done` | 환불 번호가 붙었다 | 17·17a |
+
+## 정산 `settlement`
+
+상태의 뜻·금액·집계 시각은 `D21`(`settlement-rules.md`)이 정한다. 전이는 이 표가 단일 출처다.
+
+### 전이표
+
+| 에서 | 로 | 조건 | 어디서 |
+|---|---|---|---|
+| — | `scheduled` | 회차 종료·취소 사건. 회차당 하나 | 27 소비자 |
+| `scheduled` | `pending` | `settle_at <= now()`. 항목의 합으로 금액이 선다 | 27 집계 |
+| `pending` | `confirmed` | 관리자 확인. 부르는 코드가 아직 없다(D21 「누가 보나」) | — |
+| `confirmed` | `paid` | 지급. 부르는 코드가 아직 없다 | — |
+
 ## 회차 `performance`
 
 ```
@@ -121,7 +141,7 @@ draft ──오픈──> open ──판매 마감──> closed
 DB 상태기계가 아니다. `D12`(`queue-design.md`)가 정한다. 요약만 둔다:
 
 ```
-WAITING ──입장──> ADMITTED ──선점 성공──> (토큰 삭제)
+WAITING ──입장──> ADMITTED ──선점 성공──> (정원 반납, 토큰은 45초 유예 — 23a)
    │                 └──TTL 10분──> (만료)
    └──하트비트 90초 없음──> (제거)
 ```

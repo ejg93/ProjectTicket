@@ -40,6 +40,8 @@ class NotificationStore(private val jdbc: JdbcClient) {
 
     private fun recordReserved(envelope: OutboxRelay.Envelope) {
         val reservationId = envelope.aggregateId
+        // 표가 이긴다(`D11`). 확정 직후 취소된 예매는 사건이 늦게 와도 확정 메일을 안 만든다 — 취소 메일만 간다(`I11-11`).
+        if (!stillReserved(reservationId)) return
         val performance = performanceOf(reservationId)
         val seats = jdbc.sql(
             """
@@ -69,6 +71,14 @@ class NotificationStore(private val jdbc: JdbcClient) {
         )
         insert(envelope = envelope, accountId = accountId(envelope), subject = subject, body = body)
     }
+
+    private fun stillReserved(reservationId: Long): Boolean =
+        jdbc.sql("select status = :reserved from reservation where reservation_id = :id")
+            .param("reserved", ReservationStatus.RESERVED.code)
+            .param("id", reservationId)
+            .query(Boolean::class.java)
+            .optional()
+            .orElse(false)
 
     private fun recordCancelled(envelope: OutboxRelay.Envelope) {
         val performance = performanceOf(envelope.aggregateId)
