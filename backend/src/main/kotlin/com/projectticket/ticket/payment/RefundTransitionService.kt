@@ -13,6 +13,7 @@ import com.projectticket.ticket.reservation.ReservationStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 
@@ -31,6 +32,7 @@ class RefundTransitionService(
     private val metrics: TicketMetrics,
     private val quote: RefundQuote,
 ) {
+    private val log = LoggerFactory.getLogger(RefundTransitionService::class.java)
 
     /** ① 이 끝난 환불. [refundAmount] 만 PG 로 간다 */
     data class Requested(
@@ -130,6 +132,7 @@ class RefundTransitionService(
             target = AuditLog.Target.of("reservation", reservationId),
             detail = mapOf("days_before" to daysBefore, "fee_amount" to fee, "refund_amount" to refundAmount),
         )
+        log.info("관객 취소 reservation_id={} refund_id={} days_before={}", reservationId, refundId, daysBefore)
         return Requested(
             refundId = refundId,
             reservationId = reservationId,

@@ -220,6 +220,7 @@ class PaymentTransitionService(
             target = AuditLog.Target.of("reservation", reservationId),
             detail = mapOf("tickets_issued" to issued),
         )
+        log.info("예매 확정 reservation_id={} tickets={}", reservationId, issued)
         return ReservationStatus.RESERVED.code
     }
 

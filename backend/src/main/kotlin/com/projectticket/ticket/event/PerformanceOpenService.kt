@@ -7,6 +7,7 @@ import com.projectticket.ticket.settlement.SettlementPolicyQuery
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
 
 /**
  * 회차를 연다. 홀의 좌석을 회차별 좌석으로 복제하고 상태를 `open` 으로 바꾼다.
@@ -20,6 +21,7 @@ class PerformanceOpenService(
     private val auditLog: AuditLog,
     private val policies: SettlementPolicyQuery,
 ) {
+    private val log = LoggerFactory.getLogger(PerformanceOpenService::class.java)
 
     @Transactional
     fun open(performanceId: Long, actorAccountId: Long?): Int {
@@ -63,6 +65,7 @@ class PerformanceOpenService(
             target = AuditLog.Target.of("performance", performanceId),
             detail = mapOf("seat_count" to copied),
         )
+        log.info("회차 오픈 performance_id={} seats={}", performanceId, copied)
         return copied
     }
 

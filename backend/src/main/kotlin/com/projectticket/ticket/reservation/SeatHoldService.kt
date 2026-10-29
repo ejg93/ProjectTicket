@@ -11,6 +11,7 @@ import java.time.Duration
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
 
 /**
  * 좌석 선점의 트랜잭션. `D4` 「선점의 문장 순서」 그대로다:
@@ -38,6 +39,7 @@ class SeatHoldService(
     private val seatVersions: SeatVersions,
     private val metrics: TicketMetrics,
 ) {
+    private val log = LoggerFactory.getLogger(SeatHoldService::class.java)
 
     /** 멱등키의 본문 해시가 이것으로 만들어진다 — 같은 회차·같은 좌석 순서면 같은 요청이다 */
     data class Command(val performanceId: Long, val seatIds: List<Long>)
@@ -136,6 +138,7 @@ class SeatHoldService(
             target = AuditLog.Target.of("reservation", reservationId),
             detail = mapOf("performance_id" to command.performanceId, "seat_count" to seatIds.size),
         )
+        log.info("좌석 선점 reservation_id={} performance_id={} seats={}", reservationId, command.performanceId, seatIds.size)
         return reservationId
     }
 
