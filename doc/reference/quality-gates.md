@@ -160,7 +160,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 |---|---|---|---|---|
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
 
-**대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 `/wrapup` 대조와 독립 리뷰가 본다.
+**대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 「계획 끝」 대조와 독립 리뷰가 본다.
 
 ## 문턱
 

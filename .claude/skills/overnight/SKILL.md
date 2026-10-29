@@ -40,7 +40,7 @@ Superpowers 에는 계획 여럿을 잇는 기능이 없어서 이 스킬이 그
 | 순서 | 무엇 |
 |---|---|
 | 1 | `PLAN.md` 번들 표에서 다음 설계된 번들을 고른다. 없으면 멈춤 |
-| 2 | `writing-plans` → `executing-plans`(`CLAUDE.md` 「번들 모드」) |
+| 2 | `writing-plans`(검토 안 묻음) → `executing-plans`(`CLAUDE.md` 「번들 모드」) |
 | 3 | 「계획 끝」 1~7 — 머지까지 |
 | 4 | `git checkout main && git pull` → 다음 가지(`work/<날짜>`, `-b`, `-c`) |
 | 5 | 토큰 창이 남았으면 1 로 |

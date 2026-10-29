@@ -134,7 +134,7 @@ plan_design_incomplete=$(awk '/^## 청크 분할표/{on=1} /^## 이 계획을 �
     if ($0 !~ /\*\*결정\*\*/ || $0 !~ /\*\*실패 사다리\*\*/ || $0 !~ /\*\*닫힘\*\*:? *(①|②|③|④|⑤|⑥|⑦)/) k++
   } END{print k+0}' PLAN.md)
 if [ "$plan_design_incomplete" -gt 0 ]; then
-  echo "[설계 행 누락] PLAN.md — 번호 절차가 있는 행 ${plan_design_incomplete}개에 결정·실패 사다리·「닫힘: ①~⑦」 중 빠진 것이 있다(/design 「행 형식」)"
+  echo "[설계 행 누락] PLAN.md — 번호 절차가 있는 행 ${plan_design_incomplete}개에 결정·실패 사다리·「닫힘: ①~⑦」 중 빠진 것이 있다(\`CLAUDE.md\` 「행 형식」)"
   fail=1
 fi
 fi

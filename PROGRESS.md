@@ -8,7 +8,7 @@
 |---|---|---|
 | 진행중 청크 | 없음 | |
 | **작업 단위** | **번들**이다(`B0`, 2026-09-25). 절차는 2026-10-29 부터 Superpowers 플러그인이 굴린다(`G25`) — 설계 `brainstorming`(Fable)이 `PLAN.md` 행을 적고, 실행(Opus)이 `번들 해` 로 `executing-plans` 를 한 세션 인라인·제자리로 돌고, 「계획 끝」이 full·탐침·독립 리뷰·PR·**머지까지** 한다(`CLAUDE.md` 「Superpowers 와 잇는 법」). 밤에 여럿을 잇는 바깥 루프는 `/overnight` | `번들 해` |
-| 다음 첫 손 | **번들 15 머지됨**(2026-10-29, `#52` `bcabf01`). 설계된 번들이 없다 — 다음은 설계(`brainstorming`, Fable). Superpowers 플러그인과 `Bash(gh pr merge:*)` 허용 규칙은 사용자가 local 범위(`settings.local.json`)로 넣었다. `48` 은 `wip/48` — `railway init`·Postgres·Redis 뒤 ③ 부터 | 설계 |
+| 다음 첫 손 | **번들 15 머지됨**(2026-10-29, `#52` `bcabf01`). 설계된 번들이 없다 — 다음은 설계(`brainstorming`, Fable). 연동 점검(`I12`)은 끝났다. Superpowers 플러그인과 `Bash(gh pr merge:*)` 허용 규칙은 사용자가 local 범위(`settings.local.json`)로 넣었다. `48` 은 `wip/48` — `railway init`·Postgres·Redis 뒤 ③ 부터 | 설계 |
 | PR | `#52` 머지됨(`bcabf01`, 번들 15 + 마무리 27차) · `#51` 머지됨(`bdc6972`, 번들 14 + 마무리 26차) · `#47` 머지됨(`f6b13cf`, 번들 13 + 마무리 25차) · `#45` 머지됨(`3b4c58d`, 번들 12 + 마무리 24차) · `#44` 머지됨(`7b7eeb5`, 번들 11 + 마무리 23차) · `#43` 머지됨(`96fc306`, 번들 10 + 마무리 22차) · `#40` 머지됨(`3e5f95e`, 번들 9 + 마무리 21차) · `#39` 머지됨(`66483ab`, 번들 8 + 마무리 20차) · `#36`(`bab6a61`, Dependabot) · `#35`(`d86c8f0`, 번들 7) · `#33`(번들 6) · `#29`·`#28`·`#27`(`enforce_admins` 아래 첫 머지). **필수 검사가 push 실행으로 채워진다**(`#23` 실측 — 그때 일곱). | |
 | 의존성 | Kotlin 플러그인은 Boot BOM 에 묶여 dependabot `ignore` — 이름은 `jvm`·`plugin.spring`(축약 표기 때문). Boot 가 BOM 을 올리면 지운다 | `.github/dependabot.yml` |
 | 확정된 수치 | ADR 0003(도메인 수치 + **정산·환불 시작값**), ADR 0004(세션·`paying`·관문·회차 종료) | 그 문서들 |
@@ -283,6 +283,7 @@
 | 2026-10-29 | 마무리 27차 | 완료(Opus) — 번들 15 다섯 행(`I11-6`·`I11-9`·`I11-11`·`I11-12`·`I11-13`) + `48` WIP(`wip/48`, Railway 프로젝트 미연결). **대조 다섯**: `doc-lint.sh` 통과 · 미룬 것 0 · 결정이 코드와 다른 곳 하나(아래 리뷰 ①) · 이번 결정끼리 충돌 0 · 축은 행대로(트리거 둘·버킷 설정·테스트, 다른 것은 각 줄 「예보와 다른 것」). **`--full`**: 첫 판 `detektTest` 1(`MultilineLambdaItParameter`, `ReservationLogTest` — 빠른 레인이 detekt 를 안 돈다) → 고쳐 초록. backend 두 레인(`*Concurrency*` 는 `integrationTest` 안) · frontend 100 · e2e 1 · 우리 Testcontainers 셋 정리. 빈 DB 기동이 `V25` 까지 25 적용하고 health 에 답했다(`e2e-local.sh`). **독립 리뷰: 지적 5, 처분** — 지금 고침 2(① `application.yml` actuator 주석이 `I11-13` 이 지운 「망으로 가른다」를 듦 · ② 락 표에 `SchedulerLock` 을 안 지나는 스케줄러 넷이 빠짐) · 이미 밝힘 3(`I11-6` 탐침이 새 표를 안 깸 — 손으로 빨강을 봤고 탐침은 시험이 서는지만 본다 · `I11-11` ⓑ 조회 위치 · `I11-12` `tickets`) · 좌석 상태를 조건부 UPDATE 밖에서 바꾸는 곳 0. 고침은 `.kotlin/` 무시 한 줄과 같이. **`gate-probe.sh all`**: 38 중 37 막음, `event-catalog` 1 은 패치가 안 붙었다 — `I11-13` 이 `performance.cancelled` 칸을 고쳐 문맥이 바뀌었다. 다시 떠서 막음 → 38/38 | de74c38 |
 | 2026-10-29 | 마무리 27차 뒤 정리 | 완료(Opus) — `#52` 를 CI 초록(11) 뒤 `--merge`(`bcabf01`, 사용자 지시). 첫 시도는 `cd … && gh pr merge … \| tail` 복합 명령이라 auto mode 판정기가 「Merge Without Review」로 막았다 — 사용자 지시 뒤 단독 명령으로 지났다. compose 컨테이너를 내렸다 | bcabf01 |
 | 2026-10-29 | `G25`. 절차를 Superpowers 로 | 완료(Opus) — 위 분할표. 사용자가 조건을 고르고(1인 · 결과물 우선 · 머지 전부 위임 · 대화형 + 무인 · 외부 플러그인) 후보 셋(Superpowers·Spec Kit·cc-spex)을 서브에이전트가 GitHub 원문으로 비교했다. 설계 몫이지만 결정이 다 나와 Opus 가 쳤다(사용자 지시). **정보**: 우리 훅은 `CLAUDE_PROJECT_DIR` 만 봐서 git worktree 커밋은 도장 검사를 안 지난다 — worktree 를 안 쓰는 이유. **검증**: `doc-lint.sh` · `verify.sh`(tools) | babb580 |
+| 2026-10-29 | `I12`. 점검 12차 — Superpowers 연동 | 완료(Fable 설계 · Opus 실행) — 위 분할표. 서는 자리 3(계획 검토·TDD 설정 예외·finishing 메뉴)과 어긋나는 자리 7 을 시뮬레이션이 잡았고 정독이 8 을 더했다. **오탐·무해**: `.superpowers/sdd/.gitignore` 자체 생성(중복) · session-start 가 compact 때도 주입(비용만) · `warmup` 「멈춘다」(코드 안 건드린다는 뜻) · ADR 0002 의 `wrapup`(역사) · `push-guard.sh:8`·`/verify` 의 「마무리」(별칭). **정보**: `verify.sh:21` 이 MINGW 에서 `JAVA_HOME` 을 스스로 export 한다 — `task-done` 에 접두 없이 넘겨도 된다. **예보와 다른 것**: 플랜의 표 행 「「계획 끝」 3」은 새 순서에서 리뷰가 2 라 2 로 적었다. **검증**: `doc-lint.sh` · `verify.sh`(tools) | |
 
 ## 점검 — 어디까지 봤나
 
@@ -299,6 +300,7 @@
 | 계획 자체 | 2026-09-19 (`I6`) | 분할표 105행·기준 문서 21행을 실물과 대조. 결과는 분할표 `I6` |
 | 대상 구역 · 프론트 | 2026-10-11 (`I8`) | `D16`·`D17` 규칙 ↔ 화면 `.tsx` 47. 기계 게이트 전부 확인 + 독립 감사 에이전트. 결과는 분할표 `I8` |
 | 품질 게이트 | 2026-10-23 (`I10`) | 「찾는 것이 사라져도 초록인 검사」 — 스크립트·훅·탐침·문서 대조 시험·CI. 독립 에이전트 1 + 인용 자리 직접 읽기. 결과는 분할표 `I10` |
+| 절차 연동 · Superpowers | 2026-10-29 (`I12`) | 플러그인 7.0.0 스킬 15 ↔ `CLAUDE.md`·훅. 실행 시뮬레이션 + 독립 에이전트 셋. 결과는 분할표 `I12` |
 
 ## 기록 규칙
 

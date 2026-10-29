@@ -52,12 +52,17 @@
 
 설계(「Superpowers 와 잇는 법」)가 적어 둔 행을 Superpowers `executing-plans` 로 순서대로 친다. 청크마다 1~6 은 같다. 다른 것:
 
-- `writing-plans` 가 행을 계획 파일로 옮긴다 — `.superpowers/plans/<날짜>-번들<N>.md`, 행 하나 = Task 하나. **원천은 `PLAN.md` 다.** 계획 파일은 실행용 사본이라 커밋하지 않는다(`.gitignore`)
-- **한 세션이 인라인으로 친다** — Task 마다 서브에이전트를 안 띄운다(`subagent-driven-development` 를 안 쓴다). 독립 리뷰는 「계획 끝」에 한 번
-- **제자리에서 친다 — worktree 를 안 쓴다.** 훅이 `CLAUDE_PROJECT_DIR` 의 가지·트리만 봐서 worktree 커밋은 도장 검사를 안 지난다. Superpowers 가 worktree 를 물으면 「아니오」
+- **실행 모델은 Opus 다**(`PLAN.md` 「누가 치나」). 다른 모델이면 첫 응답에서 말하고 계속한다
+- brainstorming 은 여기서 안 선다 — 행에 사실·결정·절차가 다 있다(brainstorming 「다 있으면 그냥 한다」). 예열·점검·검증도 창작이 아니라 brainstorming 을 안 부른다
+- `writing-plans` 가 행을 계획 파일로 옮긴다 — `.superpowers/plans/<날짜>-번들<N>.md`, 행 하나 = Task 하나. **원천은 `PLAN.md` 다.** 계획 파일은 실행용 사본이라 커밋하지 않는다(`.gitignore`). 계획의 `Spec:` 줄은 `PLAN.md` 의 그 행 id 와 행이 부르는 D 문서다 — spec 파일은 없다. 헤더의 REQUIRED SUB-SKILL 은 `superpowers:executing-plans` 하나다. **계획 검토를 사람에게 묻지 않는다** — 검토는 설계가 행을 적을 때 끝났다
+- **한 세션이 인라인으로 친다** — Task 마다 서브에이전트를 안 띄운다(`subagent-driven-development` 를 안 쓴다)
+- **worktree 선호: 쓰지 않는다. 제자리(`work/<날짜>` 체크아웃)에서 친다.** 훅이 `CLAUDE_PROJECT_DIR` 의 가지·트리만 봐서 worktree 커밋은 도장 검사를 안 지난다. `using-git-worktrees` 는 이 선언으로 묻지 않고 넘어간다
+- **TDD 예외(2026-10-29 사용자 허락)**: 문서·설정 파일·마이그레이션만 건드리는 행은 「실패하는 테스트 먼저」를 건너뛴다. 그 행의 마지막 번호에 적힌 시험(`doc-lint.sh`·문서 대조 시험·`tools` 레인·`integrationTest`)이 RED→GREEN 자리다. 계획에서 그 단계를 빼고 원장에 `Ruling:` 한 줄
+- Task 끝: `bash scripts/verify.sh` → 커밋(`commit-guard.sh`) → `PLAN`·`PROGRESS` 를 같은 커밋에 → `task-done PLAN N BASE -- bash scripts/verify.sh`. `task-done` 은 명령을 직접 실행해서 `JAVA_HOME=… bash` 꼴 환경 접두가 안 돈다 — `verify.sh` 는 스스로 `JAVA_HOME` 을 잡고, gradlew 를 직접 줄 때는 `env JAVA_HOME="C:/Program Files/Java/jdk-25" backend/gradlew -p backend …`
+- push·PR·머지는 묻지 않는다 — 2026-10-29 사용자가 위임했다(`executing-plans` 의 「물어야 하는 부작용」에 해당하지 않는다)
 - 「시작 세 줄」은 행에 이미 있다. 말하지 않고 확인만 한다
 - **갈려도 안 멈춘다** — 실패 사다리, 없으면 정하고 이력에 「정한 것(계획 밖)」. 행당 둘까지, 넘으면 WIP 로 빼고 다음 행
-- 청크 verify 가 빨가면 고치기 둘까지. 그래도면 WIP 로 빼고 다음 행
+- 청크 verify 가 빨가면 고치기 둘까지. 그래도면 WIP 로 빼고 다음 행 — `systematic-debugging` 이 근본 원인을 찾으라 해도 횟수 상한은 이것이다
 - **WIP 는 번들 가지에 안 올린다** — `wip/<청크>` 곁가지에 커밋하고 번들 가지로 돌아온다. 빨간 트리가 뒤 청크의 verify 를 다 빨갛게 하기 때문이다. commit hook 이 `work/*` 에서 도장 없는 커밋을 막는다
 - Docker 가 꺼져 있어도 안 선다 — `verify.sh` 가 먼저 켜고(`scripts/docker-up.sh`, 3분), 그래도 안 뜨면 빠른 레인만 돌리고 도장을 `fast-nodb` 로 남긴다. 번들 끝 `--full` 이 잡는다
 - 절반 지점에서 시간·토큰을 한 번 보고 나머지를 갈지 말한다
@@ -151,13 +156,14 @@ ProjectShop 의 Java 를 포팅할 때는 **옮기면서 Kotlin 답게 고치고
 
 절차는 Superpowers 플러그인(`obra/superpowers`)이 굴리고, 관문은 이 저장소의 검증 도구가 든다(2026-10-29 사용자 결정 — 1인 · 결과물 우선 · 머지 전부 위임).
 **이 파일이 Superpowers 스킬보다 앞선다.** 둘이 다르면 여기를 따른다.
+**확인한 판: 7.0.0**(2026-10-29, `I12`). 판이 오르면 「번들 모드」의 덮은 자리(worktree 선언 · 계획 검토 · TDD 예외 · task-done 꼴)와 아래 표를 다시 댄다.
 
 | Superpowers 단계 | 여기서 무엇을 하나 | 끼우는 관문 |
 |---|---|---|
-| `brainstorming` | 설계. 번들 후보(선행이 `완료` 인 미착수 행 4~8개, 순서는 「무엇부터」)의 갈림을 사실과 함께 (가)/(나) 로 **한 번에** 묻고, 답을 `PLAN.md` 행에 적는다. spec 파일을 따로 안 만든다. 커밋 `docs: 설계 — 번들 N` | `doc-lint.sh` 가 행 형식을 본다 |
+| `brainstorming` | 설계. 번들 후보(선행이 `완료` 인 미착수 행 4~8개, 순서는 「무엇부터」)의 갈림을 사실과 함께 (가)/(나) 로 **한 번에** 묻고, 답을 `PLAN.md` 행에 적는다. spec 파일을 따로 안 만든다. 커밋 `docs: 설계 — 번들 N`. **선호 선언**: 사람만 답할 질문은 한 메시지에 모아 (가)/(나) 로 묻는다 · 설계 문서는 `docs/superpowers/specs` 대신 `PLAN.md` 행이다 · builder-check 서브에이전트와 시각 보조는 안 쓴다 · 승인 뒤 `writing-plans` 로 안 넘어간다 — 실행은 다른 세션(Opus)이 `번들 해` 로 연다 | `doc-lint.sh` 가 행 형식을 본다 |
 | `writing-plans` | 행 → 계획 파일. Global Constraints 에 D14·D15 와 「커밋 전 `verify.sh`」 | |
 | `executing-plans` | 번들 모드 | Task 끝 → `verify.sh` → 커밋(`commit-guard.sh`) |
-| 최종 리뷰 · `finishing-a-development-branch` | 「계획 끝」. 메뉴를 안 내민다 | `--full` · 탐침 · 독립 리뷰 · PR · 머지 |
+| 최종 리뷰 | 「계획 끝」 2. `finishing-a-development-branch` 는 **부르지 않는다** — 메뉴가 사람 답을 기다린다 | `--full` · 탐침 · PR · 머지 |
 
 ### 행 형식
 
@@ -180,10 +186,10 @@ ProjectShop 의 Java 를 포팅할 때는 **옮기면서 Kotlin 답게 고치고
 | 순서 | 무엇 |
 |---|---|
 | 1 | `bash scripts/doc-lint.sh` 뒤 기계가 못 잡는 대조 — 문서가 부르는 이름이 실물과 맞나 · 「나중에」에 청크가 적혔나 · 이번 결정끼리 부딪치나 · 말한 축과 편 축이 같나. **이력은 안 고친다** |
-| 2 | `/verify` 표의 「번들 끝」 줄 전부 — `verify.sh --full` · `*Concurrency*` · 새 `V*` 면 health 기동 · 화면이면 e2e · `gate-probe.sh all` 「막았다」 전부 |
-| 3 | **독립 리뷰** — 서브에이전트 하나에 `git diff origin/main...HEAD` 와 청크들의 시작 세 줄만 준다. 대화는 안 준다. 묻는 것: 결정끼리 충돌 · 축과 diff 가 다른 자리 · 좌석 상태를 조건부 UPDATE 밖에서 바꾸는 곳. 답은 「없다」 또는 `파일:줄 — 무엇 — 어느 규칙` |
-| 4 | 찾은 것을 처분한다 — 한 줄·값 하나면 지금 고침 · 있는 청크가 다룰 것이면 그 행에 · 결정·파일 여럿이면 새 청크. 「오탐」도 근거를 적는다. 이력에 「독립 리뷰: 지적 N, 처분 …」 |
-| 5 | 끝 보고 — 정한 것(계획 밖) · WIP 행(`git branch --list 'wip/*'`) · 신규 행 · 다음 번들 후보 |
+| 2 | **독립 리뷰 = `executing-plans` 의 Final Review 하나** — `review-package` 패키지 + `code-reviewer.md`, 모델은 `fable` 로 명시. 계획의 Review Focus 에 질문 셋을 적어 둔다: 결정끼리 충돌 · 행의 축·강제 지점과 diff 가 다른 자리 · 좌석 상태를 조건부 UPDATE 밖에서 바꾸는 곳. 대화는 안 준다. 따로 리뷰를 또 돌리지 않는다 |
+| 3 | 찾은 것을 처분한다 — 한 줄·값 하나면 지금 고침 · 있는 청크가 다룰 것이면 그 행에 · 결정·파일 여럿이면 새 청크. 「오탐」도 근거를 적는다. 이력에 「독립 리뷰: 지적 N, 처분 …」. 플러그인의 「Critical/Important 는 한 번의 fix pass」보다 이 처분표가 앞선다 |
+| 4 | `/verify` 표의 「번들 끝」 줄 전부 — `verify.sh --full` · `*Concurrency*` · 새 `V*` 면 health 기동 · 화면이면 e2e · `gate-probe.sh all` 「막았다」 전부. **3 의 고침 커밋 뒤에 돈다** — 먼저 돌면 고침이 지문을 바꿔 push hook 이 막는다 |
+| 5 | 끝 보고 — 정한 것(계획 밖) · WIP 행(`git branch --list 'wip/*'`) · 신규 행 · 다음 번들 후보. 원장 `.superpowers/sdd/<slug>/progress.md` 의 `Ruling:` 줄이 이력 「정한 것(계획 밖)」에 다 있는지 대조한 뒤 워크스페이스를 지운다 |
 | 6 | PR — 본문은 청크마다 시작 세 줄(`.github/pull_request_template.md`) |
 | 7 | **머지는 Claude 가 한다** — `gh pr checks N --watch` 초록 · `review` 잡 코멘트 처분 뒤 `gh pr merge N --merge`. **단독 명령으로 낸다** — `cd`·`&&`·`;`·파이프를 붙이면 허용 규칙(`settings.local.json`)에 안 걸려 판정기가 막는다. 결과는 다음 호출에서 `gh pr view N --json state`. squash·`--auto` 는 안 쓴다 |
 
