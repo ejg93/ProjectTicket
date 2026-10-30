@@ -89,8 +89,13 @@ class QueueGateFilter(
         accountId: Long,
     ) {
         // 판매 중이 아닌 회차는 줄이 없어서 토큰을 받을 길이 없다. 그런 요청은 관문이 아니라 선점 서비스가 답한다(409·410).
+        // 판매 시작 전만은 관문이 답한다 — 선점 서비스가 다시 읽는 사이에 판매가 시작되면 토큰 없이 지난다(`QueueService.gateOf`).
         // **DB 를 보는 것은 이 실패 경로뿐**이다 — 토큰이 맞으면 관문은 Redis 만 보고 지나간다.
-        if (!queue.isGated(performanceId)) return chain.doFilter(request, response)
+        when (queue.gateOf(performanceId)) {
+            QueueService.Gate.NONE -> return chain.doFilter(request, response)
+            QueueService.Gate.BEFORE_SALE -> return reject(request, response, ErrorCode.PERFORMANCE_NOT_OPEN)
+            QueueService.Gate.GATED -> Unit
+        }
 
         // 헤더가 없으면 앞에서 Redis 를 한 번도 안 봤다. 순번을 읽다가 Redis 가 죽은 것이 드러나면 429 가 아니라 503 이다 —
         // 429 는 「줄에 서면 된다」인데 줄 자체가 없다(`D12` 「장애」, `I11-2`).

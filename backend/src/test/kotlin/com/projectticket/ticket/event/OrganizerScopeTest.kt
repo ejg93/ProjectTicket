@@ -13,6 +13,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
@@ -119,6 +120,15 @@ class OrganizerScopeTest : PostgresTestBase() {
             status { isNotFound() }
             jsonPath("$.type") { value("tag:projectticket.example,2026:event-not-found") }
         }
+    }
+
+    @Test
+    fun a_suspended_organizer_still_reads_its_own_event() {
+        // 정지가 막는 것은 쓰기(등록·열기·취소)다. 목록에 보이는 공연의 상세가 404 면 화면이 갈린다(마무리 28차 독립 리뷰).
+        val eventId = createdEvent(mine, myOrganizer)
+        jdbc.sql("update organizer set status = 'suspended' where organizer_id = :id").param("id", myOrganizer).update()
+
+        mvc.get("/api/organizer/events/$eventId") { with(user(mine)) }.andExpect { status { isOk() } }
     }
 
     @Test

@@ -47,7 +47,7 @@ class QueueGateRedisDownTest {
     fun signIn() {
         val user = TicketUser(id = ACCOUNT, email = "gate-down@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
         SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(user, null, user.authorities)
-        `when`(queue.isGated(PERFORMANCE)).thenReturn(true)
+        `when`(queue.gateOf(PERFORMANCE)).thenReturn(QueueService.Gate.GATED)
     }
 
     @AfterEach

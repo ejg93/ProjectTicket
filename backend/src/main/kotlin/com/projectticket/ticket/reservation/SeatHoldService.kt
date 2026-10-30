@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory
  * 좌석 선점의 트랜잭션. `D4` 「선점의 문장 순서」 그대로다:
  *
  * ```
+ * 0. 회차 행 select … for share                    → 취소·종료와 순서를 세운다(`I13-1`)
  * 1. reservation 행 삽입 (held, held_until)      → reservation_id
  * 2. 좌석 id 오름차순 select … for update         → 교착 방지
  * 3. 조건부 update (available 이고 회차가 open)

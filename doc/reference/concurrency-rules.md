@@ -68,6 +68,7 @@ select performance_seat_id
 `performance_seat_held_fields_check`(`V6`)가 `held` 행에 `reservation_id` 를 요구한다. 그래서 순서는 이렇다:
 
 ```
+0. 회차 행 select … for share (open 이고 판매 시작이 지났나) → 취소·종료와 순서가 선다(I13-1)
 1. reservation 행 삽입 (held, held_until)        → reservation_id 를 얻는다
 2. 좌석 id 오름차순 select … for update
 3. 조건부 update (위 문장)

@@ -51,7 +51,7 @@ class PaymentTransitionService(
      * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 회차가 판매 중이 아님 → 409 `performance-not-open`,
      * 선점이 지남 → 409 `hold-expired`, 그 밖의 상태 → 409 `invalid-transition`.
      *
-     * **회차가 `open` 인지 같은 문장에서 본다**(`I13-1`). 취소·종료가 이 예매를 놓쳤으면(선점 경합) 여기서 멈춘다.
+     * **회차가 `open` 인지 같은 문장에서 본다**(`I13-1`). 선점이 회차 행을 잠가 취소·종료가 예매를 놓치는 길은 닫혔다 — 이것은 겹 하나 더다(`psql`·새 입구).
      */
     @Transactional
     fun startPaying(accountId: Long, reservationId: Long): Paying {

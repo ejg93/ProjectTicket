@@ -24,7 +24,7 @@ class OrganizerCancelController(
     /** 200 이다 — 자원을 만드는 것이 아니라 상태를 옮긴다(`D5`). 취소된 예매 수를 돌려준다 */
     @PostMapping("/api/organizer/performances/{performanceId}/cancel")
     fun cancel(@PathVariable performanceId: Long, @AuthenticationPrincipal user: TicketUser): Cancelled {
-        membership.requirePerformance(user.id, performanceId)
+        membership.requirePerformance(user.id, performanceId, forWrite = true)
         val cancelled = cancelService.cancel(performanceId, user.id)
         // 취소가 커밋된 뒤에 줄을 걷는다(`D12`). 취소가 실패하면 줄은 그대로 있어야 한다 — 회차는 아직 열려 있다.
         queue.drop(performanceId)

@@ -105,7 +105,7 @@ class QueueRankTest : PostgresTestBase() {
         // 판매 시작 전에는 줄이 없다(`I13-1`). 관문도 안 지킨다 — 선점 서비스가 409 로 답한다.
         assertThatThrownBy { queue.enter(performanceId, first) }
             .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
-        assertThat(queue.isGated(performanceId)).isFalse()
+        assertThat(queue.gateOf(performanceId)).isEqualTo(QueueService.Gate.BEFORE_SALE)
     }
 
     @Test

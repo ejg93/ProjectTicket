@@ -23,7 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate
  * 문장 스냅샷이라 회차를 `open` 으로 읽고, 취소의 `for update` 는 아직 커밋 안 된 예매를 못 본다. 둘 다 커밋하면 취소된 회차에 `held` 가 남는다.
  *
  * 취소를 바깥 트랜잭션에 붙들어 그 창을 일부러 길게 연다. 선점은 회차 행의 `for share` 에서 취소가 끝나기를 기다렸다가 `performance-not-open` 을 받아야 한다.
- * 선점이 기다리는 시간은 [HOLD_OPEN_MS] — `lock_timeout`(2초, `I11-1`)보다 짧아야 기다림이 시간 초과로 끝나지 않는다.
+ * 선점이 기다리는 시간은 [HOLD_OPEN_MS]. `for share` 의 기다림에는 상한이 없다 — `lock_timeout` 2초는 멱등키 잠금에만 걸고 되돌린다(`I11-1`).
+ * 상한을 둘지는 `I13-9` 가 오픈 순간을 재며 정한다.
  */
 class PerformanceCancelConcurrencyTest : ConcurrencyTestBase() {
 
