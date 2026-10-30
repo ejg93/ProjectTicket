@@ -28,6 +28,8 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 ### 전이표
 
+시각·결제 조건(`held→paying`·`paying→reserved`·`paying→held` 의 시각, `reserved` 의 승인 결제)은 `V28` 트리거가 든다. 만료·취소는 시각과 무관하다.
+
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
 | — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 `sales_open_at <= now()` 이고 활성 토큰이 있다 | 13 |
@@ -65,6 +67,8 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 **둘이 갈리는 것은 `D4` 의 대조 테스트가 막는다.** 갈릴 수 있는 자리는 전이 하나가 두 표를 고치는 자리 전부이고,
 그래서 전이는 반드시 한 트랜잭션이다.
+
+발권(`ticket`)은 `reserved` 예매의 좌석에만 선다 — `ticket_requires_reserved`(`V28`)가 막는다.
 
 ## 좌석 `performance_seat`
 

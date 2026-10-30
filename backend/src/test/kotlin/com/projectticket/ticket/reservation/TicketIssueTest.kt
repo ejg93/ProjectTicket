@@ -96,7 +96,8 @@ class TicketIssueTest : PostgresTestBase() {
 
     @Test
     fun number_format_is_enforced_by_the_schema() {
-        val reservationId = hold(seats = 1)
+        // 확정 예매여야 형식 검사까지 간다 — 아니면 발권 트리거(`V28`)가 먼저 막는다.
+        val reservationId = reserved(seats = 1)
         val seatRecord = jdbc.sql("select reservation_seat_id from reservation_seat where reservation_id = :id").param("id", reservationId).query(Long::class.java).single()
 
         // 규칙을 적은 문서가 그 규칙을 어긴 예시를 든 적이 있다(identifier-rules). 제약이 잡는다 — `1` 과 `O` 가 들어 있다.

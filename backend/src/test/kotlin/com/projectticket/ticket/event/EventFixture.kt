@@ -149,9 +149,20 @@ class EventFixture(private val jdbc: JdbcClient) {
             .query(Long::class.java)
             .single()
 
-    /** `held` 예매를 전이표대로 `paying` 을 거쳐 `reserved` 로. 좌석도 `reserved` 로 */
+    /**
+     * `held` 예매를 전이표대로 `paying` 을 거쳐 `reserved` 로. 좌석도 `reserved` 로.
+     * 승인 결제 행을 확정 앞에 넣는다 — 「`reserved` 에는 승인 결제가 있다」를 트리거가 든다(`V28`).
+     */
     fun reserve(reservationId: Long) {
         jdbc.sql("update reservation set status = 'paying', paying_until = now() + interval '3 minutes' where reservation_id = :id")
+            .param("id", reservationId)
+            .update()
+        jdbc.sql(
+            """
+            insert into payment (reservation_id, status, amount, approval_number, card_last4)
+            select reservation_id, 'approved', total_amount, 'FIXTURE-' || reservation_id, '0000' from reservation where reservation_id = :id
+            """,
+        )
             .param("id", reservationId)
             .update()
         jdbc.sql("update reservation set status = 'reserved', reserved_at = now(), paying_until = null where reservation_id = :id")
