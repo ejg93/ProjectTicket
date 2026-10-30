@@ -18,6 +18,9 @@ enum class EventType(@get:JsonValue val code: String, val aggregateType: Aggrega
     PERFORMANCE_CANCELLED("performance.cancelled", AggregateType.PERFORMANCE);
 
     companion object {
+        /** 소비자가 아는 봉투 판(`D11` 「버전」). 모르는 판은 [EnvelopeVersions] 가 건너뛴다 */
+        const val SUPPORTED_VERSION = 1
+
         fun of(code: String): EventType =
             entries.firstOrNull { it.code == code } ?: error("모르는 사건 이름이다: $code")
     }

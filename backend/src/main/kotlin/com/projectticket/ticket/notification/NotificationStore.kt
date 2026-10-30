@@ -143,7 +143,15 @@ class NotificationStore(private val jdbc: JdbcClient) {
 
     data class CancelledLine(val accountId: Long, val refundAmount: Int)
 
-    private fun accountId(envelope: OutboxRelay.Envelope): Long = number(envelope, "account_id").toLong()
+    /**
+     * 받는 사람은 **표에서 읽는다**(`D11` 「소비」) — 페이로드의 `account_id` 를 안 믿는다. 회차 취소 알림과 같은 길이다.
+     * 예매가 없으면 `single()` 이 던진다 — 재시도 뒤 DLT 다.
+     */
+    private fun accountId(envelope: OutboxRelay.Envelope): Long =
+        jdbc.sql("select account_id from reservation where reservation_id = :id")
+            .param("id", envelope.aggregateId)
+            .query(Long::class.java)
+            .single()
 
     /** 사건의 숫자 필드. 카탈로그(`D11`)가 정한 필드라 없으면 생산자가 계약을 어긴 것이다 — 그 자리에서 선다 */
     private fun number(envelope: OutboxRelay.Envelope, field: String): Number =

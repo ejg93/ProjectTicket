@@ -1,5 +1,6 @@
 package com.projectticket.ticket.notification
 
+import com.projectticket.ticket.outbox.EnvelopeVersions
 import com.projectticket.ticket.outbox.EventTopics
 import com.projectticket.ticket.outbox.OutboxRelay
 import org.springframework.kafka.annotation.KafkaListener
@@ -26,8 +27,11 @@ class ReservationNotificationListener(
     /** 그룹이 정산과 다르다(ADR 0007) — 같은 그룹이면 사건 하나를 둘 중 하나만 받는다 */
     @KafkaListener(topics = [EventTopics.RESERVATION, EventTopics.PERFORMANCE], groupId = GROUP)
     fun on(message: String) {
+        val envelope = json.readValue(message, OutboxRelay.Envelope::class.java)
+        // 모르는 판은 건너뛴다 — 생산자가 두 판을 같이 내는 동안이다(`D11` 「버전」)
+        if (!EnvelopeVersions.accepts(envelope, GROUP)) return
         // **던진다**(29). 삼키면 재시도도 DLT 도 안 돈다 — 그 사건은 조용히 사라진다.
-        store.record(json.readValue(message, OutboxRelay.Envelope::class.java))
+        store.record(envelope)
     }
 
     companion object {
