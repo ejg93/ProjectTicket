@@ -110,6 +110,8 @@ class QueueRankTest : PostgresTestBase() {
 
     @Test
     fun a_closed_performance_has_no_queue() {
+        // 마감이 지나야 닫힌다(`V30`). 트리거가 갱신 전 마감을 봐서 두 문장이다 — 한 문장에 마감을 같이 당기면 우회가 된다.
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id").param("id", performanceId).update()
         jdbc.sql("update performance set status = 'closed' where performance_id = :id").param("id", performanceId).update()
 
         // 「있었는데 끝났다」라 410 이다. 없는 회차는 404 고, 화면이 그 둘을 다르게 말한다.

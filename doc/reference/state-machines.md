@@ -123,7 +123,7 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
 | — | `scheduled` | 회차 종료·취소 사건. 회차당 하나 | 27 소비자 |
-| `scheduled` | `pending` | `settle_at <= now()`. 항목의 합으로 금액이 선다 | 27 집계 |
+| `scheduled` | `pending` | `settle_at <= now()`(`V30` 트리거). 항목의 합으로 금액이 선다 | 27 집계 |
 | `pending` | `confirmed` | 관리자 확인. 부르는 코드가 아직 없다(D21 「누가 보나」) | — |
 | `confirmed` | `paid` | 지급. 부르는 코드가 아직 없다 | — |
 
@@ -148,7 +148,7 @@ draft ──오픈──> open ──판매 마감──> closed
 |---|---|---|---|
 | — | `draft` | 회차는 이 상태로만 태어난다(`V5` 삽입 가드) | 9 |
 | `draft` | `open` | 좌석이 복제됐다 | 11 |
-| `open` | `closed` | `sales_close_at < now()` | 16a |
+| `open` | `closed` | `sales_close_at < now()`(`V30` 트리거) | 16a |
 | `open` | `cancelled` | 기획사가 무른다. `closed` 뒤로는 없다 | 17a |
 
 `sales_close_at` 의 기본은 `starts_at - 1시간` 이고 `sales_open_at < sales_close_at < starts_at` 을 check 가 든다(16a).

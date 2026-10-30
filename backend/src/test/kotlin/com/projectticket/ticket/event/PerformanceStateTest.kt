@@ -36,8 +36,19 @@ class PerformanceStateTest : PostgresTestBase() {
         setStatus(performanceId, "open")
         assertThat(statusOf(performanceId)).isEqualTo("open")
 
+        passSalesClose(performanceId)
         setStatus(performanceId, "closed")
         assertThat(statusOf(performanceId)).isEqualTo("closed")
+    }
+
+    @Test
+    fun open_cannot_close_before_sales_close() {
+        val performanceId = fixture.performance(eventId, hallId)
+        setStatus(performanceId, "open")
+
+        // 마감 전에 닫으면 판매 중인 회차의 선점이 시각과 상관없이 풀린다. 앱 SQL(`PerformanceCloseService`)만 보던 조건이다.
+        assertThatThrownBy { setStatus(performanceId, "closed") }
+            .hasStackTraceContaining("판매 마감 전에 닫을 수 없다")
     }
 
     @Test
@@ -153,6 +164,12 @@ class PerformanceStateTest : PostgresTestBase() {
              where performance_id = :id
             """,
         ).param("status", status).param("id", performanceId).update()
+
+    /** 마감을 지난 순간으로. `performance_sales_window_check` 때문에 판매 시작(하루 전)보다는 뒤다 */
+    private fun passSalesClose(performanceId: Long) =
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id")
+            .param("id", performanceId)
+            .update()
 
     private fun statusOf(performanceId: Long): String =
         jdbc.sql("select status from performance where performance_id = :id")

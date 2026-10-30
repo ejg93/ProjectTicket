@@ -70,6 +70,8 @@ class EventListTest : PostgresTestBase() {
     @Test
     fun an_event_whose_performances_closed_still_answers() {
         val performanceId = openedPerformance()
+        // 마감이 지나야 닫힌다(`V30`). 트리거가 갱신 전 마감을 봐서 두 문장이다 — 한 문장에 마감을 같이 당기면 우회가 된다.
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id").param("id", performanceId).update()
         jdbc.sql("update performance set status = 'closed' where performance_id = :id").param("id", performanceId).update()
 
         // 목록에는 안 보이지만 주소는 있다. 404 로 답하면 「없는 공연」과 「지금 살 것이 없는 공연」이 같아진다.

@@ -58,6 +58,38 @@ class SettlementTransitionTriggerTest : PostgresTestBase() {
             .hasStackTraceContaining("할 수 없는 정산 상태 전이다")
     }
 
+    @Test
+    fun scheduled_goes_to_pending_once_settle_at_passes() {
+        val scheduled = scheduledSettlement(settleAt = "now() - interval '1 second'")
+
+        jdbc.sql("update settlement set status = 'pending', amount = 0, settled_at = now() where settlement_id = :id").param("id", scheduled).update()
+    }
+
+    @Test
+    fun scheduled_cannot_go_to_pending_before_settle_at() {
+        val scheduled = scheduledSettlement(settleAt = "now() + interval '1 day'")
+
+        // 정산일 전에 집계하면 그 뒤에 들어온 취소·환불이 정산서에서 빠진다. `SettlementStore.takeDue` 만 보던 조건이다.
+        assertThatThrownBy {
+            jdbc.sql("update settlement set status = 'pending', amount = 0, settled_at = now() where settlement_id = :id").param("id", scheduled).update()
+        }.hasStackTraceContaining("정산일 전에 집계할 수 없다")
+    }
+
+    private fun scheduledSettlement(settleAt: String): Long {
+        val fixture = EventFixture(jdbc)
+        val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("settle-scheduled")), hallId = fixture.hall("2관"))
+        return jdbc.sql(
+            """
+            insert into settlement (performance_id, settlement_policy_id, settle_at, status)
+            values (:performance, :policy, $settleAt, 'scheduled')
+            returning settlement_id
+            """,
+        ).param("performance", performanceId)
+            .param("policy", fixture.stampDefaultPolicy(performanceId))
+            .query(Long::class.java)
+            .single()
+    }
+
     private fun setStatus(status: String) {
         jdbc.sql("update settlement set status = :status where settlement_id = :id")
             .param("status", status)
