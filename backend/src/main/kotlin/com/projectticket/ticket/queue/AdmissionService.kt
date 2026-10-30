@@ -78,9 +78,13 @@ class AdmissionService(
      * 토큰이 가리키는 것. 없거나 만료면 null — 관문(23)이 이 값으로 계정·회차를 대조한다.
      * 만료를 여기서 안 센다. TTL 이 키를 지워서 **없는 것과 만료된 것이 같은 답**이다.
      */
-    fun find(token: String): Admission? =
-        redis.opsForValue().get(QueueKeys.admission(token))
+    fun find(token: String): Admission? {
+        // 형식 밖 토큰은 Redis 를 안 본다(`I13-6`). 다른 키 꼴(`by-account:…`)을 넣으면 그 키를 읽어 JSON 이 아닌 값에 걸리고
+        // 관문이 그것을 Redis 장애(503)로 읽었다. 없는 것과 같은 답이다 — 위조·만료와 구별하지 않는다(`D9`).
+        if (!TOKEN_FORMAT.matches(token)) return null
+        return redis.opsForValue().get(QueueKeys.admission(token))
             ?.let { objectMapper.readValue(it, Admission::class.java) }
+    }
 
     /**
      * 자리를 반납하고 토큰도 지운다. 줄을 떠났을 때(24) 부른다 —
@@ -157,6 +161,9 @@ class AdmissionService(
         val RETRY_GRACE: Duration = Duration.ofSeconds(45)
 
         private const val TOKEN_BYTES = 32
+
+        /** [newToken] 이 내는 꼴 — 32바이트 base64url, 덧붙임 없이 43자 */
+        private val TOKEN_FORMAT = Regex("^[A-Za-z0-9_-]{43}$")
 
         /**
          * 만료 정리 → 빈자리 계산 → 줄 앞에서 빼내기 → 토큰 저장까지 한 번에(`D12`).

@@ -51,10 +51,21 @@ class OrganizerMembership(private val jdbc: JdbcClient) {
         if (organizerId == null || !isMine(accountId, organizerId)) throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
     }
 
+    /**
+     * 내 소속이고 기획사가 `active` 인가. **정지된 기획사는 공연을 못 올린다**(`V4` 주석, `I13-6`) — 등록·열기·취소가 다 이 함수를 지난다.
+     * 정지는 남의 것과 같은 404 다. 「그 기획사는 있는데 정지됐다」를 알리지 않는다(`D5`).
+     */
     private fun isMine(accountId: Long, organizerId: Long): Boolean =
-        jdbc.sql("select count(*) from organizer_member where organizer_id = :organizer and account_id = :account")
+        jdbc.sql(
+            """
+            select count(*)
+              from organizer_member m join organizer o on o.organizer_id = m.organizer_id
+             where m.organizer_id = :organizer and m.account_id = :account and o.status = :active
+            """,
+        )
             .param("organizer", organizerId)
             .param("account", accountId)
+            .param("active", OrganizerStatus.ACTIVE.code)
             .query(Long::class.java)
             .single() > 0L
 }

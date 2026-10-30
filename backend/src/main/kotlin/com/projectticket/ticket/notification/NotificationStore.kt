@@ -106,8 +106,8 @@ class NotificationStore(private val jdbc: JdbcClient) {
      * **계정마다 한 통이라 금액을 계정 단위로 합친다.** 한 계정이 이 회차에 예매를 둘 했어도 키가 계정이라 둘째 `insert` 는
      * `do nothing` 이다 — 예매마다 한 행을 내면 둘째 예매의 환불액이 소리 없이 사라진다.
      *
-     * **관객이 먼저 취소한 예매도 `cancelled` 라 여기 섞인다**(24a). 그쪽은 수수료를 뗀 부분 환불인데 문구가 「전액」이라 틀린다 —
-     * 예매에 「무엇이 물렀나」가 없어서 지금은 못 가른다.
+     * **관객이 먼저 취소한 예매는 안 섞인다**(24a) — 그쪽은 수수료를 뗀 부분 환불이라 문구 「전액」이 틀린다.
+     * 예매의 `cancelled_by`(`V19`)로 회차 취소가 무른 것만 고른다.
      */
     private fun recordPerformanceCancelled(envelope: OutboxRelay.Envelope) {
         val performanceId = envelope.aggregateId

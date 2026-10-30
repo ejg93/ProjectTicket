@@ -106,6 +106,22 @@ class OrganizerScopeTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_suspended_organizer_is_not_found() {
+        // 정지된 기획사는 공연을 못 올린다(`V4` 주석, `I13-6`). 남의 것과 같은 이름이다 — 존재를 안 알린다(`D5`).
+        val eventId = createdEvent(mine, myOrganizer)
+        jdbc.sql("update organizer set status = 'suspended' where organizer_id = :id").param("id", myOrganizer).update()
+
+        createEvent(mine, myOrganizer).andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:organizer-not-found") }
+        }
+        createPerformance(mine, eventId).andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:event-not-found") }
+        }
+    }
+
+    @Test
     fun another_organizers_event_is_not_found() {
         val eventId = createdEvent(mine, myOrganizer)
 

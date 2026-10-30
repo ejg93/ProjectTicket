@@ -66,8 +66,14 @@ class ConsentService(private val jdbc: JdbcClient) {
 
         // **값이 null 인 항목을 여기서 잡는다.** JSON 의 `{"marketing_email": null}` 은 타입이 `Boolean` 이어도 들어온다 —
         // 그대로 두면 `not null` 컬럼에 부딪쳐 500 이 되고, 사용자는 무엇을 고쳐야 하는지 못 듣는다.
-        given.entries.firstOrNull { it.value == null }?.let {
-            throw TicketException(ErrorCode.UNKNOWN_CONSENT_ITEM, "동의 여부가 비어 있다: ${it.key}")
+        // 항목은 아는 것이라 `unknown-consent-item` 이 아니다 — 비어 있는 칸을 짚는 400 이다(`I13-6`, `D5`).
+        given.entries.firstOrNull { it.value == null }?.let { empty ->
+            val message = "동의 여부가 비어 있다"
+            throw TicketException(
+                ErrorCode.VALIDATION_FAILED,
+                "$message: ${empty.key}",
+                mapOf("errors" to listOf(mapOf("field" to "consents.${empty.key}", "message" to message))),
+            )
         }
 
         items.filter { it.required }.firstOrNull { given[it.code] != true }?.let {

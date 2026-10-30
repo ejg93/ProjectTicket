@@ -85,6 +85,17 @@ class QueueGateTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_malformed_token_is_treated_as_absent() {
+        // 다른 키 꼴을 토큰으로 넣으면 그 키를 읽고 JSON 이 아니라 503 이었다(`I13-6`). 형식 밖 토큰은 Redis 를 안 본다 — 없는 것과 같은 답이다.
+        admit(accountId = buyer.id, performance = performanceId)
+
+        hold(seatIds.take(1), token = "by-account:$performanceId:${buyer.id}").andExpect {
+            status { isTooManyRequests() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:admission-required") }
+        }
+    }
+
+    @Test
     fun an_admitted_buyer_passes_and_gives_the_token_back() {
         val token = admit(accountId = buyer.id, performance = performanceId)
 
