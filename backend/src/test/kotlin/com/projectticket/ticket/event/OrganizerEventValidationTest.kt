@@ -58,6 +58,13 @@ class OrganizerEventValidationTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_price_over_the_ceiling_is_rejected() {
+        // 상한은 4석 합이 `reservation.total_amount int` 안에 드는 값이다(ADR 0003, `V27`). 넘으면 선점이 500 이었다.
+        createEvent(grade(code = "VIP", section = "F1-A", price = 10_000_001))
+            .andExpect(validationFailedAt("grades[0].price"))
+    }
+
+    @Test
     fun a_section_under_two_grades_points_at_the_grade() {
         createEvent(
             grade(code = "VIP", section = "F1-A"),
@@ -108,7 +115,7 @@ class OrganizerEventValidationTest : PostgresTestBase() {
         jsonPath("$.errors[0].field") { value(field) }
     }
 
-    private fun grade(code: String, section: String) = mapOf("code" to code, "price" to 154_000, "sections" to listOf(section))
+    private fun grade(code: String, section: String, price: Int = 154_000) = mapOf("code" to code, "price" to price, "sections" to listOf(section))
 
     private fun createEvent(vararg grades: Map<String, Any>): ResultActionsDsl =
         mvc.post("/api/organizer/events") {

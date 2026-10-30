@@ -3,6 +3,7 @@ package com.projectticket.ticket.event
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.web.Paging
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
@@ -99,7 +100,7 @@ class OrganizerEventController(
     /** 등급은 공연 단위다(ADR 0003). 구역 형식은 `V4`·`V5` 의 check 가 들고 입구는 [SectionCodes] 가 **같은 글자로** 든다 — 갈리면 `AppDbConstraintTest` 가 빨개진다 */
     data class GradeRequest(
         @field:NotBlank @field:Pattern(regexp = "^[A-Z][A-Z0-9]{0,9}$") val code: String,
-        @field:NotNull @field:PositiveOrZero val price: Int,
+        @field:NotNull @field:PositiveOrZero @field:Max(MAX_PRICE_WON) val price: Int,
         @field:NotEmpty @field:SectionCodes val sections: List<String>,
     )
 
@@ -123,4 +124,9 @@ class OrganizerEventController(
     data class CreatedPerformance(val performanceId: Long)
 
     data class OpenedPerformance(val performanceId: Long, val seatCount: Int)
+
+    companion object {
+        /** 등급 가격 상한(ADR 0003). 4석 합이 `reservation.total_amount int` 안에 든다. DB 는 `V27` 의 check 가 같은 값을 든다 */
+        const val MAX_PRICE_WON = 10_000_000L
+    }
 }
