@@ -104,6 +104,19 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun an_event_whose_aggregate_type_disagrees_with_its_type_is_rejected() {
+        // 릴레이는 행의 `aggregate_type` 을 버리고 `type` 에서 만든다(`OutboxRelay`). 둘이 갈린 행은 표만 보는 사람을 속인다.
+        assertThatThrownBy {
+            jdbc.sql(
+                """
+                insert into outbox (event_id, type, aggregate_type, aggregate_id, payload)
+                values (gen_random_uuid(), 'reservation.reserved', 'performance', 1, '{}'::jsonb)
+                """,
+            ).update()
+        }.hasStackTraceContaining("outbox_type_aggregate_check")
+    }
+
+    @Test
     fun writing_an_event_outside_a_transaction_is_rejected() {
         // `MANDATORY` 가 강제 지점이다. 트랜잭션 밖에서 넣으면 사건만 남은 행이 생기고, 그 소비자는 없는 예매에 메일을 보낸다.
         assertThatThrownBy { outbox.append(EventType.RESERVATION_RESERVED, 1, mapOf("reservation_id" to 1)) }
