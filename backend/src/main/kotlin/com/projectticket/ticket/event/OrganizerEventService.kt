@@ -67,6 +67,7 @@ class OrganizerEventService(
     @Transactional
     fun createPerformance(accountId: Long, eventId: Long, command: PerformanceCommand): Long {
         membership.requireEvent(accountId, eventId)
+        requireHall(command.hallId)
 
         // 판매 창(`sales_open_at < sales_close_at < starts_at`)은 `performance_sales_window_check` 가 본다 —
         // 여기서 다시 세지 않는다. 값 검사를 두 군데 두면 하나가 낡는다.
@@ -150,6 +151,18 @@ class OrganizerEventService(
     }
 
     /** DB 제약이 막은 것도 Bean Validation 과 같은 꼴(`errors[{field, message}]`)로 낸다 — 화면이 같은 자리에서 칸을 찾는다(`D5`) */
+    /**
+     * 없는 홀은 외래키(`V5`)가 막지만 그 위반은 판매 창 check 가 아니라 그물에서 500 이었다(`I13-5`). 틀린 칸이 있는 요청이라 400 이다(`D5`).
+     * 앞에서 읽어도 경합이 없다 — 홀은 수정·삭제 입구가 없다(`V4`, 「안 만드는 입구」).
+     */
+    private fun requireHall(hallId: Long) {
+        val exists = jdbc.sql("select exists (select 1 from hall where hall_id = :id)")
+            .param("id", hallId)
+            .query(Boolean::class.java)
+            .single()
+        if (!exists) throw fieldRejected(field = "hall_id", message = "없는 홀이다")
+    }
+
     private fun fieldRejected(field: String, message: String) =
         TicketException(ErrorCode.VALIDATION_FAILED, message, mapOf("errors" to listOf(mapOf("field" to field, "message" to message))))
 

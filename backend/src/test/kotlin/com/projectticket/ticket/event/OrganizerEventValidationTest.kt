@@ -96,11 +96,25 @@ class OrganizerEventValidationTest : PostgresTestBase() {
             .andExpect(validationFailedAt("sales_close_at"))
     }
 
-    private fun createPerformance(startsAt: OffsetDateTime, salesOpenAt: OffsetDateTime, salesCloseAt: OffsetDateTime? = null): ResultActionsDsl {
+    @Test
+    fun an_unknown_hall_is_rejected_on_its_field() {
+        // 없는 홀은 외래키(`V5`)가 막는데 그 위반이 그물에서 500 이었다(`I13-5`). 틀린 칸이 있는 요청이라 400 이다(`D5`).
+        val startsAt = OffsetDateTime.now().plusDays(8)
+
+        createPerformance(startsAt, salesOpenAt = OffsetDateTime.now().minusDays(1), hall = -1)
+            .andExpect(validationFailedAt("hall_id"))
+    }
+
+    private fun createPerformance(
+        startsAt: OffsetDateTime,
+        salesOpenAt: OffsetDateTime,
+        salesCloseAt: OffsetDateTime? = null,
+        hall: Long = hallId,
+    ): ResultActionsDsl {
         val eventId = createEvent(grade(code = "VIP", section = "F1-A")).andExpect { status { isCreated() } }.andReturn().response.let {
             json.readTree(it.contentAsString)["event_id"].asLong()
         }
-        val body = mapOf("hall_id" to hallId, "starts_at" to startsAt.toString(), "sales_open_at" to salesOpenAt.toString()) +
+        val body = mapOf("hall_id" to hall, "starts_at" to startsAt.toString(), "sales_open_at" to salesOpenAt.toString()) +
             listOfNotNull(salesCloseAt?.let { "sales_close_at" to it.toString() })
         return mvc.post("/api/organizer/events/$eventId/performances") {
             with(user(organizer)); with(csrf())
