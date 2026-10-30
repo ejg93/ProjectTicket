@@ -496,7 +496,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ### Docker 를 ProjectShop 과 나눠 쓴다
 
-이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다. **2026-10-30 실측은 VM 9.71GiB 다**(`docker info` MemTotal) — 무거운 판 앞에 이 값을 다시 본다(`I13-1`).
+이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다. **2026-10-30 실측은 VM 9.71GiB 다**(`docker info` MemTotal) — 무거운 판 앞에 이 값을 다시 본다(`I13-1`). CPU 도 **10 vCPU** 다(2026-10-31 `docker info` NCPU, `load-4` 때 22) — 부하 수치를 앞 노트와 맞댈 때 같이 적는다(`load-7`).
 `verify.sh --full` 은 컨테이너 레인 뒤에 **이 저장소의** Testcontainers 컨테이너(라벨 `projectticket=true`, `PostgresTestBase` 가 붙인다)를 지운다 — 재사용으로 판마다 남아서다(`G20`). 처음(`G20`)에는 `org.testcontainers=true` 로 지워서 ProjectShop 의 돌고 있는 `--full` 이 Connection refused 로 무너졌다 — `G24` 가 우리 라벨로 좁혔다(사용자 결정).
 
 **2026-10-18 ProjectShop 세션과 합의한 규칙 셋:**
