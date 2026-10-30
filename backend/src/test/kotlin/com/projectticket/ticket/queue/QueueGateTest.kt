@@ -85,6 +85,30 @@ class QueueGateTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_malformed_token_is_treated_as_absent() {
+        // 다른 키 꼴을 토큰으로 넣으면 그 키를 읽고 JSON 이 아니라 503 이었다(`I13-6`). 형식 밖 토큰은 Redis 를 안 본다 — 없는 것과 같은 답이다.
+        admit(accountId = buyer.id, performance = performanceId)
+
+        hold(seatIds.take(1), token = "by-account:$performanceId:${buyer.id}").andExpect {
+            status { isTooManyRequests() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:admission-required") }
+        }
+    }
+
+    @Test
+    fun before_sales_open_the_gate_answers_itself() {
+        // 판매 시작 전에는 **관문이 직접 409 를 낸다**(마무리 28차 독립 리뷰). 관문을 지나 선점 서비스가 답하게 두면 관문의 읽기와 선점의 읽기 사이에
+        // 판매 시작이 오는 순간 토큰 없이 좌석을 잡는다 — `sales_open_at` 은 공개 시각이라 노릴 수 있다. 선점 서비스의 409 는 `detail` 에 회차 id 를 단다.
+        jdbc.sql("update performance set sales_open_at = now() + interval '1 hour' where performance_id = :id").param("id", performanceId).update()
+
+        hold(seatIds.take(1), token = null).andExpect {
+            status { isConflict() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-open") }
+            jsonPath("$.detail") { value("판매 중인 회차가 아니다") }
+        }
+    }
+
+    @Test
     fun an_admitted_buyer_passes_and_gives_the_token_back() {
         val token = admit(accountId = buyer.id, performance = performanceId)
 

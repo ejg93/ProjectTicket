@@ -453,6 +453,8 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 `server app:8080;` 은 compose 가 `--scale` 로 대수를 늘려도 **첫 A 레코드 하나만** 쥔다 — 셋을 띄우고 한 대가 다 받는다(35 가 부하에서 찾았다).
 매 요청에 다시 풀려면 `resolver 127.0.0.11` 을 두고 `proxy_pass` 의 호스트를 변수로 적는다. 대가는 `upstream` 블록(keepalive·죽은 대 건너뛰기)을 못 쓰는 것이다.
 
+요청 본문 크기는 nginx 기본 `client_max_body_size 1m` 이 막는다(`docker/nginx/nginx.conf` 에 설정 없음). Tomcat 은 JSON 본문을 안 자른다 — `maxPostSize` 는 폼에만 걸린다. 점검 13차(`I13`).
+
 ### JRE 이미지에는 `wget` 도 `curl` 도 없다
 
 `eclipse-temurin:*-jre` 기준이다. compose 의 `healthcheck` 에 그대로 적으면 `/bin/sh: 1: wget: not found` 로 **컨테이너만 unhealthy** 고 앱은 멀쩡하다.
@@ -493,7 +495,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ### Docker 를 ProjectShop 과 나눠 쓴다
 
-이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다.
+이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다. **2026-10-30 실측은 VM 9.71GiB 다**(`docker info` MemTotal) — 무거운 판 앞에 이 값을 다시 본다(`I13-1`).
 `verify.sh --full` 은 컨테이너 레인 뒤에 **이 저장소의** Testcontainers 컨테이너(라벨 `projectticket=true`, `PostgresTestBase` 가 붙인다)를 지운다 — 재사용으로 판마다 남아서다(`G20`). 처음(`G20`)에는 `org.testcontainers=true` 로 지워서 ProjectShop 의 돌고 있는 `--full` 이 Connection refused 로 무너졌다 — `G24` 가 우리 라벨로 좁혔다(사용자 결정).
 
 **2026-10-18 ProjectShop 세션과 합의한 규칙 셋:**

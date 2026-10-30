@@ -4,6 +4,7 @@ import com.projectticket.ticket.audit.AuditLog
 import com.projectticket.ticket.error.ErrorCode
 import com.projectticket.ticket.error.TicketException
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.PerformanceStatus
 import com.projectticket.ticket.event.SeatVersions
 import com.projectticket.ticket.observability.TicketMetrics
 import com.projectticket.ticket.outbox.EventType
@@ -47,7 +48,10 @@ class PaymentTransitionService(
     /**
      * ① `held → paying`. `paying_until` 을 박제한다(`D7`). **`held_until` 은 안 늘린다** — 결제 시도가 선점을 연장하지 않는다(`D3`).
      *
-     * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 선점이 지남 → 409 `hold-expired`, 그 밖의 상태 → 409 `invalid-transition`.
+     * 0행이면 왜인지 다시 읽어 가른다: 없거나 남의 것 → 404, 회차가 판매 중이 아님 → 409 `performance-not-open`,
+     * 선점이 지남 → 409 `hold-expired`, 그 밖의 상태 → 409 `invalid-transition`.
+     *
+     * **회차가 `open` 인지 같은 문장에서 본다**(`I13-1`). 선점이 회차 행을 잠가 취소·종료가 예매를 놓치는 길은 닫혔다 — 이것은 겹 하나 더다(`psql`·새 입구).
      */
     @Transactional
     fun startPaying(accountId: Long, reservationId: Long): Paying {
@@ -57,11 +61,13 @@ class PaymentTransitionService(
                set status = :paying, paying_until = now() + make_interval(mins => :minutes)
              where reservation_id = :id and account_id = :account
                and status = :held and held_until >= now()
+               and exists (select 1 from performance p where p.performance_id = reservation.performance_id and p.status = :open)
             returning total_amount
             """,
         )
             .param("paying", ReservationStatus.PAYING.code)
             .param("held", ReservationStatus.HELD.code)
+            .param("open", PerformanceStatus.OPEN.code)
             .param("minutes", PAYING_MINUTES)
             .param("id", reservationId)
             .param("account", accountId)
@@ -80,20 +86,29 @@ class PaymentTransitionService(
 
     private fun cannotStart(accountId: Long, reservationId: Long): TicketException {
         val row = jdbc.sql(
-            "select status, held_until >= now() as alive from reservation where reservation_id = :id and account_id = :account",
+            """
+            select r.status, r.held_until >= now() as alive, p.status as performance_status
+              from reservation r join performance p on p.performance_id = r.performance_id
+             where r.reservation_id = :id and r.account_id = :account
+            """,
         )
             .param("id", reservationId)
             .param("account", accountId)
-            .query { rs, _ -> rs.getString("status") to rs.getBoolean("alive") }
+            .query { rs, _ -> StartRefusal(rs.getString("status"), rs.getBoolean("alive"), rs.getString("performance_status")) }
             .optional()
             .orElse(null)
             ?: return TicketException(ErrorCode.RESERVATION_NOT_FOUND)
 
-        val (status, alive) = row
-        return if (status == ReservationStatus.HELD.code && !alive) {
-            TicketException(ErrorCode.HOLD_EXPIRED, "선점 시간이 지났다: reservation_id=$reservationId")
-        } else {
-            TicketException(ErrorCode.INVALID_TRANSITION, "결제할 수 없는 상태다: $status", mapOf("from" to status, "action" to "pay"))
+        val (status, alive, performanceStatus) = row
+        val held = status == ReservationStatus.HELD.code
+        return when {
+            held && performanceStatus != PerformanceStatus.OPEN.code -> TicketException(
+                ErrorCode.PERFORMANCE_NOT_OPEN,
+                "판매 중인 회차가 아니다: reservation_id=$reservationId, status=$performanceStatus",
+                mapOf("performance_status" to performanceStatus),
+            )
+            held && !alive -> TicketException(ErrorCode.HOLD_EXPIRED, "선점 시간이 지났다: reservation_id=$reservationId")
+            else -> TicketException(ErrorCode.INVALID_TRANSITION, "결제할 수 없는 상태다: $status", mapOf("from" to status, "action" to "pay"))
         }
     }
 
@@ -187,10 +202,12 @@ class PaymentTransitionService(
             update reservation
                set status = :reserved, reserved_at = now(), paying_until = null
              where reservation_id = :id and status = :paying and paying_until >= now()
+               and exists (select 1 from performance p where p.performance_id = reservation.performance_id and p.status = :open)
             """,
         )
             .param("reserved", ReservationStatus.RESERVED.code)
             .param("paying", ReservationStatus.PAYING.code)
+            .param("open", PerformanceStatus.OPEN.code)
             .param("id", reservationId)
             .update()
         if (confirmed == 0) return statusOf(reservationId)
@@ -288,6 +305,8 @@ class PaymentTransitionService(
         )
         return ReservationStatus.EXPIRED.code
     }
+
+    private data class StartRefusal(val status: String, val alive: Boolean, val performanceStatus: String)
 
     private fun statusOf(reservationId: Long): String =
         jdbc.sql("select status from reservation where reservation_id = :id").param("id", reservationId).query(String::class.java).single()

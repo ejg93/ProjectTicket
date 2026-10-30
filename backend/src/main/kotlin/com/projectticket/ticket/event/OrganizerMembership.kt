@@ -21,25 +21,26 @@ class OrganizerMembership(private val jdbc: JdbcClient) {
 
     /** @throws TicketException 그 기획사가 없거나 내 소속이 아니면 404 */
     fun require(accountId: Long, organizerId: Long) {
-        if (!isMine(accountId, organizerId)) {
+        // 공연 등록 입구 하나만 부른다 — 쓰기다.
+        if (!isMine(accountId, organizerId, forWrite = true)) {
             throw TicketException(ErrorCode.ORGANIZER_NOT_FOUND, "그 기획사가 없거나 내 소속이 아니다: organizer_id=$organizerId")
         }
     }
 
-    /** 그 공연이 내 기획사의 것인가. @return 공연의 기획사 id */
-    fun requireEvent(accountId: Long, eventId: Long): Long {
+    /** 그 공연이 내 기획사의 것인가. [forWrite] 면 기획사가 `active` 여야 한다. @return 공연의 기획사 id */
+    fun requireEvent(accountId: Long, eventId: Long, forWrite: Boolean): Long {
         val organizerId = jdbc.sql("select organizer_id from event where event_id = :id")
             .param("id", eventId)
             .query(Long::class.java)
             .optional()
             .orElse(null)
         // 없는 공연과 남의 공연이 한 이름이다.
-        if (organizerId == null || !isMine(accountId, organizerId)) throw TicketException(ErrorCode.EVENT_NOT_FOUND)
+        if (organizerId == null || !isMine(accountId, organizerId, forWrite)) throw TicketException(ErrorCode.EVENT_NOT_FOUND)
         return organizerId
     }
 
-    /** 그 회차가 내 기획사의 것인가 */
-    fun requirePerformance(accountId: Long, performanceId: Long) {
+    /** 그 회차가 내 기획사의 것인가. [forWrite] 면 기획사가 `active` 여야 한다 */
+    fun requirePerformance(accountId: Long, performanceId: Long, forWrite: Boolean) {
         val organizerId = jdbc.sql(
             "select e.organizer_id from performance p join event e on e.event_id = p.event_id where p.performance_id = :id",
         )
@@ -48,13 +49,27 @@ class OrganizerMembership(private val jdbc: JdbcClient) {
             .optional()
             .orElse(null)
         // 없는 회차와 남의 회차가 한 이름이다 — `event-not-found` 로 새면 그 회차의 존재가 드러난다.
-        if (organizerId == null || !isMine(accountId, organizerId)) throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
+        if (organizerId == null || !isMine(accountId, organizerId, forWrite)) throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND)
     }
 
-    private fun isMine(accountId: Long, organizerId: Long): Boolean =
-        jdbc.sql("select count(*) from organizer_member where organizer_id = :organizer and account_id = :account")
+    /**
+     * 내 소속인가. [forWrite] 면 기획사가 `active` 인지도 본다 — **정지된 기획사는 공연을 못 올린다**(`V4` 주석, `I13-6`).
+     * 쓰기(등록·열기·취소)만 막는다. 읽기까지 막으면 목록(소속 조인)에 보이는 공연의 상세가 404 가 된다(마무리 28차 독립 리뷰).
+     * 정지는 남의 것과 같은 404 다. 「그 기획사는 있는데 정지됐다」를 알리지 않는다(`D5`).
+     */
+    private fun isMine(accountId: Long, organizerId: Long, forWrite: Boolean): Boolean =
+        jdbc.sql(
+            """
+            select count(*)
+              from organizer_member m join organizer o on o.organizer_id = m.organizer_id
+             where m.organizer_id = :organizer and m.account_id = :account
+               and (not :forWrite or o.status = :active)
+            """,
+        )
             .param("organizer", organizerId)
             .param("account", accountId)
+            .param("forWrite", forWrite)
+            .param("active", OrganizerStatus.ACTIVE.code)
             .query(Long::class.java)
             .single() > 0L
 }

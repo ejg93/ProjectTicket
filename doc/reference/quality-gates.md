@@ -12,7 +12,7 @@
 기준이 없으면 그 262건을 놓고 「고쳐야 하나」에 사람마다 다르게 답하고, **둘 중 아무 쪽으로 답해도 근거가 안 남는다.**
 
 그리고 신호는 쌓인다. 이 저장소엔 처분 표가 이미 둘 있는데
-(`CLAUDE.md` 「드러난 것의 처분」·`/wrapup` 「찾은 것을 어떻게 처분하나」),
+(`CLAUDE.md` 「드러난 것의 처분」·`CLAUDE.md` 「계획 끝」 4),
 게이트가 만든 것이 그 둘 중 어디로도 안 가면 **세 번째 더미**가 생긴다.
 
 ## 지금 무엇이 어디에 걸려 있나
@@ -160,7 +160,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 |---|---|---|---|---|
 | ⑫ | 4xx 는 `ERROR` 로그가 아니다 | `D10` | `log.error` 1곳 | **못 내린다** — 로그 수준은 코드에 있고 4xx 인지는 실행 때 정해진다. 정적으로는 「`catch` 안의 `error`」만 잡히고 그것이 규칙과 안 겹친다. 마무리 대조 몫으로 둔다 |
 
-**대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 `/wrapup` 대조와 독립 리뷰가 본다.
+**대조에서 뺀 것**: 이미 표에 있는 것(`EnumConstraintTest`·`ErrorContractTest`·`ArchitectureTest` 의 셋·`MetricNamesTest`·트리거들), 절차 규칙(「문서를 먼저 고친다」·「값 옆에 출처」), 판단 규칙(「마스킹은 갈릴 때만」). 절차·판단은 「계획 끝」 대조와 독립 리뷰가 본다.
 
 ## 문턱
 
@@ -202,7 +202,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 | gitleaks 검출 | **먼저 그 값을 폐기한다.** 이력에서 지우는 것은 그다음이다 |
 | dependabot PR | CI 가 초록이면 머지. 빨가면 그 자체가 청크다 |
 | Dependabot 경보 | high 이상은 다음 청크보다 먼저(`CLAUDE.md` 「무엇부터」 1 과 같은 급). 그 아래는 갱신 PR 이 올릴 때 같이 |
-| 리뷰 지적(둘 다) | **마무리가 셋 중 하나로 처분한다**(`/wrapup` 「찾은 것을 어떻게 처분하나」) |
+| 리뷰 지적(둘 다) | **마무리가 셋 중 하나로 처분한다**(`CLAUDE.md` 「계획 끝」 4) |
 
 **리뷰 지적에 「나중에 본다」가 없다.** 「오탐이다」도 처분이고 그 근거를 적는다 —
 안 그러면 지적이 PR 과 함께 묻히고, **그것이 이 문서가 막으려는 세 번째 더미**다.

@@ -35,5 +35,8 @@ load/results/
 # Kotlin 컴파일 데몬의 세션 표지. 빌드마다 생긴다
 .kotlin/
 
+# Superpowers 계획 파일·진행 원장. 원천은 `PLAN.md` 라 실행용 사본만 남는다(`CLAUDE.md` 「번들 모드」)
+.superpowers/
+
 # Gradle 데몬이 OOM 때 떨군다(기본 jvmargs 에 HeapDumpOnOutOfMemoryError) — 수백 MB 라 섞이면 안 된다
 *.hprof

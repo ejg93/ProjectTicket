@@ -1,11 +1,12 @@
 package com.projectticket.ticket
 
 import com.projectticket.ticket.auth.AuthController
-import com.projectticket.ticket.auth.EmailAddress
 import com.projectticket.ticket.event.OrganizerEventController
+import com.projectticket.ticket.event.SectionCodes
 import com.projectticket.ticket.event.SectionCodesValidator
 import com.projectticket.ticket.payment.CardNumbers
 import com.projectticket.ticket.reservation.TicketService
+import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.PositiveOrZero
@@ -94,13 +95,21 @@ class AppDbConstraintTest {
     }
 
     @Test
-    fun the_price_floor_is_in_both_places() {
-        // 음수 금액은 정산·환불이 통째로 뒤집히는 값이다(`D21`). 앱의 `@PositiveOrZero` 와 DB 의 `>= 0` 은 한 규칙이다.
-        assertThat(annotationOf<PositiveOrZero>(OrganizerEventController.GradeRequest::class.java, "price"))
+    fun the_price_range_is_in_both_places() {
+        // 음수 금액은 정산·환불이 통째로 뒤집히는 값이다(`D21`). 상한은 4석 합이 `reservation.total_amount int` 안이다(ADR 0003).
+        // 앱의 `@PositiveOrZero`·`@Max` 와 DB 의 `between 0 and N` 은 한 규칙이다 — 좌석 가격은 등급 가격을 오픈 때 복제한 것이라 같은 범위다.
+        val owner = OrganizerEventController.GradeRequest::class.java
+        assertThat(annotationOf<PositiveOrZero>(owner, "price"))
             .describedAs("`price` 의 `@PositiveOrZero` 가 사라졌다. DB 만 남으면 음수 요청이 500 으로 나간다")
             .isNotNull()
-        assertThat(bodyOf(liveChecks(), "seat_grade_price_check").replace(oldValue = " ", newValue = ""))
-            .contains("price>=0")
+        val ceiling = checkNotNull(annotationOf<Max>(owner, "price")) { "`price` 의 `@Max` 가 사라졌다. DB 만 남으면 큰 가격이 500 으로 나간다" }.value
+
+        val checks = liveChecks()
+        listOf("seat_grade_price_check", "performance_seat_price_check").forEach { constraint ->
+            val range = checkNotNull(PRICE_RANGE.find(bodyOf(checks, constraint))) { "`$constraint` 가 `price between 0 and N` 꼴이 아니다" }
+            assertThat(range.groupValues[1].toLong()).describedAs("`$constraint` 의 하한").isZero()
+            assertThat(range.groupValues[2].toLong()).describedAs("`$constraint` 의 상한과 `@Max` 가 갈렸다").isEqualTo(ceiling)
+        }
     }
 
     @Test
@@ -219,7 +228,7 @@ class AppDbConstraintTest {
             "account_display_name_length_check" to
                 lengthOf(AuthController.SignupRequest::class.java, "displayName"),
             "account_email_length_check" to
-                AppLength(EmailAddress::class.java.getAnnotation(Size::class.java).max, rejectsBlank = false),
+                AppLength(metaSizeOf(AuthController.SignupRequest::class.java, "email").max, rejectsBlank = false),
             "event_title_length_check" to
                 lengthOf(OrganizerEventController.CreateEventRequest::class.java, "title"),
         )
@@ -228,8 +237,8 @@ class AppDbConstraintTest {
         val FORMATS: Map<String, String> = mapOf(
             "seat_grade_code_format_check" to
                 annotationOf<Pattern>(OrganizerEventController.GradeRequest::class.java, "code")!!.regexp,
-            "seat_section_format_check" to SectionCodesValidator.FORMAT_REGEX,
-            "seat_grade_map_section_format_check" to SectionCodesValidator.FORMAT_REGEX,
+            "seat_section_format_check" to sectionFormatOf(OrganizerEventController.GradeRequest::class.java, "sections"),
+            "seat_grade_map_section_format_check" to sectionFormatOf(OrganizerEventController.GradeRequest::class.java, "sections"),
         )
 
         /**
@@ -246,6 +255,22 @@ class AppDbConstraintTest {
             "idempotency_key_length_check" to "`IdempotencyKeys` 가 UUIDv4 만 받아 36자 고정이다. DB 의 1..255 가 더 넓다",
             "idempotency_key_hash_check" to "SHA-256 hex 를 서버가 잰다. 입구에 없다",
         )
+
+        val PRICE_RANGE = Regex("""price\s+between\s+(\d+)\s+and\s+(\d+)""")
+
+        /**
+         * 칸에 붙은 합성 애너테이션(`@EmailAddress` 꼴)이 든 `@Size`. **칸에서 읽는다** — 애너테이션 정의에서 읽으면
+         * 칸에서 떼도 이 표가 초록이다(`I13-3`).
+         */
+        fun metaSizeOf(owner: Class<*>, field: String): Size =
+            owner.getDeclaredField(field).annotations.firstNotNullOfOrNull { it.annotationClass.java.getAnnotation(Size::class.java) }
+                ?: error("`${owner.simpleName}.$field` 에 `@Size` 를 든 애너테이션이 없다 — 앱 검증이 빠졌다")
+
+        /** 구역 형식은 검증기 안 상수다. 상수를 읽기 전에 **칸에 `@SectionCodes` 가 붙었나**를 본다 — 안 보면 떼도 초록이다 */
+        fun sectionFormatOf(owner: Class<*>, field: String): String {
+            checkNotNull(annotationOf<SectionCodes>(owner, field)) { "`${owner.simpleName}.$field` 에 `@SectionCodes` 가 없다 — 앱 검증이 빠졌다" }
+            return SectionCodesValidator.FORMAT_REGEX
+        }
 
         inline fun <reified T : Annotation> annotationOf(owner: Class<*>, field: String): T? =
             owner.getDeclaredField(field).getAnnotation(T::class.java)

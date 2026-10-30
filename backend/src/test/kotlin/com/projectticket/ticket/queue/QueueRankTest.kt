@@ -99,6 +99,16 @@ class QueueRankTest : PostgresTestBase() {
     }
 
     @Test
+    fun before_sales_open_there_is_no_queue() {
+        jdbc.sql("update performance set sales_open_at = now() + interval '1 hour' where performance_id = :id").param("id", performanceId).update()
+
+        // 판매 시작 전에는 줄이 없다(`I13-1`). 관문도 안 지킨다 — 선점 서비스가 409 로 답한다.
+        assertThatThrownBy { queue.enter(performanceId, first) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
+        assertThat(queue.gateOf(performanceId)).isEqualTo(QueueService.Gate.BEFORE_SALE)
+    }
+
+    @Test
     fun a_closed_performance_has_no_queue() {
         jdbc.sql("update performance set status = 'closed' where performance_id = :id").param("id", performanceId).update()
 

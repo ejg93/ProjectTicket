@@ -106,30 +106,55 @@ class QueueService(
         Position.waiting(rank = rank + 1, etaSeconds = etaSecondsFor(rank + 1))
 
     /**
-     * 관문(23)이 지킬 회차인가.
+     * 관문(23)이 이 회차 앞에서 무엇을 하나.
      *
      * 판매 중이 아니면 줄 자체가 없어서 **토큰을 받을 길이 없다** — 그런 요청을 관문이 429 로 막으면
      * 「나중엔 된다」는 거짓말이 된다. 그 회차의 사정은 선점 서비스가 409·410 으로 더 정확히 말한다.
+     *
+     * **판매 시작 전만은 관문이 직접 답한다**([Gate.BEFORE_SALE]) — 지나 보내면 관문의 읽기와 선점의 읽기 사이에 판매 시작이 오는 순간
+     * 토큰 없이 좌석을 잡는다(마무리 28차 독립 리뷰). `sales_open_at` 은 공개 시각이라 노릴 수 있다.
      */
-    fun isGated(performanceId: Long): Boolean = statusOf(performanceId) == PerformanceStatus.OPEN.code
+    fun gateOf(performanceId: Long): Gate {
+        val sale = saleOf(performanceId) ?: return Gate.NONE
+        return when {
+            sale.onSale -> Gate.GATED
+            sale.status == PerformanceStatus.OPEN.code -> Gate.BEFORE_SALE
+            else -> Gate.NONE
+        }
+    }
+
+    enum class Gate {
+        /** 판매 중이다. 토큰이 있어야 지난다 */
+        GATED,
+
+        /** 열렸는데 판매 시작 전이다. 관문이 409 `performance-not-open` 을 낸다 */
+        BEFORE_SALE,
+
+        /** 없거나 판매 중이 아니다(`draft`·`closed`·`cancelled`). 줄이 없어 선점 서비스가 404·409 로 답한다 */
+        NONE,
+    }
 
     /**
      * 판매 중인 회차에만 줄이 선다. 닫힌 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`),
      * 화면은 그 코드로 줄을 걷는다.
      */
     private fun requireOpen(performanceId: Long) {
-        val status = statusOf(performanceId)
+        val sale = saleOf(performanceId)
             ?: throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
 
-        if (status != PerformanceStatus.OPEN.code) {
-            throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=$status")
+        if (!sale.onSale) {
+            throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=${sale.status}")
         }
     }
 
-    private fun statusOf(performanceId: Long): String? =
-        jdbc.sql("select status from performance where performance_id = :id")
+    /** [onSale] 은 `open` 이고 판매 시작(`sales_open_at`)이 지났나다(`I13-1`). 그 전에는 줄이 서지 않는다 */
+    private data class Sale(val status: String, val onSale: Boolean)
+
+    private fun saleOf(performanceId: Long): Sale? =
+        jdbc.sql("select status, status = :open and sales_open_at <= now() as on_sale from performance where performance_id = :id")
             .param("id", performanceId)
-            .query(String::class.java)
+            .param("open", PerformanceStatus.OPEN.code)
+            .query { rs, _ -> Sale(status = rs.getString("status"), onSale = rs.getBoolean("on_sale")) }
             .optional()
             .orElse(null)
 

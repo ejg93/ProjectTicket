@@ -3,6 +3,7 @@ package com.projectticket.ticket
 import com.projectticket.ticket.auth.AccountRole
 import com.projectticket.ticket.auth.AccountStatus
 import com.projectticket.ticket.event.PerformanceSeatStatus
+import com.projectticket.ticket.event.OrganizerStatus
 import com.projectticket.ticket.event.PerformanceStatus
 import com.projectticket.ticket.notification.NotificationStatus
 import com.projectticket.ticket.outbox.AggregateType
@@ -87,6 +88,7 @@ class EnumConstraintTest {
             "account_role_check" to AccountRole.entries.map { it.code },
             "account_status_check" to AccountStatus.entries.map { it.code },
             "performance_status_check" to PerformanceStatus.entries.map { it.code },
+            "organizer_status_check" to OrganizerStatus.entries.map { it.code },
             "performance_seat_status_check" to PerformanceSeatStatus.entries.map { it.code },
             "notification_status_check" to NotificationStatus.entries.map { it.code },
             "outbox_aggregate_type_check" to AggregateType.entries.map { it.code },
@@ -114,8 +116,6 @@ class EnumConstraintTest {
          * 여기 적힌 것은 이 테스트가 못 지킨다 — 갈려도 안 걸린다. 앱이 분기하기 시작하면 열거형을 만들고 위로 옮긴다.
          */
         val WITHOUT_ENUM: Set<String> = setOf(
-            // 기획사 상태도 같다 — 지금은 조회 필터에만 쓴다.
-            "organizer_status_check",
             // 동의 출처는 감사용 꼬리표다. 분기하지 않는다.
             "account_consent_source_check",
             // 환불 사유는 `D6` 의 표가 출처고 앱은 삽입만 한다.

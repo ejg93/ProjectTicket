@@ -22,7 +22,7 @@ full 은 Docker 를 먼저 본다. 안 떠 있으면 `scripts/docker-up.sh` 가 
 
 **backend 명령은 앞에 `JAVA_HOME="C:/Program Files/Java/jdk-25"` 를 붙인다.** 안 붙이면 훅이 막는다.
 
-**시점이 셋이다** — 청크(커밋 앞) · 번들 끝(`/wrapup`) · push 뒤. `CLAUDE.md` 「검증」이 층을 정하고 이 표가 명령을 든다.
+**시점이 셋이다** — 청크(커밋 앞) · 번들 끝(`CLAUDE.md` 「계획 끝」) · push 뒤. `CLAUDE.md` 「검증」이 층을 정하고 이 표가 명령을 든다.
 
 | 언제 | 시점 | 명령 | 통과 기준 |
 |---|---|---|---|

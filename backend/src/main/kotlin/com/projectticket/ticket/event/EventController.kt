@@ -34,7 +34,7 @@ class EventController(private val eventQuery: EventQuery, private val membership
         if (!eventQuery.hasPublicPerformance(eventId)) {
             // 비로그인·남의 기획사는 없는 공연과 한 이름이다 — 존재를 안 흘린다.
             if (user == null) throw TicketException(ErrorCode.EVENT_NOT_FOUND)
-            membership.requireEvent(user.id, eventId)
+            membership.requireEvent(user.id, eventId, forWrite = false)
         }
         return eventQuery.detail(eventId)
     }

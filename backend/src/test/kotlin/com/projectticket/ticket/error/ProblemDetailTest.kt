@@ -1,6 +1,8 @@
 package com.projectticket.ticket.error
 
 import com.projectticket.ticket.PostgresTestBase
+import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
@@ -28,6 +30,29 @@ class ProblemDetailTest : PostgresTestBase() {
             jsonPath("$.type") { value("tag:projectticket.example,2026:malformed-request") }
             jsonPath("$.instance") { value("/api/auth/login") }
         }
+    }
+
+    /** 경로 변수의 형이 틀려도 입력을 되돌려 싣지 않는다(`D9` 「입력과 출력」, `I13-4`). 프레임워크 기본 `detail` 은 값을 그대로 적는다 */
+    @Test
+    fun a_path_type_mismatch_does_not_echo_the_input() {
+        // `instance` 는 요청 URI 라 그 값이 실린다(RFC 9457 §3.1.5). 되돌려 싣지 말 것은 `detail` 이다.
+        mvc.get("/api/events/zq9echo").andExpect {
+            status { isBadRequest() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:malformed-request") }
+            jsonPath("$.detail") { value(Matchers.not(Matchers.containsString("zq9echo"))) }
+        }
+    }
+
+    /** 쿼리의 형이 틀려도 같다. 바인딩 실패 문구는 입력과 Java 타입 이름을 같이 적는다 */
+    @Test
+    fun a_query_type_mismatch_does_not_echo_the_input() {
+        val body = mvc.get("/api/events?page=zq9echo")
+            .andExpect { status { isBadRequest() } }
+            .andReturn()
+            .response
+            .contentAsString
+
+        assertThat(body).doesNotContain("zq9echo").doesNotContain("java.lang")
     }
 
     @Test

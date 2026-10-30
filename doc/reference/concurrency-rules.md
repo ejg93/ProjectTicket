@@ -36,7 +36,7 @@ update performance_seat
 | 규칙 | 왜 |
 |---|---|
 | 갱신 행 수 = 요청 좌석 수가 아니면 **통째로 롤백** | 4석 중 3석만 잡히면 그 3석도 안 잡는다. 「가능한 것만」은 없다(ADR 0003) — 있으면 실패 응답에 「어느 좌석이 됐나」가 붙고 화면·정산이 부분을 다뤄야 한다 |
-| 회차 `open` 을 같은 문장에서 본다 | 닫힌 회차의 좌석도 `available` 로 남아 있다(`V6` 는 회차 상태를 모른다). 따로 읽으면 그 사이에 닫힌다 |
+| 회차 행을 `for share` 로 먼저 잠근다. 판매 시작(`sales_open_at <= now()`)도 거기서 본다 | 닫힌 회차의 좌석도 `available` 로 남아 있다(`V6` 는 회차 상태를 모른다). 위 `exists` 는 문장 스냅샷이라 **커밋 전 취소·종료를 `open` 으로 읽고**, 취소의 `for update` 는 커밋 전 예매를 못 본다 — 둘 다 커밋하면 취소된 회차에 `held` 가 남는다(`I13-1`). `for share` 는 취소·종료의 `update performance`(FOR NO KEY UPDATE)와 부딪쳐 순서를 세운다 — `for key share` 는 안 부딪친다. `exists` 는 남긴다 |
 | `performance_id` 를 같이 건다 | 다른 회차의 좌석 id 를 섞어 보내는 요청이 그 회차의 좌석을 못 잡는다 |
 | 상태는 열거형 `code` 를 바인딩한다 — 리터럴로 두는 예외(부분 인덱스 짝·계층)는 `D14` 「SQL」 이 든다 | `D14` 「SQL」 |
 
@@ -68,6 +68,7 @@ select performance_seat_id
 `performance_seat_held_fields_check`(`V6`)가 `held` 행에 `reservation_id` 를 요구한다. 그래서 순서는 이렇다:
 
 ```
+0. 회차 행 select … for share (open 이고 판매 시작이 지났나) → 취소·종료와 순서가 선다(I13-1)
 1. reservation 행 삽입 (held, held_until)        → reservation_id 를 얻는다
 2. 좌석 id 오름차순 select … for update
 3. 조건부 update (위 문장)

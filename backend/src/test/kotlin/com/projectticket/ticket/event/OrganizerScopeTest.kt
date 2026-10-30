@@ -13,6 +13,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
@@ -103,6 +104,31 @@ class OrganizerScopeTest : PostgresTestBase() {
             // 공연이 아직 없는 입구라 이름도 기획사다 — `event-not-found` 는 「없거나 남의 공연」이 가진 이름이다.
             jsonPath("$.type") { value("tag:projectticket.example,2026:organizer-not-found") }
         }
+    }
+
+    @Test
+    fun a_suspended_organizer_is_not_found() {
+        // 정지된 기획사는 공연을 못 올린다(`V4` 주석, `I13-6`). 남의 것과 같은 이름이다 — 존재를 안 알린다(`D5`).
+        val eventId = createdEvent(mine, myOrganizer)
+        jdbc.sql("update organizer set status = 'suspended' where organizer_id = :id").param("id", myOrganizer).update()
+
+        createEvent(mine, myOrganizer).andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:organizer-not-found") }
+        }
+        createPerformance(mine, eventId).andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:event-not-found") }
+        }
+    }
+
+    @Test
+    fun a_suspended_organizer_still_reads_its_own_event() {
+        // 정지가 막는 것은 쓰기(등록·열기·취소)다. 목록에 보이는 공연의 상세가 404 면 화면이 갈린다(마무리 28차 독립 리뷰).
+        val eventId = createdEvent(mine, myOrganizer)
+        jdbc.sql("update organizer set status = 'suspended' where organizer_id = :id").param("id", myOrganizer).update()
+
+        mvc.get("/api/organizer/events/$eventId") { with(user(mine)) }.andExpect { status { isOk() } }
     }
 
     @Test

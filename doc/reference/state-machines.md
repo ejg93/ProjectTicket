@@ -30,10 +30,10 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
-| — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 활성 토큰이 있다 | 13 |
-| `held` | `paying` | `held_until` 이 안 지났다 | 16 |
+| — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 `sales_open_at <= now()` 이고 활성 토큰이 있다 | 13 |
+| `held` | `paying` | `held_until` 이 안 지났다. 회차가 `open` 이다 | 16 |
 | `held` | `expired` | `held_until < now()` | 14 스윕 |
-| `paying` | `reserved` | 결제 승인. `paying_until` 이 안 지났다 | 16 |
+| `paying` | `reserved` | 결제 승인. `paying_until` 이 안 지났다. 회차가 `open` 이다 | 16 |
 | `paying` | `held` | 결제 거절·실패. `held_until` 이 안 지났다 | 16 |
 | `paying` | `expired` | `paying_until < now()`, 또는 거절됐는데 `held_until` 도 지났다 | 16 타임아웃 |
 | `reserved` | `cancelled` | 관람일 당일이 아니다(ADR 0003 수수료 구간) | 17 |
@@ -65,6 +65,20 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 **둘이 갈리는 것은 `D4` 의 대조 테스트가 막는다.** 갈릴 수 있는 자리는 전이 하나가 두 표를 고치는 자리 전부이고,
 그래서 전이는 반드시 한 트랜잭션이다.
+
+## 좌석 `performance_seat`
+
+예매의 투영이라 상태가 셋뿐이다(위 「좌석과의 대응」). 전이는 `performance_seat_status_transition`(`V26`)이 막고,
+포인터가 다른 예매로 넘어가는 것은 `performance_seat_no_handover`(`V24`)가 막는다.
+
+### 전이표
+
+| 에서 | 로 | 조건 | 청크 |
+|---|---|---|---|
+| `available` | `held` | 선점. 회차가 `open` 이다 | 13 |
+| `held` | `reserved` | 예매가 `reserved` 로 간다 | 16 |
+| `held` | `available` | 예매가 `expired`·`cancelled` 로 가거나 결제가 실패해 선점이 끝났다 | 14·16·16a·17a |
+| `reserved` | `available` | 예매가 `cancelled` 로 간다 | 17·17a |
 
 ## 결제 `payment`
 

@@ -165,6 +165,17 @@ class ReservationHoldTest : PostgresTestBase() {
     }
 
     @Test
+    fun before_sales_open_is_not_open() {
+        // 판매 시작 전이다(`I13-1`). 줄도 없어서 관문을 지나고, 선점 서비스가 409 로 답한다 — 새 코드를 안 만든다.
+        jdbc.sql("update performance set sales_open_at = now() + interval '1 hour' where performance_id = :id").param("id", performanceId).update()
+
+        hold(seatIds.take(1)).andExpect {
+            status { isConflict() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-open") }
+        }
+    }
+
+    @Test
     fun someone_elses_reservation_is_not_found() {
         val body = hold(seatIds.take(1)).andReturn().response.contentAsString
         val reservationId = json.readTree(body)["reservation_id"].asLong()

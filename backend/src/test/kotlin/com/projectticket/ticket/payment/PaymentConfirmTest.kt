@@ -115,6 +115,29 @@ class PaymentConfirmTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_cancelled_performance_cannot_start_paying() {
+        val reservationId = hold(1)
+        cancelPerformanceUnderneath()
+
+        assertThatThrownBy { transitions.startPaying(accountId, reservationId) }
+            .isInstanceOf(TicketException::class.java)
+            .extracting("code")
+            .isEqualTo(ErrorCode.PERFORMANCE_NOT_OPEN)
+    }
+
+    @Test
+    fun a_cancelled_performance_cannot_confirm() {
+        val paying = transitions.startPaying(accountId, hold(1))
+        cancelPerformanceUnderneath()
+
+        // 승인이 와도 예매는 성립하지 않는다 — 늦은 승인이라 환불 스윕(`I11-3`)이 되돌린다.
+        val settled = transitions.settle(accountId, paying, approved())
+
+        assertThat(settled.late).isTrue()
+        assertThat(reservation(paying.reservationId)).isNotEqualTo("reserved")
+    }
+
+    @Test
     fun start_paying_needs_a_live_hold_of_mine() {
         val reservationId = hold(1)
 
@@ -200,6 +223,11 @@ class PaymentConfirmTest : PostgresTestBase() {
         assertThatThrownBy {
             jdbc.sql("update payment set amount = 1 where payment_id = :id").param("id", settled.paymentId).update()
         }.hasStackTraceContaining("결제 기록은 고칠 수 없다")
+    }
+
+    /** 서비스를 거치지 않고 회차만 취소로 옮긴다 — 경합이 남긴 모양(취소된 회차의 살아 있는 예매)을 그대로 만든다 */
+    private fun cancelPerformanceUnderneath() {
+        jdbc.sql("update performance set status = 'cancelled' where performance_id = :id").param("id", performanceId).update()
     }
 
     private fun hold(seats: Int): Long = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds.take(seats)))

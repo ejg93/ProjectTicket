@@ -127,9 +127,11 @@ class ConsentSignupTest : PostgresTestBase() {
     fun null_consent_value_is_rejected_not_crashed() {
         // 타입이 Boolean 이어도 JSON 의 null 은 들어온다. 그대로 두면 not null 컬럼에 부딪쳐 500 이 되고,
         // 사용자는 무엇을 고쳐야 하는지 못 듣는다.
+        // 항목은 아는 것이라 `unknown-consent-item` 이 아니다. 비어 있는 칸을 짚는 400 이다(`I13-6`, `D5`).
         signUpRaw("""{"terms_of_service":true,"privacy_collect":true,"marketing_email":null}""").andExpect {
-            status { isUnprocessableContent() }
-            jsonPath("$.detail") { value("동의 여부가 비어 있다: marketing_email") }
+            status { isBadRequest() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:validation-failed") }
+            jsonPath("$.errors[0].field") { value("consents.marketing_email") }
         }
     }
 

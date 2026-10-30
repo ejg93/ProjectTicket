@@ -50,7 +50,7 @@ class OrganizerEventQuery(private val jdbc: JdbcClient, private val membership: 
      * 팔린 수는 `reserved` 좌석만 센다 — `held` 는 선점일 뿐 아직 돈이 안 들어왔다(`D3`).
      */
     fun detail(accountId: Long, eventId: Long): OrganizerEventDetail {
-        membership.requireEvent(accountId, eventId)
+        membership.requireEvent(accountId, eventId, forWrite = false)
 
         val head = jdbc.sql(
             """

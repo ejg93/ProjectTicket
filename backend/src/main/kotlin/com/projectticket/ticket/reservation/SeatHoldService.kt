@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory
  * 좌석 선점의 트랜잭션. `D4` 「선점의 문장 순서」 그대로다:
  *
  * ```
+ * 0. 회차 행 select … for share                    → 취소·종료와 순서를 세운다(`I13-1`)
  * 1. reservation 행 삽입 (held, held_until)      → reservation_id
  * 2. 좌석 id 오름차순 select … for update         → 교착 방지
  * 3. 조건부 update (available 이고 회차가 open)
@@ -72,13 +73,15 @@ class SeatHoldService(
             )
         }
 
-        // 회차 상태를 먼저 읽는 것은 **친절한 오류를 주기 위해서**다. 강제는 아래 조건부 UPDATE 의 `exists` 가 한다 — 그 사이에 닫혀도 0행이다.
-        val performanceStatus = performanceStatusOf(command.performanceId)
-        if (performanceStatus != PerformanceStatus.OPEN.code) {
+        // **회차 행을 `for share` 로 잠그고 읽는다**(`D4` 「좌석 선점」, `I13-1`). 아래 조건부 UPDATE 의 `exists` 는 문장 스냅샷이라
+        // 커밋 전 취소·종료를 `open` 으로 읽는다 — 그 창에 든 선점은 취소된 회차에 `held` 로 남았다. 잠그면 취소·종료의 `update performance` 와
+        // 서로 기다려 순서가 선다. 공유 잠금이라 선점끼리는 안 막는다.
+        val performance = lockPerformance(command.performanceId)
+        if (performance.status != PerformanceStatus.OPEN.code || !performance.onSale) {
             throw TicketException(
                 ErrorCode.PERFORMANCE_NOT_OPEN,
-                "판매 중인 회차가 아니다: performance_id=${command.performanceId}, status=$performanceStatus",
-                mapOf("performance_status" to performanceStatus),
+                "판매 중인 회차가 아니다: performance_id=${command.performanceId}, status=${performance.status}, on_sale=${performance.onSale}",
+                mapOf("performance_status" to performance.status),
             )
         }
 
@@ -146,6 +149,16 @@ class SeatHoldService(
         jdbc.sql("select status from performance where performance_id = :id")
             .param("id", performanceId)
             .query(String::class.java)
+            .optional()
+            .orElseThrow { TicketException(ErrorCode.PERFORMANCE_NOT_FOUND) }
+
+    /** [onSale] 은 판매 시작이 지났나다(`sales_open_at <= now()`). 상태가 `open` 이어도 그 전에는 못 잡는다 */
+    private data class PerformanceGate(val status: String, val onSale: Boolean)
+
+    private fun lockPerformance(performanceId: Long): PerformanceGate =
+        jdbc.sql("select status, sales_open_at <= now() as on_sale from performance where performance_id = :id for share")
+            .param("id", performanceId)
+            .query { rs, _ -> PerformanceGate(status = rs.getString("status"), onSale = rs.getBoolean("on_sale")) }
             .optional()
             .orElseThrow { TicketException(ErrorCode.PERFORMANCE_NOT_FOUND) }
 

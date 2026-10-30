@@ -47,7 +47,10 @@ class MeController(
         return ResponseEntity.noContent().build()
     }
 
-    data class WithdrawRequest(@field:NotBlank val password: String)
+    data class WithdrawRequest(@field:NotBlank val password: String) {
+        /** 비밀번호를 안 찍는다(`D9`) */
+        override fun toString(): String = "WithdrawRequest[password=***]"
+    }
 
     data class MeResponse(val accountId: Long, val email: String, val displayName: String, val role: String)
 }
