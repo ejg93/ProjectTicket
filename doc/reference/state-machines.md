@@ -30,10 +30,10 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
-| — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 활성 토큰이 있다 | 13 |
-| `held` | `paying` | `held_until` 이 안 지났다 | 16 |
+| — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 `sales_open_at <= now()` 이고 활성 토큰이 있다 | 13 |
+| `held` | `paying` | `held_until` 이 안 지났다. 회차가 `open` 이다 | 16 |
 | `held` | `expired` | `held_until < now()` | 14 스윕 |
-| `paying` | `reserved` | 결제 승인. `paying_until` 이 안 지났다 | 16 |
+| `paying` | `reserved` | 결제 승인. `paying_until` 이 안 지났다. 회차가 `open` 이다 | 16 |
 | `paying` | `held` | 결제 거절·실패. `held_until` 이 안 지났다 | 16 |
 | `paying` | `expired` | `paying_until < now()`, 또는 거절됐는데 `held_until` 도 지났다 | 16 타임아웃 |
 | `reserved` | `cancelled` | 관람일 당일이 아니다(ADR 0003 수수료 구간) | 17 |

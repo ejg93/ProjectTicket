@@ -111,25 +111,29 @@ class QueueService(
      * 판매 중이 아니면 줄 자체가 없어서 **토큰을 받을 길이 없다** — 그런 요청을 관문이 429 로 막으면
      * 「나중엔 된다」는 거짓말이 된다. 그 회차의 사정은 선점 서비스가 409·410 으로 더 정확히 말한다.
      */
-    fun isGated(performanceId: Long): Boolean = statusOf(performanceId) == PerformanceStatus.OPEN.code
+    fun isGated(performanceId: Long): Boolean = saleOf(performanceId)?.onSale == true
 
     /**
      * 판매 중인 회차에만 줄이 선다. 닫힌 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`),
      * 화면은 그 코드로 줄을 걷는다.
      */
     private fun requireOpen(performanceId: Long) {
-        val status = statusOf(performanceId)
+        val sale = saleOf(performanceId)
             ?: throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
 
-        if (status != PerformanceStatus.OPEN.code) {
-            throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=$status")
+        if (!sale.onSale) {
+            throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=${sale.status}")
         }
     }
 
-    private fun statusOf(performanceId: Long): String? =
-        jdbc.sql("select status from performance where performance_id = :id")
+    /** [onSale] 은 `open` 이고 판매 시작(`sales_open_at`)이 지났나다(`I13-1`). 그 전에는 줄이 서지 않는다 */
+    private data class Sale(val status: String, val onSale: Boolean)
+
+    private fun saleOf(performanceId: Long): Sale? =
+        jdbc.sql("select status, status = :open and sales_open_at <= now() as on_sale from performance where performance_id = :id")
             .param("id", performanceId)
-            .query(String::class.java)
+            .param("open", PerformanceStatus.OPEN.code)
+            .query { rs, _ -> Sale(status = rs.getString("status"), onSale = rs.getBoolean("on_sale")) }
             .optional()
             .orElse(null)
 
