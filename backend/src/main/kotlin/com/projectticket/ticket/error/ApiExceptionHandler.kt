@@ -56,7 +56,10 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
         val problem = problems.create(ErrorCode.VALIDATION_FAILED, null, servletRequestOf(request))
         problem.setProperty(
             "errors",
-            e.bindingResult.fieldErrors.map { FieldError(field = toSnakeCase(it.field), message = it.defaultMessage) },
+            // 형이 틀린 바인딩(`?page=abc`)의 기본 문구는 입력과 Java 타입 이름을 같이 적는다 — 고정 문구로 바꾼다(`I13-4`, `D9`).
+            e.bindingResult.fieldErrors.map {
+                FieldError(field = toSnakeCase(it.field), message = if (it.isBindingFailure) MALFORMED_VALUE else it.defaultMessage)
+            },
         )
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status).body(problem)
     }
@@ -79,7 +82,8 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
         request: WebRequest,
     ): ResponseEntity<Any> {
         if (body is ProblemDetail && body.properties == null) {
-            val ours = problems.create(frameworkCodeOf(statusCode), body.detail, servletRequestOf(request))
+            // 프레임워크 `detail` 은 버린다 — 형 불일치면 `Failed to convert 'x' with value: '…'` 처럼 입력을 되돌려 싣는다(`I13-4`, `D9`).
+            val ours = problems.create(frameworkCodeOf(statusCode), null, servletRequestOf(request))
             ours.status = statusCode.value()
             return super.createResponseEntity(ours, headers, statusCode, request)
         }
@@ -118,4 +122,9 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
 
     private fun toSnakeCase(camel: String): String =
         camel.replace(Regex("([a-z0-9])([A-Z])"), "$1_$2").lowercase()
+
+    private companion object {
+        /** 형이 틀린 칸의 문구. 입력을 안 싣는다 */
+        const val MALFORMED_VALUE = "형식이 맞지 않는다"
+    }
 }

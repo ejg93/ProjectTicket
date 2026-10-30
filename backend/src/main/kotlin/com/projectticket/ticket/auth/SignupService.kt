@@ -32,7 +32,10 @@ class SignupService(
         val displayName: String,
         val consents: Map<String, Boolean?>,
         val actorIp: String?,
-    )
+    ) {
+        /** 비밀번호를 안 찍는다(`D9`). 이메일은 `SignupRequest` 와 같이 둔다 */
+        override fun toString(): String = "Command[email=$email, displayName=$displayName]"
+    }
 
     @Transactional
     fun signUp(command: Command): Long {

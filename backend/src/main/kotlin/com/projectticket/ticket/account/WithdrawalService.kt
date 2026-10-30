@@ -86,5 +86,8 @@ class WithdrawalService(
             detail = mapOf("ip" to ip, "reason" to reason),
         )
 
-    private data class Credentials(val email: String, val passwordHash: String)
+    private data class Credentials(val email: String, val passwordHash: String) {
+        /** 이메일도 해시도 안 찍는다(`D9`·`D10`) */
+        override fun toString(): String = "Credentials[***]"
+    }
 }

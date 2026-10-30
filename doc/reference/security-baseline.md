@@ -109,8 +109,8 @@
 | 없는 경로 | 로그인 전에는 **401** | 404 를 주면 어떤 경로가 있는지를 비로그인에게 알려 준다 |
 | 공개 경로 | **메서드까지 연다** — 조회는 GET(`PUBLIC_GET_PATHS`), 가입·로그인은 POST(`PUBLIC_POST_PATHS`). 그 밖의 메서드는 익명이면 401. `PublicPathMethodTest`(`S1`) | 경로만 열면 뒤에 붙는 DELETE·PUT 입구가 인증 없이 인가를 지난다 |
 | principal | `TicketUser` 가 인증 뒤 해시를 지운다(`CredentialsContainer`). `equals` 는 id 로만 | 해시가 세션 내내 메모리에 남으면 안 된다. `data class` 면 못 지운다 |
-| 요청 객체 `toString` | `SignupRequest`·`LoginRequest` 가 재정의 | `data class` 기본 `toString` 이 평문 비밀번호를 찍는다 |
-| 오류 본문 | `detail` 에 개인정보·SQL·스택 없음. `trace_id` 는 오류에만 | `D10` |
+| 요청 객체 `toString` | `password`·`passwordHash` 칸을 든 클래스 전부가 재정의하고 그 칸을 안 읽는다 — `ArchitectureTest.passwordHoldersMaskToString` 이 센다(`I13-4`) | `data class` 기본 `toString` 이 평문 비밀번호를 찍는다. 이름을 적은 표는 새 클래스를 빠뜨린다 |
+| 오류 본문 | `detail` 에 개인정보·SQL·스택 없음. 프레임워크 예외의 `detail` 은 버리고 형이 틀린 칸의 `errors[].message` 는 고정 문구다 — 입력을 되돌려 싣지 않는다(`ProblemDetailTest`, `I13-4`). `trace_id` 는 오류에만 | `D10` |
 | 프록시 뒤 IP | `forward-headers-strategy: native`(33). 신뢰 대역은 톰캣 기본값(사설망·루프백) — `application.yml` | 안 켜면 `acted_ip`·감사의 IP 가 프록시 IP 가 되고 로그인 실패 카운터가 한 IP 로 뭉친다 |
 
 ## 감사
@@ -138,7 +138,7 @@
 |---|---|---|
 | Redis | 관문 닫힘(503). 좌석 조회는 DB 에서 만든다(느려질 뿐). 세션은 다시 로그인 | 우리 것이라 열지 않는다. 좌석 상태는 DB 라 안 망가진다 |
 | 모의 PG 시간 초과 | **재시도 안 한다.** 상태 조회로 푼다(`D4`) | 승인됐는데 응답만 못 받았을 수 있다. 재시도가 이중 결제다 |
-| 예상 못 한 예외 | 500 `internal`, 원인은 스택까지 로그에 | 응답에 담으면 유출이다 |
+| 예상 못 한 예외 | 500 `internal`, 원인은 스택까지 로그에. PG 의 DETAIL(위반한 행)은 뺀다 — 드라이버 속성 `logServerErrorDetail: false`(`PgErrorDetailTest`, `I13-4`) | 응답에 담으면 유출이다. 행 값이 로그에 실리면 `D10` 「개인정보는 안 찍는다」를 어긴다 |
 | 교착 | 1회 재시도 | `D4` |
 
 ## 비밀 관리

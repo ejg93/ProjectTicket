@@ -188,7 +188,30 @@ class ArchitectureTest {
             },
         )
 
+    /**
+     * 비밀번호·해시를 든 클래스의 `toString` 은 그 칸을 안 읽는다(`D9` 「로그인이 흘리면 안 되는 것」, `I13-4`). `data class` 기본 `toString` 은
+     * 평문 비밀번호를 찍는다 — 예외 메시지·로그·디버거에 실리는 자리다. 문서 표(5위)에 이름을 적어 두면 새 클래스를 빠뜨려서 여기(4위)로 내린다.
+     */
+    @ArchTest
+    val passwordHoldersMaskToString: ArchRule = classes()
+        .should(
+            object : ArchCondition<JavaClass>("not read a password or its hash in toString") {
+                override fun check(item: JavaClass, events: ConditionEvents) {
+                    // `data class` 기본 `toString` 은 모든 칸을 읽는다. 직접 쓴 `toString` 이 비밀번호 칸을 안 읽으면 가린 것이다.
+                    item.methods
+                        .asSequence()
+                        .filter { it.name == "toString" && it.rawParameterTypes.isEmpty() }
+                        .flatMap { it.fieldAccesses }
+                        .filter { it.target.name in PASSWORD_FIELDS && it.target.owner == item }
+                        .forEach { events.add(SimpleConditionEvent.violated(item, "${item.name}.toString 이 ${it.target.name} 을 찍는다 — 기본 toString 이 평문을 찍는다")) }
+                }
+            },
+        )
+
     private companion object {
+        /** 평문 비밀번호·해시를 든 칸 이름. 새 이름을 쓰면 여기 더한다 */
+        val PASSWORD_FIELDS = setOf("password", "passwordHash")
+
         /** 앱 시계를 읽어도 되는 클래스. 늘리려면 `time-rules.md` 의 예외 표에 사유를 먼저 적는다 */
         val APP_CLOCK_ALLOWED = setOf(
             "com.projectticket.ticket.demo.DemoSeeder",
