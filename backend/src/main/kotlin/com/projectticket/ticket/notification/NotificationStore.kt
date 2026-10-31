@@ -145,13 +145,14 @@ class NotificationStore(private val jdbc: JdbcClient) {
 
     /**
      * 받는 사람은 **표에서 읽는다**(`D11` 「소비」) — 페이로드의 `account_id` 를 안 믿는다. 회차 취소 알림과 같은 길이다.
-     * 예매가 없으면 `single()` 이 던진다 — 재시도 뒤 DLT 다.
+     * 예매가 없으면 던진다 — 재시도 뒤 DLT 다. DLT 를 보는 사람이 식별자를 얻게 메시지에 `reservation_id` 를 싣는다(`D10`).
      */
     private fun accountId(envelope: OutboxRelay.Envelope): Long =
         jdbc.sql("select account_id from reservation where reservation_id = :id")
             .param("id", envelope.aggregateId)
             .query(Long::class.java)
-            .single()
+            .optional()
+            .orElseThrow { IllegalStateException("알림을 받을 예매가 없다: reservation_id=${envelope.aggregateId}") }
 
     /** 사건의 숫자 필드. 카탈로그(`D11`)가 정한 필드라 없으면 생산자가 계약을 어긴 것이다 — 그 자리에서 선다 */
     private fun number(envelope: OutboxRelay.Envelope, field: String): Number =

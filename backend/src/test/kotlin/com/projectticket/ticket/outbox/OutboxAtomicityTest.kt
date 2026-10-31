@@ -53,7 +53,8 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
 
         val row = eventOf(reservationId, "reservation.reserved")
         assertThat(row.aggregateType).isEqualTo("reservation")
-        assertThat(row.version).isEqualTo(1)
+        // 생산자 판(DB 기본값)과 소비자가 아는 판이 같다 — 한쪽만 올리면 소비자가 사건을 건너뛰어 알림·정산이 조용히 멎는다(`EnvelopeVersions`)
+        assertThat(row.version).isEqualTo(EventType.SUPPORTED_VERSION)
         // 카탈로그가 정한 필드 그대로(`D11`). 빠지면 소비자가 표를 못 찾는다.
         assertThat(payloadOf(row)).containsOnlyKeys(
             "reservation_id", "account_id", "performance_id", "payment_id", "total_amount", "seat_count",

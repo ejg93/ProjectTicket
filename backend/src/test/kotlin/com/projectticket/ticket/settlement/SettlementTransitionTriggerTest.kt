@@ -62,7 +62,10 @@ class SettlementTransitionTriggerTest : PostgresTestBase() {
     fun scheduled_goes_to_pending_once_settle_at_passes() {
         val scheduled = scheduledSettlement(settleAt = "now() - interval '1 second'")
 
-        jdbc.sql("update settlement set status = 'pending', amount = 0, settled_at = now() where settlement_id = :id").param("id", scheduled).update()
+        // 롤백 레인이라 금액·항목 합의 지연 트리거는 안 돈다 — 여기서 재는 것은 시각 조건 하나다
+        assertThat(
+            jdbc.sql("update settlement set status = 'pending', amount = 0, settled_at = now() where settlement_id = :id").param("id", scheduled).update(),
+        ).isEqualTo(1)
     }
 
     @Test
