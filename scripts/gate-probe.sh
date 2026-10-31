@@ -62,7 +62,8 @@ for name in "$@"; do
     took=$((SECONDS - start))
     if [ "$rc" -eq 0 ]; then
       echo "[$name] 초록 — 게이트가 안 막았다(${took}초). 이것이 발견이다"; bad=1
-    elif [ -n "$expect" ] && ! printf '%s' "$out" | grep -qF -- "$expect"; then
+    # 파이프로 주지 않는다 — 출력이 64KB 를 넘으면 `grep -q` 가 먼저 끝나 `printf` 가 SIGPIPE(141)를 받고 `pipefail` 이 「못 찾았다」로 읽는다(마무리 29차, `oversell-rowcount`)
+    elif [ -n "$expect" ] && ! grep -qF -- "$expect" <<< "$out"; then
       echo "[$name] 빨강인데 다른 이유다 — 「$expect」 가 출력에 없다(${took}초):"; printf '%s\n' "$out" | tail -8 | sed 's/^/    /'; bad=1
     else
       echo "[$name] 막았다 — exit $rc, 「$expect」(${took}초)"
