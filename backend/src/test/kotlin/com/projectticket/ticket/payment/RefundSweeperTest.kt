@@ -90,7 +90,7 @@ class RefundSweeperTest : PostgresTestBase() {
     fun a_live_reservation_is_left_alone() {
         // 예매가 살아 있으면 좌석을 받은 것이다. 여기에 환불 행을 만들면 산 사람에게 돈을 돌려준다.
         val reservationId = fixture.hold(accountId = buyer, performanceId = performanceId, section = "F1-A", seatNumber = 1)
-        approve(reservationId)
+        // 승인 결제 행은 픽스처가 확정 앞에 넣는다(`V28`).
         fixture.reserve(reservationId)
 
         assertThat(sweeper.sweep()).isZero()

@@ -7,8 +7,12 @@ import com.projectticket.ticket.error.TicketException
 object IdempotencyKeys {
 
     const val HEADER = "Idempotency-Key"
-    /** RFC 9562 — 셋째 마디가 `4` 로 시작하고 넷째 마디가 `8`·`9`·`a`·`b` 로 시작한다 */
-    private val UUID_V4 = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+    /**
+     * RFC 9562 — 셋째 마디가 `4` 로 시작하고 넷째 마디가 `8`·`9`·`a`·`b` 로 시작한다.
+     * `idempotency_key_format_check`(`V31`)와 글자가 같다 — `AppDbConstraintTest.formats_match_the_database` 가 대조한다.
+     */
+    const val FORMAT_REGEX = "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    private val UUID_V4 = Regex(FORMAT_REGEX)
 
     /**
      * 없거나 UUIDv4 형식이 아니면 400 `validation-failed`(`D4`). 프레임워크에 맡기면(`required = true`) `malformed-request` 로 나가서 화면이 다른 가지를 탄다.

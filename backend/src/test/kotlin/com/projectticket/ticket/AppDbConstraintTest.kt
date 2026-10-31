@@ -4,6 +4,7 @@ import com.projectticket.ticket.auth.AuthController
 import com.projectticket.ticket.event.OrganizerEventController
 import com.projectticket.ticket.event.SectionCodes
 import com.projectticket.ticket.event.SectionCodesValidator
+import com.projectticket.ticket.idempotency.IdempotencyKeys
 import com.projectticket.ticket.payment.CardNumbers
 import com.projectticket.ticket.reservation.TicketService
 import jakarta.validation.constraints.Max
@@ -239,6 +240,7 @@ class AppDbConstraintTest {
                 annotationOf<Pattern>(OrganizerEventController.GradeRequest::class.java, "code")!!.regexp,
             "seat_section_format_check" to sectionFormatOf(OrganizerEventController.GradeRequest::class.java, "sections"),
             "seat_grade_map_section_format_check" to sectionFormatOf(OrganizerEventController.GradeRequest::class.java, "sections"),
+            "idempotency_key_format_check" to IdempotencyKeys.FORMAT_REGEX,
         )
 
         /**
@@ -252,7 +254,7 @@ class AppDbConstraintTest {
             "payment_card_last4_format_check" to "입구를 ASCII 로 좁힌 근거다 — 짝은 the_card_entrance_guarantees_the_last4_format",
             "organizer_code_format_check" to "앱 입구가 없다. `DemoSeeder` 만 넣는다 — 기획사 등록 입구가 생기면 위 표로",
             "seat_row_label_format_check" to "좌석은 `DemoSeeder` 가 넣는다 — 공연장 등록 입구가 생기면 위 표로",
-            "idempotency_key_length_check" to "`IdempotencyKeys` 가 UUIDv4 만 받아 36자 고정이다. DB 의 1..255 가 더 넓다",
+            "idempotency_key_length_check" to "형식 check(`idempotency_key_format_check`, 위 표)가 36자로 묶는다. 1..255 는 그 아래 그물이다",
             "idempotency_key_hash_check" to "SHA-256 hex 를 서버가 잰다. 입구에 없다",
         )
 

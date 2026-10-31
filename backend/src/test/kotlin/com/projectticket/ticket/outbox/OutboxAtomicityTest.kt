@@ -53,7 +53,8 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
 
         val row = eventOf(reservationId, "reservation.reserved")
         assertThat(row.aggregateType).isEqualTo("reservation")
-        assertThat(row.version).isEqualTo(1)
+        // 생산자 판(DB 기본값)과 소비자가 아는 판이 같다 — 한쪽만 올리면 소비자가 사건을 건너뛰어 알림·정산이 조용히 멎는다(`EnvelopeVersions`)
+        assertThat(row.version).isEqualTo(EventType.SUPPORTED_VERSION)
         // 카탈로그가 정한 필드 그대로(`D11`). 빠지면 소비자가 표를 못 찾는다.
         assertThat(payloadOf(row)).containsOnlyKeys(
             "reservation_id", "account_id", "performance_id", "payment_id", "total_amount", "seat_count",
@@ -101,6 +102,19 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
         // 돈은 받았고 좌석은 못 줬다 — 예매가 성립 안 했으니 확정 사건도 없다. 되돌리는 것은 환불(17b)이다.
         assertThat(settled.late).isTrue()
         assertThat(eventCount(reservationId, "reservation.reserved")).isZero()
+    }
+
+    @Test
+    fun an_event_whose_aggregate_type_disagrees_with_its_type_is_rejected() {
+        // 릴레이는 행의 `aggregate_type` 을 버리고 `type` 에서 만든다(`OutboxRelay`). 둘이 갈린 행은 표만 보는 사람을 속인다.
+        assertThatThrownBy {
+            jdbc.sql(
+                """
+                insert into outbox (event_id, type, aggregate_type, aggregate_id, payload)
+                values (gen_random_uuid(), 'reservation.reserved', 'performance', 1, '{}'::jsonb)
+                """,
+            ).update()
+        }.hasStackTraceContaining("outbox_type_aggregate_check")
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.util.UUID
 
 /**
  * 멱등키 청소가 지키는 선(`D4` 「멱등키 — 보관 24시간」, 청크 `13b` 의 닫힘 조건).
@@ -69,7 +70,8 @@ class IdempotencyCleanerTest : PostgresTestBase() {
     }
 
     private fun key(hoursAgo: Int): String {
-        val value = "key-$hoursAgo-${System.nanoTime()}"
+        // 키는 UUIDv4 다(`idempotency_key_format_check`, `V31`)
+        val value = UUID.randomUUID().toString()
         jdbc.sql(
             """
             insert into idempotency_key (account_id, key_value, request_hash, response_body, created_at)

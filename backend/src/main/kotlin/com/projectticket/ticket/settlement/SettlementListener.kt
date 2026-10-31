@@ -1,5 +1,6 @@
 package com.projectticket.ticket.settlement
 
+import com.projectticket.ticket.outbox.EnvelopeVersions
 import com.projectticket.ticket.outbox.EventTopics
 import com.projectticket.ticket.outbox.OutboxRelay
 import org.springframework.kafka.annotation.KafkaListener
@@ -24,8 +25,11 @@ class SettlementListener(
      */
     @KafkaListener(topics = [EventTopics.RESERVATION, EventTopics.PERFORMANCE], groupId = GROUP)
     fun on(message: String) {
+        val envelope = json.readValue(message, OutboxRelay.Envelope::class.java)
+        // 모르는 판은 건너뛴다(`D11` 「버전」) — 알림과 같은 도우미다
+        if (!EnvelopeVersions.accepts(envelope, GROUP)) return
         // 던진다(29) — 재시도·DLT 는 `ConsumerErrorHandling` 이 든다. 멱등은 `performance_id` 유일 제약이다
-        store.schedule(json.readValue(message, OutboxRelay.Envelope::class.java))
+        store.schedule(envelope)
     }
 
     companion object {

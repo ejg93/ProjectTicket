@@ -298,6 +298,7 @@ CI 러너에서는 효과가 없다. **마이그레이션을 고쳤으면 재사
 
 **재사용 컨테이너는 커밋 레인이 남긴 행을 실행 사이에 든다**(`G11`). `ConcurrencyTestBase` 는 바탕 `PREFIX` 가 붙은 행만 지우므로 접두 밖 행은 아무도 안 지운다.
 `SeatChangesTest` 가 제 `PREFIX` 로 바탕 것을 가려 실행마다 `held` 넷을 남겼고, 5분 뒤 전역 수를 세는 스윕 시험(`PaymentConfirmTest`)이 0→4 로 흔들렸다 — 재실행은 앞선 커밋 스윕이 넷을 걷어 초록이라 원인이 안 보인다. `TestConventionTest` 가 가림을 막는다.
+새 check 의 거절 시험을 **커밋 레인에서 빨강으로** 보면 그 어긋난 행이 남는다. 다음 실행의 `add constraint` 가 기존 행 검사에서 죽어 컨텍스트가 안 떠 그 레인 전부가 빨갛다(`I13-8a` — `outbox` 한 행으로 41개). 남은 행을 지우거나 재사용 컨테이너를 지운다.
 
 **역할은 DB 가 아니라 클러스터에 산다**(마무리 17차). `V20` 의 `create role ticket_app` 은 같은 Postgres 안의 둘째 DB 에서 「already exists」(42710)로 선다 — `ticket-db` 에 `ticket_check` 를 만들어 빈 DB 기동을 재면 `V20` 에서 멈춘다. 빈 기동은 버리는 컨테이너(새 클러스터)로 잰다(`/verify`). Testcontainers·CI 는 매번 새 클러스터라 안 걸린다.
 
@@ -495,7 +496,7 @@ Dockerfile 에서 하나를 깔거나, 셸 없이 되는 방법으로 바꾼다.
 
 ### Docker 를 ProjectShop 과 나눠 쓴다
 
-이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다. **2026-10-30 실측은 VM 9.71GiB 다**(`docker info` MemTotal) — 무거운 판 앞에 이 값을 다시 본다(`I13-1`).
+이 기계의 Docker Desktop(WSL2 VM 하나)을 `C:\workspace\ProjectShop` 과 같이 쓴다. VM 메모리는 `%USERPROFILE%\.wslconfig` 의 `memory=` 가 정한다 — Docker Desktop 설정 화면의 슬라이더가 아니다(WSL2 백엔드). 2026-10-18 에 8GB → 16GB(VM 15.62GiB)로 올렸다. **2026-10-30 실측은 VM 9.71GiB 다**(`docker info` MemTotal) — 무거운 판 앞에 이 값을 다시 본다(`I13-1`). CPU 도 **10 vCPU** 다(2026-10-31 `docker info` NCPU, `load-4` 때 22) — 부하 수치를 앞 노트와 맞댈 때 같이 적는다(`load-7`).
 `verify.sh --full` 은 컨테이너 레인 뒤에 **이 저장소의** Testcontainers 컨테이너(라벨 `projectticket=true`, `PostgresTestBase` 가 붙인다)를 지운다 — 재사용으로 판마다 남아서다(`G20`). 처음(`G20`)에는 `org.testcontainers=true` 로 지워서 ProjectShop 의 돌고 있는 `--full` 이 Connection refused 로 무너졌다 — `G24` 가 우리 라벨로 좁혔다(사용자 결정).
 
 **2026-10-18 ProjectShop 세션과 합의한 규칙 셋:**

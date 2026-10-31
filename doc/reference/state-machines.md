@@ -28,6 +28,8 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 ### 전이표
 
+시각·결제 조건(`held→paying`·`paying→reserved`·`paying→held` 의 시각, `reserved` 의 승인 결제)은 `V28` 트리거가 든다. 만료·취소는 시각과 무관하다.
+
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
 | — | `held` | 좌석 N 개 전부 `available` 이고 회차가 `open` 이고 `sales_open_at <= now()` 이고 활성 토큰이 있다 | 13 |
@@ -65,6 +67,8 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 **둘이 갈리는 것은 `D4` 의 대조 테스트가 막는다.** 갈릴 수 있는 자리는 전이 하나가 두 표를 고치는 자리 전부이고,
 그래서 전이는 반드시 한 트랜잭션이다.
+
+발권(`ticket`)은 `reserved` 예매의 좌석에만 선다 — `ticket_requires_reserved`(`V28`)가 막는다.
 
 ## 좌석 `performance_seat`
 
@@ -119,7 +123,7 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
 | — | `scheduled` | 회차 종료·취소 사건. 회차당 하나 | 27 소비자 |
-| `scheduled` | `pending` | `settle_at <= now()`. 항목의 합으로 금액이 선다 | 27 집계 |
+| `scheduled` | `pending` | `settle_at <= now()`(`V30` 트리거). 항목의 합으로 금액이 선다 | 27 집계 |
 | `pending` | `confirmed` | 관리자 확인. 부르는 코드가 아직 없다(D21 「누가 보나」) | — |
 | `confirmed` | `paid` | 지급. 부르는 코드가 아직 없다 | — |
 
@@ -144,11 +148,31 @@ draft ──오픈──> open ──판매 마감──> closed
 |---|---|---|---|
 | — | `draft` | 회차는 이 상태로만 태어난다(`V5` 삽입 가드) | 9 |
 | `draft` | `open` | 좌석이 복제됐다 | 11 |
-| `open` | `closed` | `sales_close_at < now()` | 16a |
+| `open` | `closed` | `sales_close_at < now()`(`V30` 트리거) | 16a |
 | `open` | `cancelled` | 기획사가 무른다. `closed` 뒤로는 없다 | 17a |
 
 `sales_close_at` 의 기본은 `starts_at - 1시간` 이고 `sales_open_at < sales_close_at < starts_at` 을 check 가 든다(16a).
 `cancelled` 는 17a 가 check 목록과 전이 트리거에 더한다 — `open` 에서만 간다. `closed` 뒤의 취소는 없다.
+
+## 알림 `notification`
+
+| 상태 | 뜻 |
+|---|---|
+| `pending` | 사건을 받아 본문을 적었다. 아직 안 보냈다 |
+| `sent` | 보냈다. 모의 발송이라 이 표의 본문이 보낸 것이다 |
+| `failed` | 보내다 실패했다. 사유가 `failure_reason` 에 있다 |
+| `skipped` | 안 보내기로 했다(탈퇴한 계정 등). 사유가 `failure_reason` 에 있다 |
+
+전이는 `notification_status_transition`(`V29`)이 막는다. 끝 상태 셋에서 나가는 전이는 없다 — 실패를 다시 보내는 경로가 생기면 표와 트리거에 같이 더한다.
+
+### 전이표
+
+| 에서 | 로 | 조건 | 어디서 |
+|---|---|---|---|
+| — | `pending` | 사건·계정당 하나(`notification_event_account_key`) | 26 |
+| `pending` | `sent` | 발송 성공 | 26 |
+| `pending` | `failed` | 발송 실패 | 26 |
+| `pending` | `skipped` | 받을 계정이 없다 | 26 |
 
 ## 대기열 토큰 (Redis)
 

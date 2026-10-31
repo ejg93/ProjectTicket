@@ -202,7 +202,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         // 응답 없이 커밋되면 재전송이 빈 답을 받는다. 저장 코드를 빠뜨린 것을 커밋 시점에 잡는다.
         assertThatThrownBy {
             inTransaction {
-                jdbc.sql("insert into idempotency_key (account_id, key_value, request_hash) values (:account, 'k', repeat('a', 64))")
+                jdbc.sql("insert into idempotency_key (account_id, key_value, request_hash) values (:account, gen_random_uuid()::text, repeat('a', 64))")
                     .param("account", accountId)
                     .update()
             }
