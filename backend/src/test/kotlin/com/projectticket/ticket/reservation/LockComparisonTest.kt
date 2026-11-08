@@ -18,7 +18,7 @@ import java.sql.SQLException
 /**
  * 락 방식 넷의 비교 측정(19·34, ADR 0006·0008). **테스트가 아니라 계측이다** — 결과가 초록·빨강이 아니라 숫자고, `gradlew measure` 로만 돈다(`D8` 「측정」).
  *
- * 같은 좌석 하나를 N 스레드가 동시에 잡는다. 세 방식이 같은 스크래치 표 위에서 같은 조건으로 돈다:
+ * 같은 좌석 하나를 N 스레드가 동시에 잡는다. 네 방식이 같은 스크래치 표 위에서 같은 조건으로 돈다:
  *
  * | 방식 | 문장 |
  * |---|---|
@@ -37,21 +37,32 @@ class LockComparisonTest : ConcurrencyTestBase() {
     @Autowired lateinit var transactionManager: PlatformTransactionManager
     @Autowired lateinit var schedulerLock: SchedulerLock
 
+    /**
+     * 연결은 `ticket_app` 역할이라 `public` 에 표를 못 만든다(4a — 그 뒤 이 측정이 `permission denied for schema public` 으로 섰고
+     * `build` 밖이라 아무도 몰랐다, `I14-3`). 표를 만들고 지우는 동안만 `set local role none` 으로 주인이 되고, 재는 문장은 앱 역할로 돈다.
+     */
     @BeforeEach
-    fun createScratchTable() {
+    fun createScratchTable() = asOwner {
         jdbc.sql("drop table if exists lock_measure_seat").update()
         jdbc.sql("create table lock_measure_seat (seat_id bigint primary key, status text not null, version int not null default 0)").update()
+        jdbc.sql("grant select, insert, update on lock_measure_seat to ticket_app").update()
     }
 
     @AfterEach
-    fun dropScratchTable() {
+    fun dropScratchTable() = asOwner {
         jdbc.sql("drop table if exists lock_measure_seat").update()
     }
+
+    private fun asOwner(block: () -> Unit) =
+        TransactionTemplate(transactionManager).executeWithoutResult {
+            jdbc.sql("set local role none").update()
+            block()
+        }
 
     // 측정 표를 표준 출력으로 낸다 — measure 레인이 그것을 doc/notes 로 옮긴다(로거면 로그 꼴이 섞인다)
     @Suppress("ForbiddenMethodCall")
     @Test
-    fun compare_three_strategies() {
+    fun compare_four_strategies() {
         val rows = mutableListOf<Row>()
         for (threads in THREAD_COUNTS) {
             rows += measure("조건부 UPDATE", threads) { conditionalUpdate() }
