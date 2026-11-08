@@ -2,7 +2,6 @@ package com.projectticket.ticket
 
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.streams.asSequence
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
@@ -118,16 +117,8 @@ class StateMachineDocTest {
         }.toSet()
     }
 
-    /** `V2` 가 `V10` 보다 먼저다. 이름순으로 읽으면 갈아 끼운 판이 앞에 온다 */
-    private fun migrationsInOrder(): List<String> =
-        Files.walk(root.resolve("backend/src/main/resources/db/migration")).use { paths ->
-            paths.asSequence()
-                .filter { it.fileName.toString().startsWith("V") && it.toString().endsWith(".sql") }
-                // `!!` 의 근거: 위 filter 가 `V` 로 시작하는 것만 남겼고 이름 규약이 `V<숫자>__` 다(`EnumConstraintTest` 와 같은 자리).
-                .sortedBy { VERSION.find(it.fileName.toString())!!.groupValues[1].toInt() }
-                .map(Files::readString)
-                .toList()
-        }
+    /** 판 순서 + 주석을 걷는다 — 주석 처리된 전이를 실물로 읽지 않게(`I14-1`) */
+    private fun migrationsInOrder(): List<String> = MigrationSql.inOrder(root)
 
     private companion object {
         /** 전이표를 둔 상태기계. 결제는 전이가 없다 — 시도마다 행이 한 번 서고 끝이라 트리거도 없다 */
@@ -138,6 +129,5 @@ class StateMachineDocTest {
         val FUNCTION_NAME = Regex("""create or replace function (\w+)_status_transition\(\)""")
         val STATE = Regex("""`(\w+)`""")
         val VALUE = Regex("""'([^']*)'""")
-        val VERSION = Regex("""^V(\d+)""")
     }
 }

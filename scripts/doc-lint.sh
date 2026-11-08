@@ -71,7 +71,8 @@ for f in "${dup_check_files[@]}"; do
   # 표 셀도 본다(`B0-3`) — 이 저장소는 내용의 대부분이 표라 행을 빼면 검사가 거의 눈을 감는다. 30자 이상 셀의 완전 중복.
   # `screen-rules.md` 는 화면 문구 정의라 같은 문구가 여러 행에 서는 것이 정상이다.
   case "$f" in doc/reference/screen-rules.md) continue ;; esac
-  cell_dups=$(awk -F'|' '/^\|/{for(i=2;i<NF;i++){s=$i; gsub(/^ +| +$/,"",s); if(length(s)>=30) print s}}' "$f" | sort | uniq -d)
+  # `length` 는 로케일을 탄다 — `LANG` 이 빈 Git Bash 는 바이트(한글 한 자 3), CI 의 `C.UTF-8` 은 글자다. 글자로 맞춘다(마무리 30차)
+  cell_dups=$(LC_ALL=C.UTF-8 awk -F'|' '/^\|/{for(i=2;i<NF;i++){s=$i; gsub(/^ +| +$/,"",s); if(length(s)>=30) print s}}' "$f" | sort | uniq -d)
   if [ -n "$cell_dups" ]; then
     echo "[중복 셀] $f — 같은 말이 표의 두 칸에 있다. 한쪽을 지우거나 다르게 적는다:"; echo "$cell_dups" | sed 's/^/    /'; fail=1
   fi

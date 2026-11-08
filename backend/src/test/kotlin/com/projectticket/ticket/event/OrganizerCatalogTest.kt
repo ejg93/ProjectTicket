@@ -25,11 +25,12 @@ class OrganizerCatalogTest : PostgresTestBase() {
     private lateinit var fixture: EventFixture
     private lateinit var mine: TicketUser
     private var hallId: Long = 0
+    private var myOrganizer: Long = 0
 
     @BeforeEach
     fun setUp() {
         fixture = EventFixture(jdbc)
-        val myOrganizer = fixture.organizer("catalog-mine")
+        myOrganizer = fixture.organizer("catalog-mine")
         fixture.organizer("catalog-other")
         val accountId = jdbc.sql(
             "insert into account (email, password_hash, display_name, role) values ('catalog@test.local', 'x', '담당자', 'organizer') returning account_id",
@@ -49,7 +50,7 @@ class OrganizerCatalogTest : PostgresTestBase() {
         val body = json.readTree(mvc.get("/api/organizer/organizers") { with(user(mine)) }.andReturn().response.contentAsString)
 
         assertThat(body.size()).isEqualTo(1)
-        assertThat(body[0]["organizer_id"].asLong()).isPositive()
+        assertThat(body[0]["organizer_id"].asLong()).isEqualTo(myOrganizer)
     }
 
     @Test

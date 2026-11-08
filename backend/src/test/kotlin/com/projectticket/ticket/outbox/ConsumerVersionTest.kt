@@ -76,6 +76,24 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
         }
     }
 
+    /**
+     * 정산 쪽 건너뜀은 회차 사건으로 잰다 — `reservation.reserved` 는 판이 맞아도 `SettlementStore.schedule` 이 정산 행을 안 만들어
+     * 위 시험의 정산 호출은 로그 줄로만 보인다.
+     */
+    @Test
+    fun an_unknown_version_does_not_schedule_a_settlement() {
+        val performanceId = fixture.performance(eventId, hallId)
+        val closed = reservedEnvelope().copy(
+            type = EventType.PERFORMANCE_CLOSED,
+            aggregateId = performanceId,
+            version = EventType.SUPPORTED_VERSION + 1,
+        )
+
+        settlements.on(json.writeValueAsString(closed))
+
+        assertThat(settlementCount(performanceId)).describedAs("모르는 판의 회차 종료가 정산을 예약했다").isZero()
+    }
+
     @Test
     fun the_recipient_comes_from_the_reservation_not_the_payload() {
         val stranger = fixture.account("${PREFIX}stranger@test.local")
@@ -103,6 +121,12 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
         PendingEvents(jdbc, json).deliver { envelopes += it }
         return envelopes.single { it.type == EventType.RESERVATION_RESERVED && it.aggregateId == reservationId }
     }
+
+    private fun settlementCount(performanceId: Long): Long =
+        jdbc.sql("select count(*) from settlement where performance_id = :id")
+            .param("id", performanceId)
+            .query(Long::class.java)
+            .single()
 
     private fun notificationCount(envelope: OutboxRelay.Envelope): Long =
         jdbc.sql("select count(*) from notification where event_id = :event")

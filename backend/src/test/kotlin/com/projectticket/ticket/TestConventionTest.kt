@@ -103,7 +103,42 @@ class TestConventionTest {
         assertThat(docTags - buildTags)
             .describedAs("레인 표의 태그가 build.gradle.kts 의 includeTags·excludeTags 에 없다")
             .isEmpty()
+        // 반대쪽도 본다 — 빌드에 새 태그를 걸고 표에 안 적으면 그 레인을 아무도 모른다(`I14-4`)
+        assertThat(buildTags - docTags)
+            .describedAs("build.gradle.kts 의 includeTags·excludeTags 태그가 레인 표에 없다")
+            .isEmpty()
     }
+
+    /** 「층」 표의 바탕 칸이 부르는 `*TestBase` = [BASES]. 바탕을 더하고 표나 목록 한쪽만 고치면 빨강(`I14-4`) */
+    @Test
+    fun the_layer_table_names_the_bases() {
+        val named = tableRows("| 층 |").asSequence()
+            .flatMap { row -> BACKTICKED_NAME.findAll(row[4]).map { it.groupValues[1] } }
+            .filter { it.endsWith("TestBase") }
+            .toSet()
+        assertThat(named).describedAs("testing-strategy.md 「| 층 |」 표의 바탕 칸이 BASES 와 다르다").isEqualTo(BASES.map { it.simpleName }.toSet())
+    }
+
+    /** 손으로 단 `@Tag("measure")` 클래스 = 「레인」 표 측정 행이 부르는 시험. 측정 시험을 더하면 표에 이름이 선다(`I14-4`) */
+    @Test
+    fun the_measure_lane_row_names_every_measure_test() {
+        val tagged = topLevel.filter { it.hasTag("measure") }.map { it.simpleName }.toSet()
+        val named = tableRows("| 레인 |").asSequence()
+            .filter { row -> row[4].trim() == "`measure`" }
+            .flatMap { row -> BACKTICKED_NAME.findAll(row[3]).map { it.groupValues[1] } }
+            .filter { it.endsWith("Test") }
+            .toSet()
+        assertThat(tagged).describedAs("`@Tag(\"measure\")` 클래스를 못 읽었다").isNotEmpty()
+        assertThat(named).describedAs("testing-strategy.md 「레인」 표 측정 행이 부르는 시험이 손 measure 태그 클래스와 다르다").isEqualTo(tagged)
+    }
+
+    private fun tableRows(header: String): List<List<String>> =
+        Files.readString(Path.of("..").toAbsolutePath().normalize().resolve("doc/reference/testing-strategy.md")).lineSequence()
+            .dropWhile { !it.startsWith(header) }
+            .drop(2)
+            .takeWhile { it.startsWith("|") }
+            .map { it.split("|") }
+            .toList()
 
     private fun JavaClass.family(): List<JavaClass> = classes.filter { it.name == name || it.name.startsWith("$name$") }
 
@@ -116,9 +151,11 @@ class TestConventionTest {
     private fun JavaClass.isOnBase(): Boolean = BASES.any { isAssignableTo(it) }
 
     /** `@Tag` 를 둘 이상 달면 컴파일러가 `@Tags` 로 묶는다 — 둘 다 본다(마무리 12차 독립 리뷰) */
-    private fun JavaClass.tagsDb(): Boolean =
-        tryGetAnnotationOfType(Tag::class.java).map { it.value == "db" }.orElse(false) ||
-            tryGetAnnotationOfType(Tags::class.java).map { tags -> tags.value.any { it.value == "db" } }.orElse(false)
+    private fun JavaClass.tagsDb(): Boolean = hasTag("db")
+
+    private fun JavaClass.hasTag(tag: String): Boolean =
+        tryGetAnnotationOfType(Tag::class.java).map { it.value == tag }.orElse(false) ||
+            tryGetAnnotationOfType(Tags::class.java).map { tags -> tags.value.any { it.value == tag } }.orElse(false)
 
     private companion object {
         /** 테스트 클래스는 지금 쉰이 넘는다. 이 밑이면 읽기가 틀린 것이다 */
@@ -152,6 +189,7 @@ class TestConventionTest {
 
         val GRADLEW = Regex("""`gradlew (\w+)`""")
         val BACKTICKED = Regex("`([a-z]+)`")
+        val BACKTICKED_NAME = Regex("""`([A-Z]\w+)`""")
         val REGISTERED = Regex("""tasks\.register<(\w+)>\("(\w+)"\)""")
         val TAG_CALL = Regex("""(?:include|exclude)Tags\(([^)]*)\)""")
         val QUOTED = Regex("\"([a-z]+)\"")

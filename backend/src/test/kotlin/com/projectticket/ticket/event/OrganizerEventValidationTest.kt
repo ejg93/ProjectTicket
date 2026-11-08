@@ -18,7 +18,9 @@ import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
 
 /**
- * DB 제약이 막은 기획사 입력이 **어느 칸이 틀렸는지** 400 으로 답하나(`45d-a`, `D5` 「검증 실패는 어느 필드가 틀렸는지 준다」).
+ * 틀린 기획사 입력이 **어느 칸이 틀렸는지** 400 으로 답하나(`45d-a`, `D5` 「검증 실패는 어느 필드가 틀렸는지 준다」).
+ * 막는 자리는 둘이다 — DB 제약(등급 중복·판매 창)과 그 앞의 앱 검증(가격 상한 `@Max`·없는 홀 `requireHall`). 앱 검증이 먼저 400 이라
+ * 뒤의 둘은 DB 제약까지 안 간다(`I14-1`).
  *
  * 전에는 등급 코드 중복·판매 창 위반이 500 이었다. **응답만 본다** — 제약 위반 뒤 롤백 바탕의 합류 트랜잭션은
  * aborted 라 뒤에 `jdbc.sql` 로 세면 그 단언이 죽는다.
@@ -59,7 +61,7 @@ class OrganizerEventValidationTest : PostgresTestBase() {
 
     @Test
     fun a_price_over_the_ceiling_is_rejected() {
-        // 상한은 4석 합이 `reservation.total_amount int` 안에 드는 값이다(ADR 0003, `V27`). 넘으면 선점이 500 이었다.
+        // 상한은 4석 합이 `reservation.total_amount int` 안에 드는 값이다(ADR 0003). `GradeRequest.price` 의 `@Max` 가 먼저 400 이다 — `V27` check 까지 안 간다.
         createEvent(grade(code = "VIP", section = "F1-A", price = 10_000_001))
             .andExpect(validationFailedAt("grades[0].price"))
     }
@@ -98,7 +100,7 @@ class OrganizerEventValidationTest : PostgresTestBase() {
 
     @Test
     fun an_unknown_hall_is_rejected_on_its_field() {
-        // 없는 홀은 외래키(`V5`)가 막는데 그 위반이 그물에서 500 이었다(`I13-5`). 틀린 칸이 있는 요청이라 400 이다(`D5`).
+        // 없는 홀은 `OrganizerEventService.requireHall` 이 먼저 400 이다 — 외래키(`V5`)까지 안 간다. 전에는 그 위반이 그물에서 500 이었다(`I13-5`).
         val startsAt = OffsetDateTime.now().plusDays(8)
 
         createPerformance(startsAt, salesOpenAt = OffsetDateTime.now().minusDays(1), hall = -1)

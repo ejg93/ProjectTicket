@@ -9,9 +9,11 @@
 | 층 | 무엇을 검증 | 의존 | 바탕 | 있나 |
 |---|---|---|---|---|
 | 구조 | 계층·의존·애너테이션 위치 | 클래스 파일 | `ArchitectureTest` | 있다 |
-| 단위 | 순수 계산(수수료 구간, 순번→예상 대기) | 없음 | 없음 | 17·21 부터 |
+| 단위 | 순수 계산(수수료 구간, 순번→예상 대기) · 장애 경로(필터를 직접 세우고 서비스를 Mockito 로 바꿔 예외를 던진다 — `QueueGateRedisDownTest`) | 없음 | 없음 | 17·21 부터 |
+| 대조 | 문서·설정 파일 ↔ 코드의 같은 이름(오류 슬러그·전이표·레인 표·버전) | 파일 | 없음 — 아래 「두 층에 흩어진 문자열의 대조」 | 있다 |
 | 통합 | SQL, 제약·트리거, 스프링 배선, 응답 모양 | 컨테이너 DB | `PostgresTestBase` — 롤백 | 있다 |
 | **동시성** | **같은 좌석을 둘이 못 잡는다** | 컨테이너 DB, 커밋 | `ConcurrencyTestBase` — **롤백 없음**(12f) | 12f 부터 |
+| 기동 | 빈 DB 에서 러너가 실제로 도나(데모 데이터) | 컨테이너 DB, 커밋 | 바탕이 없다 — `SeedBootTest` 가 `@SpringBootTest`·`@Tag("db")`·`@Import(PostgresTestBase.Containers)` 를 직접 단다. 설정 값이 컨텍스트를 가른다 | 12 부터 |
 | HTTP | 쿠키 왕복, 필터 순서, 실제 상태 코드 | 컨테이너 DB + 서블릿 | 바탕이 없다 — `SharedSessionTest` 가 앱 둘을 직접 띄운다 | 33 부터 |
 | 화면 | 오류 `type` 에 따른 분기, 상태에 따른 표시 | jsdom | Vitest + Testing Library | 39 부터 |
 | E2E | 프록시·세션 쿠키·CSRF 가 실제로 오가나 | 브라우저 + 서버 둘 | Playwright — `frontend/e2e/`, CI `e2e` 잡 | `46b` 부터 |
@@ -25,14 +27,15 @@
 |---|---|---|---|
 | 빠른 | `gradlew test` | 컨테이너 없이 초 단위로 답한다 | 태그 없음 |
 | 느린 | `gradlew integrationTest` | 컨테이너를 띄운다. `build` 가 같이 돈다 | `db` |
-| **측정** | `gradlew measure` | 수치를 남기는 것 — 1000 스레드 선점(19), 락 비교, 가상 스레드 전후(35a). **`build` 밖이다** | `measure` |
-| **변이** | `gradlew mutationTest` | 순수 계산 여덟 클래스에 변이를 넣고 빠른 레인 시험이 잡나(PIT, `G4`). 산출물은 살아남은 변이 목록(`doc/notes/mutation-2026-09.md`)이고 문턱이 없다. **`build` 밖이다** — 대상을 고친 청크가 손으로 돈다 | 빠른 레인 전체(`db`·`measure` 제외) |
+| **측정** | `gradlew measure` | 수치를 남기는 것 — 손 태그는 `LockComparisonTest` 하나(락 방식 넷 × 스레드 100·1000, 19·34). 가상 스레드 전후는 이 레인이 아니라 k6 다(`doc/notes/virtual-threads.md`). **`build` 밖이다** | `measure` |
+| **변이** | `gradlew mutationTest` | 순수 계산 여덟 클래스에 변이를 넣고 빠른 레인 시험이 잡나(PIT, `G4`). 산출물은 살아남은 변이 목록(최신 `doc/notes/mutation-*.md`)이고 문턱이 없다 — 목록은 수가 아니라 기준선이다. **`build` 밖이다** — 대상 소스를 고치면 `verify.sh` 가 `scripts/mutation-gate.sh` 로 같이 돌고, 노트 처분표 밖에서 산 변이가 나오면 빨강(`I14-2`). origin/main 기준이라 번들 안에서 한 번 고치면 그 뒤 backend verify 마다 돈다 | 빠른 레인 전체(`db`·`measure` 제외) |
 
 **태그는 바탕이 붙인다.** `PostgresTestBase`·`ConcurrencyTestBase` 를 상속하면 `db` 가 따라오고, 상속하지 않고 DB 를 쓰면 빠른 레인에서 곧바로 빨개진다.
 빠뜨릴 자리가 없는 것이 이 방식의 값이다.
 
 **측정 레인이 `build` 밖인 이유**: 결과가 초록·빨강이 아니라 **숫자**다. 숫자는 `doc/notes/` 에 적고 ADR 이 읽는다.
 CI 러너에서 재면 값이 흔들려서 뜻이 없다 — 손으로 돌리고 기계 사양을 같이 적는다.
+**재는 대상을 고친 청크가 손으로 돈다** — 측정 시험 파일이나 그것이 부르는 경로(`SchedulerLock` 등)를 고쳤거나 Docker 할당이 바뀌었으면 다시 재고 노트에 절을 더한다(`I14-3`). `build` 밖이라 스크립트로 더 못 내린다 — 변이(`mutation-gate.sh`)와 달리 판정이 초록·빨강이 아니다.
 
 ## 컨테이너
 
@@ -65,8 +68,11 @@ ProjectShop 이 이 길을 갔고 그 코드가 참고다. **지금 안 하는 �
 | 남는 것 | 어디서 비우나 | 왜 남나 |
 |---|---|---|
 | `SecurityContextHolder` 의 인증 | `PostgresTestBase.clearSecurityContext` | MockMvc 가 스레드를 나눠 쓴다 |
-| 감사 `ATTEMPT` 행 | `PostgresTestBase.purgeCommittedAuditLogs` | `REQUIRES_NEW` 라 롤백에 안 쓸린다. 정리도 별도 트랜잭션이고, 보존 가드를 그 트랜잭션에서만 끈다 |
-| `CsrfFilter` 의 저장소 | `CsrfCookieTest.restoreOurCsrfRepository` | `csrf()` 후처리기가 공유 필터의 저장소를 바꿔 끼우고 컨텍스트에 남긴다(`stack.md`) |
+| Redis 의 세션·키 | `PostgresTestBase.flushRedis` | `@Transactional` 은 DB 만 되돌린다. 세션이 계정 이름으로 색인돼 같은 이메일을 쓰는 남의 세션을 센다 |
+| 감사 `ATTEMPT` 행 | `PostgresTestBase.purgeCommittedAuditLogs` | `REQUIRES_NEW` 라 롤백에 안 쓸린다. 정리도 별도 트랜잭션이고, 그 트랜잭션에서만 `set local role none` 으로 주인이 되고(연결은 `ticket_app` 이라 지울 권한이 없다) 보존 가드를 끈다 |
+| `CsrfFilter` 의 저장소 | `CsrfCookieTest.restoreOurCsrfRepository` — 바탕이 아니라 `csrf()` 를 쓰는 그 시험이 되돌린다 | `csrf()` 후처리기가 공유 필터의 저장소를 바꿔 끼우고 컨텍스트에 남긴다(`stack.md`) |
+
+커밋 레인(`ConcurrencyTestBase`)은 롤백이 없어 접두 행을 `purgeAfter` 가 지우고 시작할 때도 한 번 지운다 — 파기 흉내 계정이 늘었으면 빨강이다(`G11-1`).
 
 **시드는 그대로 쓴다.** 마이그레이션이 넣은 동의 항목·(12 뒤로) 공연장을 테스트가 다시 만들지 않는다 — 실제 초기 데이터 위에서 도는지가 검증 대상이다.
 
@@ -94,7 +100,7 @@ ProjectShop 이 이 길을 갔고 그 코드가 참고다. **지금 안 하는 �
 HTTP 층으로 올리는 것과 다르다 — 서블릿이 필요한 게 아니라 **커밋**이 필요한 것이다.
 
 ```
-@SpringBootTest        (@Transactional 없음)
+@SpringBootTest(properties = ["ticket.scheduling.enabled=false"])   (@Transactional 없음)
 @AutoConfigureMockMvc  (안 쓰지만 컨텍스트 캐시 키를 PostgresTestBase 와 맞춘다)
 @Tag("db")
 @Import(PostgresTestBase.Containers::class)
@@ -138,8 +144,10 @@ abstract class ConcurrencyTestBase
 | 만료·타임아웃(14·16) | **DB 시각이 시계다**(`D7`). 앱 시계를 고정해도 SQL 의 `now()` 는 안 움직이므로, 만료를 재는 테스트는 `held_until = now() - interval '1 second'` 로 **이미 지난 행을 직접 넣는다** |
 | 값이 채워졌나만 본다 | `isNotNull()` 은 달력을 안 탄다 |
 | 관통 흐름 | 날짜를 안 넣는다. 이어지는지가 목적이다 |
+| 앞뒤만 뜻이 있는 시각(판매 창·관람) | `OffsetDateTime.now()` 상대값(`plusDays(8)`·`minusDays(1)`)으로 넣는다 — 절대 날짜를 박지 않는다(`OrganizerEventValidationTest` 등) |
+| 락 TTL 만료 뒤 동작 | TTL 을 **인자로 줄여** 만료를 만든다 — `SchedulerSingleRunTest` 가 `ttl = 200ms` 에 400ms 일한다. 운영 값이 아니라 「만료 뒤 남의 락을 안 푼다」를 잰다 |
 
-`Thread.sleep` 으로 시간을 흘리지 않는다 — 5분을 기다릴 수 없고 5초로 줄이면 운영과 다른 값을 잰다.
+`Thread.sleep` 으로 시간을 흘리지 않는다 — 5분을 기다릴 수 없고 5초로 줄이면 운영과 다른 값을 잰다. 위 TTL 꼴은 운영 값을 재는 것이 아니라 예외다.
 
 비동기가 끝나기를 **기다리는** 것은 다르다 — `Waits.until`·`Waits.value` 가 조건이 맞는 즉시 돌아온다. 고정 대기는 **없음을 재는 자리**에만 쓴다(`ConsumerIdempotencyTest` 의 `SETTLE_MS` — 둘째 행이 안 생기는 것은 기다려야만 보인다).
 
@@ -167,10 +175,14 @@ abstract class ConcurrencyTestBase
 
 **대개 한쪽만 본다.** 화면이 쓰는 것이 서버에 있어야 하고 그 반대는 아니다.
 
+위 표는 **두 층 사이**의 대조만 든다. 문서·설정 파일 ↔ 코드 대조는 그 밖에도 백엔드 12·화면 6 이다(2026-11-08 — `EventCatalogTest`·`MetricNamesTest`·`QualityGateDocTest`·`StackVersionConsistencyTest`·`screen-map`·`color-tokens` 등). 표에 다 적지 않는다 — 더할 때마다 표가 낡는다. 세는 법: `grep -rlE 'resolve\("(doc|PLAN|\.github|frontend|scripts|load|docker)' backend/src/test` · `grep -rlE 'readFileSync|doc/' frontend/src --include='*.test.ts*'`.
+
 ## 테스트 이름
 
 `snake_case` 로 **문장**을 적는다 — `hundred_threads_one_winner`, `refused_optional_item_leaves_a_false_row`. 실패 목록이 그대로 읽히는 것이 목적이다.
 클래스는 `*Test`. `@DisplayName` 을 안 쓴다 — 이름이 두 벌이면 한쪽이 낡는다.
+
+예외 둘 — `ArchitectureTest` 의 `@ArchTest` 11 은 필드라 camelCase 다(detekt `VariableNaming` 이 필드 이름을 본다). 화면 Vitest 는 `it("비어 있으면 비었다고 말한다")` 처럼 한글 문장이다 — 이름이 문자열이다.
 
 ## 알려진 구멍은 테스트로 고정한다
 
@@ -184,4 +196,4 @@ JaCoCo 가 붙어 있고 **문턱은 없다.** 문턱을 정하는 것은 `D18` 
 
 ## 이 문서를 고칠 때
 
-**레인·태그·바탕 이름은 `build.gradle.kts` 와 같아야 한다.** `TestConventionTest`(빠른 레인, `G7d`)가 셋을 잰다 — 「레인」 표의 명령·태그가 빌드 파일에 있고 빌드 파일의 `Test` 태스크가 표에 있다 · DB·`MockMvc` 를 쓰는 테스트는 바탕을 물려받는다 · 손으로 단 `@Tag("db")` 는 바탕 둘과 사유 있는 이름 목록(`SharedSessionTest`·`SeedBootTest`)뿐이다. 바탕을 더하면 「층」 표에 행을 더하고 그 테스트의 `BASES` 에도 더한다.
+**레인·태그·바탕 이름은 `build.gradle.kts` 와 같아야 한다.** `TestConventionTest`(빠른 레인, `G7d`)가 셋을 잰다 — 「레인」 표의 명령·태그가 빌드 파일에 있고 빌드 파일의 `Test` 태스크가 표에 있다 · DB·`MockMvc` 를 쓰는 테스트는 바탕을 물려받는다 · 손으로 단 `@Tag("db")` 는 바탕 둘과 사유 있는 이름 목록(`SharedSessionTest`·`SeedBootTest`)뿐이다. 바탕을 더하면 「층」 표에 행을 더하고 그 테스트의 `BASES` 에도 더한다. 같은 시험이 셋을 더 잰다(`I14-4`) — 「층」 표 바탕 칸의 `*TestBase` = `BASES` · 손 `@Tag("measure")` 클래스 = 「레인」 표 측정 행이 부르는 이름 · 빌드 파일의 `includeTags`·`excludeTags` ⊆ 레인 표 태그.

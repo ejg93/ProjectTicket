@@ -120,7 +120,7 @@ hook '편집 훅 존댓말'      doc-lint-edit    "$(edit "$p")"                
 hook 'sed 훅 존댓말'       doc-lint-bash    "$(cmd 'sed -i s/a/a/ CLAUDE.md')"  2 '[존댓말]'
 restore
 
-printf '| 가 | 이 셀은 서른 글자를 넘기는 시험용 중복 셀 문장이다 |\n| 나 | 이 셀은 서른 글자를 넘기는 시험용 중복 셀 문장이다 |\n' >> "$fx/CLAUDE.md"
+printf '| 가 | 이 셀은 서른 글자를 넘기는 시험용 중복 셀 문장이다 — 글자로 세도 넘는다 |\n| 나 | 이 셀은 서른 글자를 넘기는 시험용 중복 셀 문장이다 — 글자로 세도 넘는다 |\n' >> "$fx/CLAUDE.md"
 lint '표 셀 중복'   1 '[중복 셀]' CLAUDE.md
 restore
 
