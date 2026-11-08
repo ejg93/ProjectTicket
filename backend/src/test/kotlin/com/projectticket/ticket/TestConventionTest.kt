@@ -112,7 +112,7 @@ class TestConventionTest {
     /** 「층」 표의 바탕 칸이 부르는 `*TestBase` = [BASES]. 바탕을 더하고 표나 목록 한쪽만 고치면 빨강(`I14-4`) */
     @Test
     fun the_layer_table_names_the_bases() {
-        val named = tableRows("| 층 |")
+        val named = tableRows("| 층 |").asSequence()
             .flatMap { row -> BACKTICKED_NAME.findAll(row[4]).map { it.groupValues[1] } }
             .filter { it.endsWith("TestBase") }
             .toSet()
@@ -123,7 +123,7 @@ class TestConventionTest {
     @Test
     fun the_measure_lane_row_names_every_measure_test() {
         val tagged = topLevel.filter { it.hasTag("measure") }.map { it.simpleName }.toSet()
-        val named = tableRows("| 레인 |")
+        val named = tableRows("| 레인 |").asSequence()
             .filter { row -> row[4].trim() == "`measure`" }
             .flatMap { row -> BACKTICKED_NAME.findAll(row[3]).map { it.groupValues[1] } }
             .filter { it.endsWith("Test") }

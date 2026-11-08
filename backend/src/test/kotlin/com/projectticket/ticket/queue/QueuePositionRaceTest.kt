@@ -56,7 +56,7 @@ class QueuePositionRaceTest : ConcurrencyTestBase() {
         val admitted = AtomicInteger(0)
         val polls = AtomicInteger(0)
         val results = runConcurrently(POLLERS + 1) { index ->
-            if (index == POLLERS) admitAll(done, admitted) else pollFront(accounts, done, admitted, polls)
+            if (index == POLLERS) admitAll(done, admitted) else pollFront(accounts = accounts, done = done, admitted = admitted, polls = polls)
         }
 
         val missing = results.sumOf { it.getOrThrow() }

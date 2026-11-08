@@ -42,22 +42,25 @@ class LockComparisonTest : ConcurrencyTestBase() {
      * `build` 밖이라 아무도 몰랐다, `I14-3`). 표를 만들고 지우는 동안만 `set local role none` 으로 주인이 되고, 재는 문장은 앱 역할로 돈다.
      */
     @BeforeEach
-    fun createScratchTable() = asOwner {
-        jdbc.sql("drop table if exists lock_measure_seat").update()
-        jdbc.sql("create table lock_measure_seat (seat_id bigint primary key, status text not null, version int not null default 0)").update()
-        jdbc.sql("grant select, insert, update on lock_measure_seat to ticket_app").update()
+    fun createScratchTable() {
+        asOwner {
+            jdbc.sql("drop table if exists lock_measure_seat").update()
+            jdbc.sql("create table lock_measure_seat (seat_id bigint primary key, status text not null, version int not null default 0)").update()
+            jdbc.sql("grant select, insert, update on lock_measure_seat to ticket_app").update()
+        }
     }
 
     @AfterEach
-    fun dropScratchTable() = asOwner {
-        jdbc.sql("drop table if exists lock_measure_seat").update()
+    fun dropScratchTable() {
+        asOwner { jdbc.sql("drop table if exists lock_measure_seat").update() }
     }
 
-    private fun asOwner(block: () -> Unit) =
+    private fun asOwner(block: () -> Unit) {
         TransactionTemplate(transactionManager).executeWithoutResult {
             jdbc.sql("set local role none").update()
             block()
         }
+    }
 
     // 측정 표를 표준 출력으로 낸다 — measure 레인이 그것을 doc/notes 로 옮긴다(로거면 로그 꼴이 섞인다)
     @Suppress("ForbiddenMethodCall")

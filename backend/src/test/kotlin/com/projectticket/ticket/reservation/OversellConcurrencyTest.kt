@@ -68,7 +68,7 @@ class OversellConcurrencyTest : ConcurrencyTestBase() {
                 .withFailMessage { "두 번 팔렸다 — performance_seat_id=$seat 의 포인터가 기록한 예매 $live 와 다르다" }
                 .isEqualTo(live.single())
             assertThat(statusOf(seat))
-                .withFailMessage { "좌석 상태가 선점을 안 따른다 — performance_seat_id=$seat 가 ${statusOf(seat)}" }
+                .withFailMessage { "좌석 상태가 선점을 안 따른다 — performance_seat_id=$seat 가 ${statusOf(seat) ?: "행 없음"}" }
                 .isEqualTo("held")
         }
     }
