@@ -125,6 +125,8 @@ if changed backend && [ -d backend ]; then
       echo "== backend 지문이 origin/main 과 다르다 → ./gradlew test (빠른 레인)"
       (cd backend && ./gradlew test -q) || ok=0
     fi
+    # 변이 대상 소스를 고쳤으면 PIT 를 같이 돌고 기준선 노트와 맞댄다(`I14-2`) — 「고친 청크가 손으로 돈다」가 문서에만 있어 아무도 안 돌았다
+    if [ "$ok" -eq 1 ]; then bash scripts/mutation-gate.sh "$tree" || ok=0; fi
   fi
 fi
 if changed frontend && [ -d frontend ]; then

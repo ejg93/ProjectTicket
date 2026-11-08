@@ -160,3 +160,5 @@ jobs:
           sudo mv shellcheck-v0.11.0/shellcheck /usr/local/bin/
       - run: bash scripts/shell-lint.sh
       - run: bash scripts/doc-lint.sh
+      # 훅·doc-lint 의 막는 경우를 친다(G1). 로컬 tools 레인만 돌았다(I14-2)
+      - run: bash scripts/hooks-test.sh

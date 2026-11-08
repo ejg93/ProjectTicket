@@ -136,7 +136,7 @@ gh api repos/ejg93/ProjectTicket/branches/main/protection/required_status_checks
 
 **부순 절차는 탐침으로 남긴다**(`G2`). `scripts/probes/<이름>.patch` 가 명령·기대 문구·패치를 들고,
 `bash scripts/gate-probe.sh <이름>|all` 이 HEAD 워크트리에 대고 돌린다 — 작업 트리를 안 건드린다. 게이트를 고친 청크는 그 탐침을 다시 돈다.
-`hooks-test.sh`(`G1`)는 훅·`doc-lint` 쪽 같은 것이라 tools 레인이 매번 돈다.
+`hooks-test.sh`(`G1`)는 훅·`doc-lint` 쪽 같은 것이라 로컬 tools 레인과 CI `docs` 잡이 매번 돈다(`I14-2`).
 
 ### 부수다가 알게 된 것
 
