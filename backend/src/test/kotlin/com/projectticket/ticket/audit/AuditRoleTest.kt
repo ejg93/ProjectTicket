@@ -15,8 +15,8 @@ import org.springframework.transaction.support.TransactionTemplate
  * **이것이 강제 지점 1번에 가장 가까운 자리다.** `V3` 의 보존 트리거는 표 주인이 `disable trigger` 로 끌 수 있는데,
  * 권한은 문장이 파싱되기 전에 막는다 — 끄려면 권한을 다시 주는 문장을 남겨야 하고 그것은 흔적이 남는다.
  *
- * 테스트 바탕은 주인으로 붙는다(감사 정리에 `session_replication_role` 이 필요해서다). 그래서 여기서는
- * **트랜잭션 안에서 `set local role`** 로 그 역할을 입어 본다 — 운영에서 앱이 붙자마자 입는 것과 같은 역할이다.
+ * 테스트 바탕은 앱과 같은 `ticket_app` 역할로 붙고 감사 정리 동안만 `set local role none` 으로 주인이 된다(`PostgresTestBase`). 여기서는
+ * **트랜잭션 안에서 `set local role`** 로 역할을 문장마다 못박는다 — 바탕의 연결 역할이 바뀌어도 이 시험이 재는 역할은 안 바뀐다.
  */
 class AuditRoleTest : PostgresTestBase() {
 
