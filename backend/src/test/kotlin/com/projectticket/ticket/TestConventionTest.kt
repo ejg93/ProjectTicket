@@ -124,7 +124,7 @@ class TestConventionTest {
     fun the_measure_lane_row_names_every_measure_test() {
         val tagged = topLevel.filter { it.hasTag("measure") }.map { it.simpleName }.toSet()
         val named = tableRows("| 레인 |")
-            .filter { row -> "`measure`" in row[4] }
+            .filter { row -> row[4].trim() == "`measure`" }
             .flatMap { row -> BACKTICKED_NAME.findAll(row[3]).map { it.groupValues[1] } }
             .filter { it.endsWith("Test") }
             .toSet()

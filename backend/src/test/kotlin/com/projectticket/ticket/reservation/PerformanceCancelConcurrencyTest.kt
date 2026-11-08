@@ -81,6 +81,7 @@ class PerformanceCancelConcurrencyTest : ConcurrencyTestBase() {
             .isEqualTo(ErrorCode.PERFORMANCE_NOT_OPEN)
         assertThat(seatRows())
             .withFailMessage { "취소된 회차의 좌석 행이 선점을 남겼다: ${seatRows()}" }
+            .hasSize(seatIds.size)
             .allSatisfy { assertThat(it).isEqualTo("available" to null) }
         assertThat(recordedSeats())
             .withFailMessage { "취소된 회차에 reservation_seat 가 ${recordedSeats()} 행 남았다" }

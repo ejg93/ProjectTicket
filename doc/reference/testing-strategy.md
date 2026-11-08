@@ -28,7 +28,7 @@
 | 빠른 | `gradlew test` | 컨테이너 없이 초 단위로 답한다 | 태그 없음 |
 | 느린 | `gradlew integrationTest` | 컨테이너를 띄운다. `build` 가 같이 돈다 | `db` |
 | **측정** | `gradlew measure` | 수치를 남기는 것 — 손 태그는 `LockComparisonTest` 하나(락 방식 넷 × 스레드 100·1000, 19·34). 가상 스레드 전후는 이 레인이 아니라 k6 다(`doc/notes/virtual-threads.md`). **`build` 밖이다** | `measure` |
-| **변이** | `gradlew mutationTest` | 순수 계산 여덟 클래스에 변이를 넣고 빠른 레인 시험이 잡나(PIT, `G4`). 산출물은 살아남은 변이 목록(최신 `doc/notes/mutation-*.md`)이고 문턱이 없다 — 목록은 수가 아니라 기준선이다. **`build` 밖이다** — 대상 소스를 고치면 `verify.sh` 가 `scripts/mutation-gate.sh` 로 같이 돌고, 노트 처분표 밖에서 산 변이가 나오면 빨강(`I14-2`) | 빠른 레인 전체(`db`·`measure` 제외) |
+| **변이** | `gradlew mutationTest` | 순수 계산 여덟 클래스에 변이를 넣고 빠른 레인 시험이 잡나(PIT, `G4`). 산출물은 살아남은 변이 목록(최신 `doc/notes/mutation-*.md`)이고 문턱이 없다 — 목록은 수가 아니라 기준선이다. **`build` 밖이다** — 대상 소스를 고치면 `verify.sh` 가 `scripts/mutation-gate.sh` 로 같이 돌고, 노트 처분표 밖에서 산 변이가 나오면 빨강(`I14-2`). origin/main 기준이라 번들 안에서 한 번 고치면 그 뒤 backend verify 마다 돈다 | 빠른 레인 전체(`db`·`measure` 제외) |
 
 **태그는 바탕이 붙인다.** `PostgresTestBase`·`ConcurrencyTestBase` 를 상속하면 `db` 가 따라오고, 상속하지 않고 DB 를 쓰면 빠른 레인에서 곧바로 빨개진다.
 빠뜨릴 자리가 없는 것이 이 방식의 값이다.
