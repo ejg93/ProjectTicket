@@ -54,11 +54,14 @@ class QueuePositionRaceTest : ConcurrencyTestBase() {
 
         val done = AtomicBoolean(false)
         val admitted = AtomicInteger(0)
+        val polls = AtomicInteger(0)
         val results = runConcurrently(POLLERS + 1) { index ->
-            if (index == POLLERS) admitAll(done, admitted) else pollFront(accounts, done, admitted)
+            if (index == POLLERS) admitAll(done, admitted) else pollFront(accounts, done, admitted, polls)
         }
 
         val missing = results.sumOf { it.getOrThrow() }
+        // 폴링이 한 번도 안 돌았으면 `missing == 0` 은 경합을 안 잰 초록이다
+        assertThat(polls.get()).describedAs("폴러가 입장 중에 한 번도 못 물었다 — 경합을 안 쟀다").isPositive()
         assertThat(missing).describedAs("입장하는 순간의 폴링이 「줄에 없다」를 받았다 — 토큰과 순번을 따로 읽는다(`35g`)").isZero()
         assertThat(accounts.count { admission.tokenFor(performanceId, it) != null }).isEqualTo(LINE)
     }
@@ -79,9 +82,10 @@ class QueuePositionRaceTest : ConcurrencyTestBase() {
     }
 
     /** 폴러 하나. 문지기가 끝날 때까지 묻고 「줄에 없다」를 받은 수를 준다 */
-    private fun pollFront(accounts: List<Long>, done: AtomicBoolean, admitted: AtomicInteger): Int {
+    private fun pollFront(accounts: List<Long>, done: AtomicBoolean, admitted: AtomicInteger, polls: AtomicInteger): Int {
         var missing = 0
         while (!done.get()) {
+            polls.incrementAndGet()
             // **다음 배치에 들 사람만 묻는다** — 줄 맨 앞 한 배치. 아무나 물으면 입장 순간에 걸릴 확률이 배치 ÷ 줄이라 경합이 안 난다
             val front = admitted.get()
             val reach = minOf(a = AdmissionService.BATCH_SIZE.toInt(), b = LINE - front).coerceAtLeast(1)

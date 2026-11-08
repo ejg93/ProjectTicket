@@ -67,8 +67,17 @@ class OversellConcurrencyTest : ConcurrencyTestBase() {
             assertThat(pointerOf(seat))
                 .withFailMessage { "두 번 팔렸다 — performance_seat_id=$seat 의 포인터가 기록한 예매 $live 와 다르다" }
                 .isEqualTo(live.single())
+            assertThat(statusOf(seat))
+                .withFailMessage { "좌석 상태가 선점을 안 따른다 — performance_seat_id=$seat 가 ${statusOf(seat)}" }
+                .isEqualTo("held")
         }
     }
+
+    private fun statusOf(performanceSeatId: Long): String? =
+        jdbc.sql("select status from performance_seat where performance_seat_id = :seat")
+            .param("seat", performanceSeatId)
+            .query(String::class.java)
+            .single()
 
     /** 진 쪽은 전부 「남이 이겼다」로 끝난다. 다른 예외면 그 메시지를 문구에 싣는다 — 어느 겹이 막았는지가 거기 있다 */
     private fun assertAllLosersSawSeatTaken(failures: List<Throwable>) {

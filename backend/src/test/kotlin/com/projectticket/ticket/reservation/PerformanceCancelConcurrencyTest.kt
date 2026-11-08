@@ -79,7 +79,27 @@ class PerformanceCancelConcurrencyTest : ConcurrencyTestBase() {
         assertThat((result.exceptionOrNull() as? TicketException)?.code)
             .withFailMessage { "선점이 performance-not-open 으로 끝나지 않았다: $result" }
             .isEqualTo(ErrorCode.PERFORMANCE_NOT_OPEN)
+        assertThat(seatRows())
+            .withFailMessage { "취소된 회차의 좌석 행이 선점을 남겼다: ${seatRows()}" }
+            .allSatisfy { assertThat(it).isEqualTo("available" to null) }
+        assertThat(recordedSeats())
+            .withFailMessage { "취소된 회차에 reservation_seat 가 ${recordedSeats()} 행 남았다" }
+            .isZero()
     }
+
+    private fun seatRows(): List<Pair<String, Long?>> =
+        jdbc.sql("select status, reservation_id from performance_seat where performance_id = :id order by performance_seat_id")
+            .param("id", performanceId)
+            .query { rs, _ -> rs.getString("status") to rs.getObject("reservation_id", Long::class.javaObjectType) }
+            .list()
+
+    private fun recordedSeats(): Int =
+        jdbc.sql(
+            """
+            select count(*) from reservation_seat rs join reservation r on r.reservation_id = rs.reservation_id
+             where r.performance_id = :id
+            """,
+        ).param("id", performanceId).query(Int::class.java).single()
 
     private fun liveReservations(): List<Long> =
         jdbc.sql("select reservation_id from reservation where performance_id = :id and status in ('held', 'paying', 'reserved')")
