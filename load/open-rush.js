@@ -29,6 +29,8 @@ const enterFailed = new Counter("enter_failed");
 const left = new Counter("left");
 const releaseFailed = new Counter("release_failed");
 const dropped = new Counter("dropped");
+// 회차가 닫혀 줄이 걷혔다(410 `queue-closed`) — 화면처럼 그 계정은 멈춘다. 안 멈추면 취소 뒤 폴링이 판 끝까지 410 을 친다(`load-8`)
+const closed = new Counter("closed");
 const seatsWon = new Counter("seats_won");
 const seatsTaken = new Counter("seats_taken");
 const holdOther = new Counter("hold_other");
@@ -154,6 +156,11 @@ function poll(a) {
   pollLatency.add(Date.now() - started);
   if (res.status === 404) {
     dropped.add(1);
+    a.done = true;
+    return;
+  }
+  if (res.status === 410) {
+    closed.add(1);
     a.done = true;
     return;
   }
