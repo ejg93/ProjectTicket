@@ -29,6 +29,8 @@ const enterFailed = new Counter("enter_failed");
 const left = new Counter("left");
 const releaseFailed = new Counter("release_failed");
 const dropped = new Counter("dropped");
+// 회차가 닫혀 줄이 걷혔다(410 `queue-closed`) — 화면처럼 그 계정은 멈춘다. 안 멈추면 취소 뒤 폴링이 판 끝까지 410 을 친다(`load-8`)
+const closed = new Counter("closed");
 const seatsWon = new Counter("seats_won");
 const seatsTaken = new Counter("seats_taken");
 const holdOther = new Counter("hold_other");
@@ -55,11 +57,11 @@ export const options = {
     },
   },
   tags: { phase: "run" },
-  // 문턱은 `D13` 칸이다. 이긴 선점은 이 판(`load-4`)이 세운 「오픈 순간」 칸(셋 ≤ 105ms). 초과 판매 0 은 k6 가 못 본다 — `README.md` 「오픈 순간」의 SQL.
+  // 문턱은 `D13` 칸이다. 이긴 선점은 「오픈 순간」 칸 — 22 vCPU ≤ 105ms(`load-4`) · 10 vCPU ≤ 415ms(`load-8`). 초과 판매 0 은 k6 가 못 본다 — `README.md` 「오픈 순간」의 SQL.
   thresholds: {
     http_req_failed: ["rate==0"],
     "http_req_duration{phase:run}": ["p(95)>=0"],
-    // 기본은 compose 셋 칸(`D13`). k8s 판은 `k8s-hpa-test.sh` 가 k8s 칸을 넘긴다(`54`) — nginx 없이 kind 3~6대가 한 기계를 나눈다.
+    // 기본은 compose 셋 · Docker 22 vCPU 칸(`D13`). 10 vCPU 면 `HOLD_WON_P95=415`·`POLL_P95=311`(`README.md`). k8s 판은 `k8s-hpa-test.sh` 가 k8s 칸을 넘긴다(`54`) — nginx 없이 kind 3~6대가 한 기계를 나눈다.
     poll_latency_ms: [`p(95)<${__ENV.POLL_P95 || 140}`],
     wait_over_expected: [`p(95)<${__ENV.WAIT_RATIO_P95 || 2}`],
     hold_won_ms: [`p(95)<${__ENV.HOLD_WON_P95 || 105}`],
@@ -154,6 +156,11 @@ function poll(a) {
   pollLatency.add(Date.now() - started);
   if (res.status === 404) {
     dropped.add(1);
+    a.done = true;
+    return;
+  }
+  if (res.status === 410) {
+    closed.add(1);
     a.done = true;
     return;
   }
