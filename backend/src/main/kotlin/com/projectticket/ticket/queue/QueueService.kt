@@ -21,6 +21,7 @@ class QueueService(
     private val redis: StringRedisTemplate,
     private val jdbc: JdbcClient,
     private val admission: AdmissionService,
+    private val sales: PerformanceSaleCache,
 ) {
 
     /**
@@ -28,7 +29,9 @@ class QueueService(
      * member 가 계정이라 한 사람이 줄에 두 번 못 선다.
      */
     fun enter(performanceId: Long, accountId: Long): Position {
-        requireOpen(performanceId)
+        // 진입은 캐시를 안 지난다(`55`) — 다른 대가 닫은 회차를 「판매 중」으로 믿으면 닫힌 회차에 줄 키를 다시 만든다.
+        // 입장·청소 스케줄러는 `open` 회차만 훑어서 그 키는 안 지워진다. 진입은 사람마다 한 번이라 폴링보다 드물다.
+        requireOpen(performanceId, loadSale(performanceId))
         // 이미 들어온 사람을 다시 줄에 세우면 방금 얻은 자리를 스스로 버린다 — 새로고침이 그 모양이다(`D12`).
         // 토큰 확인과 줄 세우기를 **한 스크립트로** 한다(`35g`) — 따로 읽으면 그 사이에 입장한 사람을 다시 줄에 세운다.
         val answer = redis.execute(ENTER, keysOf(performanceId, accountId), accountId.toString())
@@ -49,7 +52,7 @@ class QueueService(
 
     /** 폴링(2초)이 부르는 자리(`D12`). 하트비트 기록은 24 가 여기에 더한다 */
     fun position(performanceId: Long, accountId: Long): Position {
-        requireOpen(performanceId)
+        requireOpen(performanceId, saleOf(performanceId))
         // 입장한 사람은 줄에서 빠져 있다(`ZPOPMIN`). **토큰·순번·하트비트를 한 스크립트로 읽는다**(`35g`) —
         // 토큰을 먼저 보고 순번을 따로 읽으면 그 사이에 입장 스크립트가 끼어 방금 들어온 사람이 404 를 받는다(줄 1만에서 8, `load-3` 「35c」).
         // **폴링이 하트비트를 겸한다**(`D12`) — 줄에 있을 때만 남긴다.
@@ -58,8 +61,18 @@ class QueueService(
         return when (kind) {
             ADMITTED -> Position.admitted(value)
             WAITING -> position(value.toLong())
-            else -> throw TicketException(ErrorCode.NOT_IN_QUEUE, "줄에 없다: performance_id=$performanceId account_id=$accountId")
+            else -> notInQueue(performanceId, accountId)
         }
+    }
+
+    /**
+     * 줄이 걷힌 것이 다른 대의 회차 종료일 수 있다 — 이 대의 캐시는 아직 「판매 중」이다(`55`).
+     * DB 를 다시 읽어 닫혔으면 410 이다. 404 면 화면이 「다시 줄을 서 주세요」로 멈춘다(`queue-status.tsx`)
+     */
+    private fun notInQueue(performanceId: Long, accountId: Long): Nothing {
+        sales.evict(performanceId)
+        requireOpen(performanceId, saleOf(performanceId))
+        throw TicketException(ErrorCode.NOT_IN_QUEUE, "줄에 없다: performance_id=$performanceId account_id=$accountId")
     }
 
     /** 스크립트 둘이 같은 순서로 받는다 — 계정의 토큰 · 줄 · 하트비트 */
@@ -99,6 +112,8 @@ class QueueService(
      */
     fun drop(performanceId: Long) {
         redis.delete(QueueKeys.ofPerformance(performanceId))
+        // 이 대의 판매 상태도 버린다(`55`) — 안 버리면 닫은 대의 폴링이 TTL 동안 「판매 중」을 믿고 404 `not-in-queue` 를 낸다
+        sales.evict(performanceId)
     }
 
     /** `ZRANK` 는 0부터다. 보이는 순번은 1부터고 예상 대기는 그 순번으로 센다 */
@@ -138,23 +153,25 @@ class QueueService(
      * 판매 중인 회차에만 줄이 선다. 닫힌 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`),
      * 화면은 그 코드로 줄을 걷는다.
      */
-    private fun requireOpen(performanceId: Long) {
-        val sale = saleOf(performanceId)
-            ?: throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
+    private fun requireOpen(performanceId: Long, sale: PerformanceSale?) {
+        sale ?: throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
 
         if (!sale.onSale) {
             throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=${sale.status}")
         }
     }
 
-    /** [onSale] 은 `open` 이고 판매 시작(`sales_open_at`)이 지났나다(`I13-1`). 그 전에는 줄이 서지 않는다 */
-    private data class Sale(val status: String, val onSale: Boolean)
+    /**
+     * `on_sale` 은 `open` 이고 판매 시작(`sales_open_at`)이 지났나다(`I13-1`). 그 전에는 줄이 서지 않는다.
+     * 판정은 DB `now()` 가 하고(`D7`), 폴링마다 회차 행을 안 읽게 대마다 담는다([PerformanceSaleCache], `55`).
+     */
+    private fun saleOf(performanceId: Long): PerformanceSale? = sales.get(performanceId, ::loadSale)
 
-    private fun saleOf(performanceId: Long): Sale? =
+    private fun loadSale(performanceId: Long): PerformanceSale? =
         jdbc.sql("select status, status = :open and sales_open_at <= now() as on_sale from performance where performance_id = :id")
             .param("id", performanceId)
             .param("open", PerformanceStatus.OPEN.code)
-            .query { rs, _ -> Sale(status = rs.getString("status"), onSale = rs.getBoolean("on_sale")) }
+            .query { rs, _ -> PerformanceSale(status = rs.getString("status"), onSale = rs.getBoolean("on_sale")) }
             .optional()
             .orElse(null)
 

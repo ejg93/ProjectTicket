@@ -57,11 +57,11 @@ export const options = {
     },
   },
   tags: { phase: "run" },
-  // 문턱은 `D13` 칸이다. 이긴 선점은 「오픈 순간」 칸 — 22 vCPU ≤ 105ms(`load-4`) · 10 vCPU ≤ 415ms(`load-8`). 초과 판매 0 은 k6 가 못 본다 — `README.md` 「오픈 순간」의 SQL.
+  // 문턱은 `D13` 칸이다. 이긴 선점은 「오픈 순간」 칸 — 22 vCPU ≤ 105ms(`load-4`) · 10 vCPU ≤ 272ms(`load-9`). 초과 판매 0 은 k6 가 못 본다 — `README.md` 「오픈 순간」의 SQL.
   thresholds: {
     http_req_failed: ["rate==0"],
     "http_req_duration{phase:run}": ["p(95)>=0"],
-    // 기본은 compose 셋 · Docker 22 vCPU 칸(`D13`). 10 vCPU 면 `HOLD_WON_P95=415`·`POLL_P95=311`(`README.md`). k8s 판은 `k8s-hpa-test.sh` 가 k8s 칸을 넘긴다(`54`) — nginx 없이 kind 3~6대가 한 기계를 나눈다.
+    // 기본은 compose 셋 · Docker 22 vCPU 칸(`D13`). 10 vCPU 면 `HOLD_WON_P95=272`·`POLL_P95=301`(`README.md`). k8s 판은 `k8s-hpa-test.sh` 가 k8s 칸을 넘긴다(`54`) — nginx 없이 kind 3~6대가 한 기계를 나눈다.
     poll_latency_ms: [`p(95)<${__ENV.POLL_P95 || 140}`],
     wait_over_expected: [`p(95)<${__ENV.WAIT_RATIO_P95 || 2}`],
     hold_won_ms: [`p(95)<${__ENV.HOLD_WON_P95 || 105}`],

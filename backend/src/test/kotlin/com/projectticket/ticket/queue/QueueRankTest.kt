@@ -37,6 +37,8 @@ class QueueRankTest : PostgresTestBase() {
 
     private lateinit var fixture: EventFixture
     private var performanceId: Long = 0
+    private var eventId: Long = 0
+    private var hallId: Long = 0
     private var first: Long = 0
     private var second: Long = 0
     private var third: Long = 0
@@ -44,8 +46,8 @@ class QueueRankTest : PostgresTestBase() {
     @BeforeEach
     fun setUp() {
         fixture = EventFixture(jdbc)
-        val eventId = fixture.event(fixture.organizer("${PREFIX}org"))
-        val hallId = fixture.hall(venueName = "${PREFIX}홀")
+        eventId = fixture.event(fixture.organizer("${PREFIX}org"))
+        hallId = fixture.hall(venueName = "${PREFIX}홀")
         fixture.seats(hallId, "F1-A", 2)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
         performanceId = fixture.performance(eventId, hallId)
@@ -135,6 +137,54 @@ class QueueRankTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_closed_performance_is_gone_at_once() {
+        queue.enter(performanceId, first)
+        // 폴링이 판매 상태를 한 번 읽어 담는다(`55`) — 닫은 대가 그 항목을 안 지우면 다음 폴링이 TTL 동안 「판매 중」을 믿는다
+        queue.position(performanceId, first)
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 hour' where performance_id = :id")
+            .param("id", performanceId)
+            .update()
+        assertThat(closer.closeDue()).isEqualTo(1)
+
+        assertThatThrownBy { queue.position(performanceId, first) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
+    }
+
+    @Test
+    fun another_instance_closing_answers_410_not_404() {
+        queue.enter(performanceId, first)
+        queue.position(performanceId, first)
+        closeElsewhere()
+
+        // 줄이 걷힌 것을 보면 DB 를 다시 읽는다 — 404 `not-in-queue` 면 화면이 「다시 줄을 서 주세요」로 멈춘다
+        assertThatThrownBy { queue.position(performanceId, first) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
+    }
+
+    @Test
+    fun entering_after_another_instance_closed_makes_no_queue() {
+        queue.enter(performanceId, first)
+        queue.position(performanceId, first)
+        closeElsewhere()
+
+        assertThatThrownBy { queue.enter(performanceId, second) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
+        // 닫힌 회차의 줄은 입장·청소 스케줄러가 안 훑어서(`status = open` 만) 한 번 서면 안 지워진다
+        assertThat(redis.hasKey(QueueKeys.waiting(performanceId))).isFalse()
+    }
+
+    @Test
+    fun opening_a_draft_opens_the_gate_at_once() {
+        val draft = fixture.performance(eventId, hallId, startsInDays = 2)
+        assertThat(queue.gateOf(draft)).isEqualTo(QueueService.Gate.NONE)
+
+        openService.open(draft, actorAccountId = null)
+
+        // `draft` 를 담았으면 TTL 동안 관문이 안 지켜 토큰 없이 선점이 지난다
+        assertThat(queue.gateOf(draft)).isEqualTo(QueueService.Gate.GATED)
+    }
+
+    @Test
     fun the_endpoint_answers_rank_and_eta() {
         val principal = TicketUser(id = first, email = "${PREFIX}1@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 
@@ -145,6 +195,14 @@ class QueueRankTest : PostgresTestBase() {
                 jsonPath("$.rank") { value(2) }
                 jsonPath("$.eta_seconds") { value(1) }
             }
+    }
+
+    /** 다른 대가 회차를 닫은 꼴 — DB 와 Redis 줄은 같이 바뀌고 이 대의 판매 상태 캐시는 안 지워진다 */
+    private fun closeElsewhere() {
+        // 마감이 지나야 닫힌다(`V30`) — 두 문장이다
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id").param("id", performanceId).update()
+        jdbc.sql("update performance set status = 'closed' where performance_id = :id").param("id", performanceId).update()
+        redis.delete(QueueKeys.ofPerformance(performanceId))
     }
 
     private companion object {

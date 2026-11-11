@@ -11,10 +11,10 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 
 | 대상 | 버전 | 어디에 박혀 있나 |
 |---|---|---|
-| Spring Boot | 4.1.1 | `backend/build.gradle.kts` |
+| Spring Boot | 4.1.2 | `backend/build.gradle.kts` |
 | Kotlin | 2.3.21 | 같은 파일의 플러그인. **Boot BOM 이 관리하는 값과 맞춘다** — 플러그인은 BOM 밖이라 직접 적는다 |
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
-| Gradle | 9.8.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
+| Gradle | 9.9.0 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
@@ -25,18 +25,18 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
 | ArchUnit | 1.5.1 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | dependency-management | 1.1.7 | `build.gradle.kts` 의 `io.spring.dependency-management` 플러그인. Boot BOM 을 들이는 도구라 BOM 밖이다 |
-| pitest | 1.30.1 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
+| pitest | 1.30.2 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
 | pitest-junit5-plugin | 1.2.3 | 같은 구성. JUnit 플랫폼에서 시험을 찾는다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
 | Node | 22 | `.github/workflows/ci.yml`. 화면이 쓴다 |
-| Next | 16.4.2 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
+| Next | 16.4.5 | `frontend/package.json`. App Router. **판을 올리면 `frontend-rules.md` 의 캐시 절부터 다시 본다** — 기본값이 판마다 갈렸다 |
 | React | 19.3.1 | `frontend/package.json`. `useFormStatus` 가 여기서 온다 |
 | kind | 0.33.0 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** `scripts/k8s-up.sh` 가 부른다(`36`). 클러스터 설정은 `k8s/kind.yaml`. winget 으로 깔았으면 **새 터미널**에서야 PATH 에 보인다 |
 | Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
 | kubectl | 1.36.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
 | k6 | 2.2.0 | `grafana/k6:2.2.0` 컨테이너 — `load/README.md`, `scripts/k8s-rollout-test.sh`. 쓰는 법의 함정은 아래 「k6」 |
-| Playwright | 1.64.1 | `frontend/package.json`(`^1.64.1`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
+| Playwright | 1.65.0 | `frontend/package.json`(`^1.65.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | ShellCheck | 0.11.0 | `.github/workflows/ci.yml`(`docs` 잡 — 판과 sha256 을 박는다). 로컬은 winget `koalaman.shellcheck` — 패키지 폴더가 사용자 PATH 에 들어가서 **설치 전에 연 셸은 못 찾는다**(`scripts/shell-lint.sh` 가 그 폴더를 직접 본다) |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
 
