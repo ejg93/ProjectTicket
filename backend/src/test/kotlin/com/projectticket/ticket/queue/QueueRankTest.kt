@@ -135,6 +135,20 @@ class QueueRankTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_closed_performance_is_gone_at_once() {
+        queue.enter(performanceId, first)
+        // 폴링이 판매 상태를 한 번 읽어 담는다(`55`) — 닫은 대가 그 항목을 안 지우면 다음 폴링이 TTL 동안 「판매 중」을 믿는다
+        queue.position(performanceId, first)
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 hour' where performance_id = :id")
+            .param("id", performanceId)
+            .update()
+        assertThat(closer.closeDue()).isEqualTo(1)
+
+        assertThatThrownBy { queue.position(performanceId, first) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
+    }
+
+    @Test
     fun the_endpoint_answers_rank_and_eta() {
         val principal = TicketUser(id = first, email = "${PREFIX}1@test.local", role = AccountRole.AUDIENCE, passwordHash = null, active = true)
 

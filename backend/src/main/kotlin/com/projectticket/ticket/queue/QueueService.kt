@@ -21,6 +21,7 @@ class QueueService(
     private val redis: StringRedisTemplate,
     private val jdbc: JdbcClient,
     private val admission: AdmissionService,
+    private val sales: PerformanceSaleCache,
 ) {
 
     /**
@@ -99,6 +100,8 @@ class QueueService(
      */
     fun drop(performanceId: Long) {
         redis.delete(QueueKeys.ofPerformance(performanceId))
+        // 이 대의 판매 상태도 버린다(`55`) — 안 버리면 닫은 대의 폴링이 TTL 동안 「판매 중」을 믿고 404 `not-in-queue` 를 낸다
+        sales.evict(performanceId)
     }
 
     /** `ZRANK` 는 0부터다. 보이는 순번은 1부터고 예상 대기는 그 순번으로 센다 */
@@ -147,16 +150,33 @@ class QueueService(
         }
     }
 
-    /** [onSale] 은 `open` 이고 판매 시작(`sales_open_at`)이 지났나다(`I13-1`). 그 전에는 줄이 서지 않는다 */
-    private data class Sale(val status: String, val onSale: Boolean)
-
-    private fun saleOf(performanceId: Long): Sale? =
-        jdbc.sql("select status, status = :open and sales_open_at <= now() as on_sale from performance where performance_id = :id")
-            .param("id", performanceId)
+    /**
+     * `on_sale` 은 `open` 이고 판매 시작(`sales_open_at`)이 지났나다(`I13-1`). 그 전에는 줄이 서지 않는다.
+     * 판정은 DB `now()` 가 하고(`D7`), 폴링마다 회차 행을 안 읽게 대마다 담는다([PerformanceSaleCache], `55`).
+     * 판매 시작까지 남은 ms 도 DB 가 재서 준다 — 캐시가 그 순간에 항목을 끝낸다.
+     */
+    private fun saleOf(performanceId: Long): PerformanceSale? = sales.get(performanceId) { id ->
+        jdbc.sql(
+            """
+            select status,
+                   status = :open and sales_open_at <= now() as on_sale,
+                   greatest(0, (extract(epoch from sales_open_at - now()) * 1000)::bigint) as until_open_ms
+              from performance
+             where performance_id = :id
+            """,
+        )
+            .param("id", id)
             .param("open", PerformanceStatus.OPEN.code)
-            .query { rs, _ -> Sale(status = rs.getString("status"), onSale = rs.getBoolean("on_sale")) }
+            .query { rs, _ ->
+                PerformanceSale(
+                    status = rs.getString("status"),
+                    onSale = rs.getBoolean("on_sale"),
+                    untilOpen = Duration.ofMillis(rs.getLong("until_open_ms")),
+                )
+            }
             .optional()
             .orElse(null)
+    }
 
     /**
      * 줄의 대답. **무엇이 들었는지는 [state] 가 정한다**(사용자 선택) — 대기 중에는 순번이, 입장 뒤에는 토큰이 온다.
