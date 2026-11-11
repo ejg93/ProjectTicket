@@ -66,18 +66,13 @@ class PerformanceSaleCacheTest {
     }
 
     @Test
-    fun an_entry_before_sales_open_ends_at_the_opening() {
-        // 판매 시작 1초 전에 읽은 「아직 아니다」는 TTL 5초를 다 안 산다 — 시작 순간에 다시 읽어야 열린다(`D7` 판정은 DB)
-        val before = PerformanceSale(status = "open", onSale = false, untilOpen = Duration.ofSeconds(1))
-        val load = loader(before)
+    fun a_performance_not_on_sale_is_not_cached() {
+        // 판매 전·draft·닫힘은 늘 DB 를 읽는다 — 담으면 판매 시작·`draft → open` 순간에 TTL 만큼 늦게 열린다(마무리 32차 리뷰)
+        val load = loader(PerformanceSale(status = "open", onSale = false))
 
         cache.get(ID, load)
-        advance(Duration.ofMillis(999))
         cache.get(ID, load)
-        assertThat(loads).isEqualTo(1)
 
-        advance(Duration.ofMillis(1))
-        cache.get(ID, load)
         assertThat(loads).isEqualTo(2)
     }
 
@@ -93,6 +88,6 @@ class PerformanceSaleCacheTest {
 
     private companion object {
         const val ID = 7L
-        val ON_SALE = PerformanceSale(status = "open", onSale = true, untilOpen = Duration.ZERO)
+        val ON_SALE = PerformanceSale(status = "open", onSale = true)
     }
 }

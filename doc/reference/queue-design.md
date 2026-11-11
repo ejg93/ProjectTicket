@@ -133,7 +133,7 @@ C 가 막는 것은 「입장했는데 안 사는 사람」이 쌓여서 활성 
 | 줄에서 제거 | 90초 하트비트 없음(ADR 0003) | 스케줄러가 `seen` 을 훑어 `ZREM`. 뒷사람이 당겨진다 |
 | 명시적 이탈 | `DELETE /api/queue/{perf}` | `ZREM` + 토큰 있으면 삭제 |
 | 토큰 만료 | 10분 | Redis TTL 이 지운다. `active` ZSET 은 다음 입장 때 1 단계가 정리 |
-| 회차 종료 | `closed`·`cancelled` 전이(16a·17a) | **회차로 훑을 수 있는 키 넷**(`queue:`·`:seen`·`:active`·`:admit_window`, `QueueKeys.ofPerformance`)을 삭제. `admit:{token}`·`admit:by-account:…` 는 회차로 못 훑어서 TTL 10분이 지운다 — 남아 있어도 선점이 회차 상태를 다시 봐서(13) 아무것도 못 한다. 지우는 것은 **커밋 뒤**다(21). 줄에 남은 사람은 폴링에서 410 `queue-closed` — 닫은 대는 바로, 다른 대는 판매 상태 캐시(`PerformanceSaleCache`, `55`)가 끝나는 최대 5초 뒤 |
+| 회차 종료 | `closed`·`cancelled` 전이(16a·17a) | **회차로 훑을 수 있는 키 넷**(`queue:`·`:seen`·`:active`·`:admit_window`, `QueueKeys.ofPerformance`)을 삭제. `admit:{token}`·`admit:by-account:…` 는 회차로 못 훑어서 TTL 10분이 지운다 — 남아 있어도 선점이 회차 상태를 다시 봐서(13) 아무것도 못 한다. 지우는 것은 **커밋 뒤**다(21). 줄에 남은 사람은 폴링에서 410 `queue-closed` — 판매 상태 캐시(`PerformanceSaleCache`, `55`)가 있어도 바로다. 닫은 대는 `drop` 이 캐시를 비우고, 다른 대는 폴링이 줄 없음을 보면 캐시를 버리고 DB 를 다시 읽는다. 진입은 캐시를 안 지난다 |
 
 ## 장애
 
