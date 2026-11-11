@@ -11,10 +11,10 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 
 | 대상 | 버전 | 어디에 박혀 있나 |
 |---|---|---|
-| Spring Boot | 4.1.1 | `backend/build.gradle.kts` |
+| Spring Boot | 4.1.2 | `backend/build.gradle.kts` |
 | Kotlin | 2.3.21 | 같은 파일의 플러그인. **Boot BOM 이 관리하는 값과 맞춘다** — 플러그인은 BOM 밖이라 직접 적는다 |
 | Java | 25 | 같은 파일의 toolchain. CI 도 25 |
-| Gradle | 9.8.1 | `backend/gradle/wrapper/gradle-wrapper.properties` |
+| Gradle | 9.9.0 | `backend/gradle/wrapper/gradle-wrapper.properties` |
 | PostgreSQL | 17-alpine | `docker-compose.yml`. 테스트 컨테이너도 같은 이미지다(`PostgresTestBase`) |
 | Redis | 7-alpine | `docker-compose.yml`, `PostgresTestBase`. 세션이 여기 산다(`20a`). 대기열·좌석 캐시는 `21`·`D20` |
 | detekt | 2.0.0-alpha.6 | `backend/build.gradle.kts`, 설정은 `backend/config/detekt/detekt.yml`. **알파인 이유는 아래 「기억으로 쓰면 틀리는 자리」** |
@@ -25,7 +25,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Testcontainers | 2.0.5 | `build.gradle.kts` 의 BOM. **Boot BOM 이 관리하지 않는다** |
 | ArchUnit | 1.5.1 | `build.gradle.kts`. **`archunit-junit6`** — 이 저장소가 JUnit 6 이다 |
 | dependency-management | 1.1.7 | `build.gradle.kts` 의 `io.spring.dependency-management` 플러그인. Boot BOM 을 들이는 도구라 BOM 밖이다 |
-| pitest | 1.30.1 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
+| pitest | 1.30.2 | `build.gradle.kts` 의 `pitest` 구성(`pitest-command-line`). 변이 시험(`G4`) — Gradle 플러그인이 아니라 CLI 를 직접 부른다 |
 | pitest-junit5-plugin | 1.2.3 | 같은 구성. JUnit 플랫폼에서 시험을 찾는다 |
 | Jackson | 3.x | 안 적는다. Boot BOM 이 준다. 패키지가 `tools.jackson` |
 | Spring Security | 7.x | 안 적는다. Boot BOM 이 준다 |
