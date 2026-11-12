@@ -80,6 +80,15 @@ class LoginAttemptTest : PostgresTestBase() {
         assertThat(attempts.isBlocked(email = EMAIL, ip = "203.0.113.99")).isFalse()
     }
 
+    @Test
+    fun an_account_is_locked_after_100_failures_from_any_address() {
+        // 주소를 바꿔 가며 한 계정을 두드리면 이메일·IP 키는 매번 새로 시작한다. NIST SP 800-63B Rev 4 §3.2.2 는 한 계정의
+        // 연속 실패를 100 이하로 묶으라 한다(`I16-5`).
+        repeat(LoginAttemptService.MAX_ACCOUNT_ATTEMPTS) { logIn(WRONG, ip = "198.51.100.${it + 1}") }
+
+        logIn(PASSWORD, ip = "192.0.2.200").andExpect { status { isUnauthorized() } }
+    }
+
     private fun signUp() =
         mvc.post("/api/auth/signup") {
             with(csrf())
@@ -87,12 +96,12 @@ class LoginAttemptTest : PostgresTestBase() {
             content = """{"email":"$EMAIL","password":"$PASSWORD","display_name":"관객","consents":{"terms_of_service":true,"privacy_collect":true}}"""
         }.andExpect { status { isCreated() } }
 
-    private fun logIn(password: String): ResultActionsDsl =
+    private fun logIn(password: String, ip: String = IP): ResultActionsDsl =
         mvc.post("/api/auth/login") {
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
             content = """{"email":"$EMAIL","password":"$password"}"""
-            with { request -> request.apply { remoteAddr = IP } }
+            with { request -> request.apply { remoteAddr = ip } }
         }
 
     /** 응답이 무엇을 말하는가. `trace_id` 는 요청마다 달라서 비교에서 뺀다(`LoginFlowTest` 와 같은 방식) */
