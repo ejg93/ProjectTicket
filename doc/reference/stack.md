@@ -554,6 +554,8 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 **JPA 를 안 쓴다.** `spring-boot-starter-jdbc` 만 들이고 엔티티는 하나도 안 만든다(ADR 0001). 좌석 선점이 조건부 UPDATE 의 갱신 행 수로 판정하는 코드라(`D4`) SQL 이 그대로 보여야 하고,
 스키마를 지키는 것은 Flyway 와 마이그레이션이다. 의존성 목록이 설계를 안 속이게 한다 — `data-jpa` 스타터를 들이면 다음 사람이 Hibernate 가 도는 줄 안다.
 
+**Hikari 풀은 대당 10 이다**(Hikari 기본값) — 손잡이는 `HIKARI_MAX_POOL`(`application.yml`, compose 앱 env, `57`). PG `max_connections` 는 compose·k8s 둘 다 설정이 없어 100 이다 — compose 3 대 × 20 = 60 은 안, k8s HPA 최대 6 대 × 20 = 120 은 넘는다. 그래서 기본을 안 올렸다.
+
 ## 프론트에서 안 쓰는 것
 
 관례로 깔리는 넷을 안 쓴다. 근거가 없으면 다음 사람이 빠뜨린 줄 알고 채워 넣는다.
