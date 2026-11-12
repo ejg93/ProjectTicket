@@ -26,10 +26,13 @@ class LoginAttemptService(private val redis: StringRedisTemplate) {
     fun isBlocked(email: String, ip: String): Boolean =
         count(key(email, ip)) >= MAX_ATTEMPTS || count(accountKey(email)) >= MAX_ACCOUNT_ATTEMPTS
 
-    /** 둘 다 올린다. 첫 실패에만 TTL 을 건다 — 매번 걸면 계속 두드리는 동안 잠금이 영원히 밀린다 */
+    /**
+     * 둘 다 올린다. 첫 실패에만 TTL 을 건다 — 매번 걸면 계속 두드리는 동안 잠금이 영원히 밀린다.
+     * TTL 이 없는 키(`INCR` 와 `EXPIRE` 사이에서 끊긴 것)에도 다시 건다 — 안 걸면 그 계정은 영원히 갇힌다.
+     */
     fun recordFailure(email: String, ip: String) {
         listOf(key(email, ip), accountKey(email)).forEach { key ->
-            if (redis.opsForValue().increment(key) == 1L) {
+            if (redis.opsForValue().increment(key) == 1L || redis.getExpire(key) == NO_EXPIRY) {
                 redis.expire(key, LOCK_DURATION)
             }
         }
@@ -56,6 +59,9 @@ class LoginAttemptService(private val redis: StringRedisTemplate) {
 
         /** 잠금이 저절로 풀리는 시간. 사람이 푸는 자리를 안 만든다 — 관리자 일이 늘고 사용자는 15분을 기다릴 수 있다 */
         val LOCK_DURATION: Duration = Duration.ofMinutes(15)
+
+        /** `TTL` 이 「만료 없음」에 주는 값 */
+        private const val NO_EXPIRY = -1L
 
         private const val KEY_PREFIX = "login:fail:"
         private const val ACCOUNT_KEY_PREFIX = "login:fail-account:"

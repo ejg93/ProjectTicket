@@ -1,10 +1,12 @@
 package com.projectticket.ticket.error
 
+import io.lettuce.core.RedisCommandTimeoutException
 import io.micrometer.tracing.Tracer
 import jakarta.servlet.FilterChain
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.springframework.dao.QueryTimeoutException
 import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletRequest
@@ -38,6 +40,23 @@ class ProblemFallbackFilterTest {
 
         assertThat(response.status).isEqualTo(503)
         assertThat(response.contentAsString).contains("queue-unavailable")
+    }
+
+    @Test
+    fun a_redis_command_timeout_is_503_too() {
+        // 뜬 뒤에 Redis 가 죽으면 연결 실패가 아니라 명령 시간 초과로 드러난다 — Spring 이 Lettuce 예외를 감싼다(독립 리뷰 I1).
+        val response = run(FilterChain { _, _ -> throw QueryTimeoutException("Redis command timed out", RedisCommandTimeoutException("t")) })
+
+        assertThat(response.status).isEqualTo(503)
+        assertThat(response.getHeader("Retry-After")).isEqualTo(ProblemWriter.RETRY_AFTER_SECONDS)
+    }
+
+    @Test
+    fun a_database_query_timeout_is_still_500() {
+        // 같은 `QueryTimeoutException` 이라도 Redis 가 원인이 아니면 `queue-unavailable` 이 아니다
+        val response = run(FilterChain { _, _ -> throw QueryTimeoutException("jdbc") })
+
+        assertThat(response.status).isEqualTo(500)
     }
 
     @Test

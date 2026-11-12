@@ -73,6 +73,17 @@ class LoginAttemptTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_counter_left_without_a_lock_time_gets_one() {
+        // `INCR` 와 `EXPIRE` 는 두 명령이라 사이에서 끊기면 TTL 없는 키가 남는다. 계정 키가 100 에 닿으면 맞는 비밀번호도 막혀
+        // `reset` 이 못 돌아 영원히 갇힌다 — 다음 실패가 TTL 을 다시 건다(마무리 34차 독립 리뷰 m3).
+        redis.opsForValue().set("login:fail-account:$EMAIL", "3")
+
+        logIn(WRONG)
+
+        assertThat(redis.getExpire("login:fail-account:$EMAIL")).isBetween(1, LoginAttemptService.LOCK_DURATION.toSeconds())
+    }
+
+    @Test
     fun another_address_is_not_locked_out() {
         repeat(LoginAttemptService.MAX_ATTEMPTS) { logIn(WRONG) }
 

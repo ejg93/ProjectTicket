@@ -2,7 +2,6 @@ package com.projectticket.ticket.error
 
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
-import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
@@ -92,23 +91,19 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
     }
 
     /**
-     * 대기열·세션·좌석 버전이 같은 Redis 라 죽으면 예매를 못 받는다 — 관문·필터 그물([ProblemFallbackFilter])과 같은
-     * 503 `queue-unavailable` + `Retry-After` 다(`I16-4`, RFC 9110 §15.6.4). 전에는 마지막 그물이 500 `internal` 로 냈다.
-     */
-    @ExceptionHandler(RedisConnectionFailureException::class)
-    fun handle(e: RedisConnectionFailureException, request: HttpServletRequest): ResponseEntity<ProblemDetail> {
-        log.warn("Redis 연결 실패로 요청을 못 받았다: {} {}", request.method, request.requestURI, e)
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-            .header(HttpHeaders.RETRY_AFTER, ProblemWriter.RETRY_AFTER_SECONDS)
-            .body(problems.create(ErrorCode.QUEUE_UNAVAILABLE, null, request))
-    }
-
-    /**
      * 마지막 그물. 여기까지 온 것은 우리가 예상 못 한 것이다. 원인을 응답에 안 담는다 — 스택이나 SQL 문구가 나가면
      * 그 자체가 정보 유출이다(`D9`). 원인은 스택까지 로그에 남긴다.
      */
     @ExceptionHandler(Exception::class)
     fun handle(e: Exception, request: HttpServletRequest): ResponseEntity<ProblemDetail> {
+        // 대기열·세션·좌석 버전이 같은 Redis 라 죽으면 예매를 못 받는다 — 관문·필터 그물과 같은 503 + `Retry-After` 다
+        // (`I16-4`, RFC 9110 §15.6.4). 판정은 [isRedisDown] 하나다 — 연결 실패와 명령 시간 초과를 같이 본다.
+        if (e.isRedisDown()) {
+            log.warn("Redis 장애로 요청을 못 받았다: {} {}", request.method, request.requestURI, e)
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, ProblemWriter.RETRY_AFTER_SECONDS)
+                .body(problems.create(ErrorCode.QUEUE_UNAVAILABLE, null, request))
+        }
         log.error("처리하지 못한 예외: {} {}", request.method, request.requestURI, e)
         return respond(problems.create(ErrorCode.INTERNAL, null, request))
     }

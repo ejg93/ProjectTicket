@@ -40,10 +40,14 @@ class QueueGateFilter(
     private val metrics: TicketMetrics,
 ) : OncePerRequestFilter(), SecuredApiFilter {
 
-    override fun shouldNotFilter(request: HttpServletRequest): Boolean = performanceIdOf(request) == null
+    override fun shouldNotFilter(request: HttpServletRequest): Boolean = holdTargetOf(request) == null
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
-        val performanceId = performanceIdOf(request) ?: return chain.doFilter(request, response)
+        val target = holdTargetOf(request) ?: return chain.doFilter(request, response)
+        // 순수 십진이 아니면 끊는다(fail closed). MVC 의 `Long` 변환은 공백을 걷고 `0x` 16진을 받아서, 여기서 지나보내면
+        // 그 표기가 토큰 없이 선점에 닿는다(마무리 34차 독립 리뷰 C1).
+        val performanceId = target.takeIf { DECIMAL.matches(it) }?.toLongOrNull()
+            ?: return reject(request = request, response = response, code = ErrorCode.PERFORMANCE_NOT_FOUND)
         // 로그인하지 않았으면 인가 필터가 이미 401 을 냈다. 여기 오는 요청은 세션이 있다.
         val user = SecurityContextHolder.getContext().authentication?.principal as? TicketUser
             ?: return chain.doFilter(request, response)
@@ -131,15 +135,20 @@ class QueueGateFilter(
     }
 
     /**
-     * 선점 경로에서만 회차 id 가 나온다. 다른 요청은 [shouldNotFilter] 가 걸러 낸다.
+     * 선점 경로면 회차 id 자리의 글자(디코드 뒤)를 낸다. 다른 요청은 null 이라 [shouldNotFilter] 가 걸러 낸다.
      *
      * **MVC 와 같은 눈으로 본다**(`PathPattern`, `I16-1`) — 디코드 전 `requestURI` 를 정규식으로 보면 `%31` 같은 경로가
-     * 여기서는 안 걸리고 컨트롤러에는 id 로 닿는다.
+     * 여기서는 안 걸리고 컨트롤러에는 id 로 닿는다. 숫자로 바꾸는 것은 부르는 쪽이다 — 바꿀 수 없는 글자도 선점 경로다.
+     * 파싱은 요청당 한 번이다 — [shouldNotFilter] 와 [doFilterInternal] 이 둘 다 부른다.
      */
-    private fun performanceIdOf(request: HttpServletRequest): Long? {
+    private fun holdTargetOf(request: HttpServletRequest): String? {
         if (!HttpMethod.POST.matches(request.method)) return null
-        val path = ServletRequestPathUtils.parseAndCache(request).pathWithinApplication()
-        return HOLD_PATH.matchAndExtract(path)?.uriVariables?.get("performanceId")?.toLongOrNull()
+        val parsed = if (ServletRequestPathUtils.hasParsedRequestPath(request)) {
+            ServletRequestPathUtils.getParsedRequestPath(request)
+        } else {
+            ServletRequestPathUtils.parseAndCache(request)
+        }
+        return HOLD_PATH.matchAndExtract(parsed.pathWithinApplication())?.uriVariables?.get("performanceId")
     }
 
     companion object {
@@ -147,6 +156,7 @@ class QueueGateFilter(
         const val ADMISSION_HEADER = "X-Admission-Token"
 
         private val HOLD_PATH = PathPatternParser.defaultInstance.parse("/api/performances/{performanceId}/reservations")
+        private val DECIMAL = Regex("[0-9]+")
         private const val CREATED = 201
     }
 }
