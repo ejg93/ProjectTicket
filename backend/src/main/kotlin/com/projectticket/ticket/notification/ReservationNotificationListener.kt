@@ -1,5 +1,6 @@
 package com.projectticket.ticket.notification
 
+import com.projectticket.ticket.outbox.ConsumerLog
 import com.projectticket.ticket.outbox.EnvelopeVersions
 import com.projectticket.ticket.outbox.EventTopics
 import com.projectticket.ticket.outbox.OutboxRelay
@@ -32,6 +33,7 @@ class ReservationNotificationListener(
         if (!EnvelopeVersions.accepts(envelope, GROUP)) return
         // **던진다**(29). 삼키면 재시도도 DLT 도 안 돈다 — 그 사건은 조용히 사라진다.
         store.record(envelope)
+        ConsumerLog.handled(envelope, GROUP)
     }
 
     companion object {

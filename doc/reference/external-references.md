@@ -70,7 +70,7 @@ Boot BOM 이 Testcontainers 를 관리하지 않으므로 `testcontainers-bom` �
 
 | 자료 | 링크 | 확인한 것 |
 |---|---|---|
-| W3C Trace Context | https://www.w3.org/TR/trace-context/ | `traceparent` 형식. 이 링크는 **Recommendation**(2021-11-23)이고 Level 2 는 별도 문서다 — 하위호환이라 `D10` 은 안 바뀐다 |
+| W3C Trace Context | https://www.w3.org/TR/trace-context/ | `traceparent` 형식. 이 링크는 **Recommendation**(2021-11-23)이고 Level 2 는 별도 문서다 — 하위호환이라 `D10` 은 안 바뀐다. 비동기 경계는 `traceparent` 대신 `event_id` 로 잇는다(`D10`, `I16-7`) |
 | Spring Boot 관측 | https://docs.spring.io/spring-boot/reference/actuator/tracing.html | Micrometer Tracing + Brave. 자동설정·브리지 둘 다 필요(`stack.md`) |
 
 OpenTelemetry 는 30 이 붙인다. 지금 붙이면 볼 화면 없이 컨테이너만 는다.

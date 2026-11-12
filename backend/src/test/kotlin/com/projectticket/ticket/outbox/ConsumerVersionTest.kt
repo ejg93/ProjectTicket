@@ -44,9 +44,14 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
     private val logger = LoggerFactory.getLogger(EnvelopeVersions::class.java) as Logger
     private val captured = ListAppender<ILoggingEvent>().apply { start() }
 
+    /** 처리한 사건의 한 줄(`I16-7`). 이름으로 잡는다 — 요청 로그와 소비자 로그를 `event_id` 로 잇는 자리다(`D10` 「비동기 경계」) */
+    private val handledLogger = LoggerFactory.getLogger("com.projectticket.ticket.outbox.ConsumerLog") as Logger
+    private val handled = ListAppender<ILoggingEvent>().apply { start() }
+
     @BeforeEach
     fun setUp() {
         logger.addAppender(captured)
+        handledLogger.addAppender(handled)
         fixture = EventFixture(jdbc)
         accountId = fixture.account("${PREFIX}version@test.local")
         eventId = fixture.event(fixture.organizer("${PREFIX}org"))
@@ -58,6 +63,7 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
     @AfterEach
     fun detach() {
         logger.detachAppender(captured)
+        handledLogger.detachAppender(handled)
     }
 
     @Test
@@ -92,6 +98,25 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
         settlements.on(json.writeValueAsString(closed))
 
         assertThat(settlementCount(performanceId)).describedAs("모르는 판의 회차 종료가 정산을 예약했다").isZero()
+    }
+
+    @Test
+    fun each_consumer_logs_the_event_id_it_handled() {
+        val envelope = reservedEnvelope()
+
+        notifications.on(json.writeValueAsString(envelope))
+        settlements.on(json.writeValueAsString(envelope))
+
+        // `traceparent` 는 아웃박스에서 끊긴다 — 요청 쪽 `reservation_id` 에서 `event_id` 로 건너오려면 소비자가 이 줄을 남겨야 한다
+        val lines = handled.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
+        assertThat(lines).hasSize(2)
+        assertThat(lines).anySatisfy { assertThat(it).contains("consumer=${ReservationNotificationListener.GROUP}") }
+        assertThat(lines).anySatisfy { assertThat(it).contains("consumer=${SettlementListener.GROUP}") }
+        // 식별자만(`D10`) — 페이로드는 안 찍는다
+        assertThat(lines).allSatisfy {
+            assertThat(it).contains("event_id=${envelope.eventId}", "type=reservation.reserved", "aggregate_id=${envelope.aggregateId}")
+                .doesNotContain("total_amount")
+        }
     }
 
     @Test

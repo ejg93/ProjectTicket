@@ -40,6 +40,19 @@
 **값을 만드는 곳은 하나다.** `ProblemFactory` 도 `Tracer` 에서 가져온다. 헤더를 따로 파싱하면 깨진 헤더에서 둘이 갈리고, 사용자가 불러 준 ID 로 로그를 못 찾는다.
 `RequestTraceTest` 가 응답의 ID 와 로그의 ID 가 같은지 잰다.
 
+### 비동기 경계 — `event_id` 로 잇는다
+
+추적 ID 는 **아웃박스에서 끊긴다.** `outbox` 에 추적 열이 없고 릴레이가 헤더 없이 보낸다 — 소비자 로그의 `traceId` 는 요청과 다른 값이다.
+**`traceparent` 를 싣지 않는다**(2026-11-12 사용자, `I16-7`) — 소비자가 우리뿐이라(ADR 0007) 열 하나와 헤더 전파를 더해 얻는 것이 아래 다리보다 적다.
+
+| 단계 | 로그·표 | 잇는 키 |
+|---|---|---|
+| 요청 | 업무 INFO(`traceId` + `reservation_id`, `I11-12`) | `reservation_id` |
+| 아웃박스 | `outbox.aggregate_id` → `outbox.event_id` | `aggregate_id` = `reservation_id`·`performance_id` |
+| 소비자 | `ConsumerLog` 의 INFO 한 줄(`consumer`·`event_id`·`type`·`aggregate_id`). 모르는 판의 건너뜀(`EnvelopeVersions`)도 같은 키다 | `event_id` |
+
+`ConsumerVersionTest.each_consumer_logs_the_event_id_it_handled` 가 소비자 둘의 줄을 잰다.
+
 ## 형식 — 사람이 읽는 텍스트
 
 ```

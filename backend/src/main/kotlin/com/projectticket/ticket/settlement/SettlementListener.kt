@@ -1,5 +1,6 @@
 package com.projectticket.ticket.settlement
 
+import com.projectticket.ticket.outbox.ConsumerLog
 import com.projectticket.ticket.outbox.EnvelopeVersions
 import com.projectticket.ticket.outbox.EventTopics
 import com.projectticket.ticket.outbox.OutboxRelay
@@ -30,6 +31,7 @@ class SettlementListener(
         if (!EnvelopeVersions.accepts(envelope, GROUP)) return
         // 던진다(29) — 재시도·DLT 는 `ConsumerErrorHandling` 이 든다. 멱등은 `performance_id` 유일 제약이다
         store.schedule(envelope)
+        ConsumerLog.handled(envelope, GROUP)
     }
 
     companion object {
