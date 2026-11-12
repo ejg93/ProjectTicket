@@ -25,7 +25,7 @@ class SettlementSweeper(private val store: SettlementStore) {
         }
 
         var settled = 0
-        var total = 0
+        var total = 0L
         due.forEach {
             // 0원 정산서도 만든다 — 전부 취소된 회차가 「0 이다」로 기록에 남는다(`D21` 「회차 취소」).
             // 경합에 지면 남이 이미 집계한 것이라 안 센다(`settle` 이 null 을 준다) — 로그의 수가 실제와 갈리지 않게.

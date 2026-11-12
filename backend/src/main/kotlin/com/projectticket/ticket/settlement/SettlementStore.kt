@@ -87,7 +87,7 @@ class SettlementStore(private val jdbc: JdbcClient) {
      * 반올림은 **항목마다 한 번, 원 단위 half-up**(`D21`). 좌석마다 반올림하면 합이 안 맞는다.
      */
     @Transactional
-    fun settle(due: Due): Int? {
+    fun settle(due: Due): Long? {
         val sale = saleOf(due.performanceId)
         val platformFee = -round(sale, due.commissionRate)
         val cancelFee = round(cancelFeeBaseOf(due.performanceId), due.cancelFeeShare)
@@ -126,17 +126,17 @@ class SettlementStore(private val jdbc: JdbcClient) {
      * 판매된 것 — `reserved` 예매의 좌석 가격 합(`D21`). 취소·만료된 예매는 안 든다.
      * 상태를 **리터럴로 둔다** — 정산은 맨 아래 층이라 `ReservationStatus` 를 못 본다(`ArchitectureTest`). 값이 열거형 `code` 인지는 `SqlTextTest` 가 본다(`I9-4`).
      */
-    private fun saleOf(performanceId: Long): Int =
+    private fun saleOf(performanceId: Long): Long =
         jdbc.sql(
             """
             select coalesce(sum(rs.price), 0)
               from reservation_seat rs join reservation r on r.reservation_id = rs.reservation_id
              where r.performance_id = :id and r.status = 'reserved'
             """,
-        ).param("id", performanceId).query(Int::class.java).single()
+        ).param("id", performanceId).query(Long::class.java).single()
 
     /** 관객 취소의 수수료 합. 회차 취소·승인 지연은 수수료가 0 이라(`D6`) 여기 안 든다 */
-    private fun cancelFeeBaseOf(performanceId: Long): Int =
+    private fun cancelFeeBaseOf(performanceId: Long): Long =
         jdbc.sql(
             """
             select coalesce(sum(rf.fee_amount), 0)
@@ -145,10 +145,10 @@ class SettlementStore(private val jdbc: JdbcClient) {
               join reservation r on r.reservation_id = pm.reservation_id
              where r.performance_id = :id and rf.reason = 'audience'
             """,
-        ).param("id", performanceId).query(Int::class.java).single()
+        ).param("id", performanceId).query(Long::class.java).single()
 
-    private fun round(base: Int, rate: BigDecimal): Int =
-        BigDecimal(base).multiply(rate).setScale(0, RoundingMode.HALF_UP).intValueExact()
+    private fun round(base: Long, rate: BigDecimal): Long =
+        BigDecimal(base).multiply(rate).setScale(0, RoundingMode.HALF_UP).longValueExact()
 
     data class Due(val settlementId: Long, val performanceId: Long, val commissionRate: BigDecimal, val cancelFeeShare: BigDecimal)
 }
