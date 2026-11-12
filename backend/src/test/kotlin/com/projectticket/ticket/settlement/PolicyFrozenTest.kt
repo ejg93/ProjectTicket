@@ -104,7 +104,7 @@ class PolicyFrozenTest : PostgresTestBase() {
     }
 
     @Test
-    fun a_draft_is_stamped_once_from_null() {
+    fun a_draft_is_stamped_from_null() {
         val fixture = EventFixture(jdbc)
         val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("frozen-draft")), hallId = fixture.hall())
 

@@ -539,6 +539,7 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 | Postgres 판 | `railway add --database postgres` 가 `postgres-ssl:18` 을 준다 — compose 는 17. `V1`~`V33` 가 18 에서 그대로 돈다(2026-11-12 `applied_migrations` 33) |
 | 첫 도메인 | `railway domain` 직후 20초쯤은 502 「Application failed to respond」. 배포가 `SUCCESS` 면 기다리면 200 이다 |
 | `railway add` | 플래그를 다 줘도 대화형 질문 줄을 찍는다 — 값은 플래그대로 들어간다 |
+| actuator | 공개 주소라 `MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health` 로 `prometheus` 를 닫는다(`/actuator/prometheus` 404). `/actuator/health/readiness` 는 그대로 열린다 |
 
 ### k8s 앱 파드의 기동
 

@@ -5,6 +5,7 @@
 #   bash scripts/railway-env.sh <앱 서비스 이름>
 #
 # Kafka 애드온이 없다 — 소비자를 끄고(`SPRING_KAFKA_LISTENER_AUTO_STARTUP=false`) 아웃박스 발행 실패는 로그로 받아들인다(`stack.md`).
+# 공개 주소라 actuator 는 health 만 연다 — compose·k8s 의 `prometheus` 노출은 망 안 수집기 전제다(`D9` 「노출면」, 마무리 33차).
 # 토픽 생성도 끈다(`SPRING_KAFKA_ADMIN_AUTO_CREATE=false`) — 켜 두면 AdminClient 가 없는 브로커로 재부트스트랩 로그를 쉬지 않고 찍는다(2026-11-12 첫 배포).
 set -euo pipefail
 service=${1:?앱 서비스 이름을 준다}
@@ -20,4 +21,5 @@ railway variable set -s "$service" \
   'SPRING_DATA_REDIS_PASSWORD=${{Redis.REDISPASSWORD}}' \
   'SESSION_COOKIE_SECURE=true' \
   'SPRING_KAFKA_LISTENER_AUTO_STARTUP=false' \
-  'SPRING_KAFKA_ADMIN_AUTO_CREATE=false'
+  'SPRING_KAFKA_ADMIN_AUTO_CREATE=false' \
+  'MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health'
