@@ -24,16 +24,7 @@ class SettlementTransitionTriggerTest : PostgresTestBase() {
     fun setUp() {
         val fixture = EventFixture(jdbc)
         val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("settle-transition")), hallId = fixture.hall())
-        settlementId = jdbc.sql(
-            """
-            insert into settlement (performance_id, settlement_policy_id, settle_at, status, amount, settled_at)
-            values (:performance, :policy, now(), 'pending', 0, now())
-            returning settlement_id
-            """,
-        ).param("performance", performanceId)
-            .param("policy", fixture.stampDefaultPolicy(performanceId))
-            .query(Long::class.java)
-            .single()
+        settlementId = pendingSettlement(jdbc, performanceId, fixture.stampDefaultPolicy(performanceId), amount = 0)
     }
 
     @Test

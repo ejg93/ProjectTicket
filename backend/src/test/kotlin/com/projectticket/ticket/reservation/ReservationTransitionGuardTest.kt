@@ -57,6 +57,20 @@ class ReservationTransitionGuardTest : PostgresTestBase() {
         }
     }
 
+    /** 결제 중에 선점 시각이 지나면 `held` 로 못 돌아간다 — 돌아가면 만료된 선점이 되살아난다(`V28`, `I15-2`) */
+    @Test
+    fun a_lapsed_hold_cannot_fall_back_to_held() {
+        val reservationId = hold("late-fallback@test.local")
+        startPaying(reservationId, payingUntil = "now() + interval '3 minutes'")
+        jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
+
+        assertRejected("선점 시각이 지났다") {
+            jdbc.sql("update reservation set status = 'held', paying_until = null where reservation_id = :id")
+                .param("id", reservationId)
+                .update()
+        }
+    }
+
     @Test
     fun a_lapsed_payment_window_cannot_confirm() {
         val reservationId = hold("late-confirm@test.local")
