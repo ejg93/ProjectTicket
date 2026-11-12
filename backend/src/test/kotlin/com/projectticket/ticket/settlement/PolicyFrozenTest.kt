@@ -6,8 +6,13 @@ import com.projectticket.ticket.event.PerformanceOpenService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.TransactionTemplate
 
 /**
  * 정책 행과 박제 열을 DB 가 굳히는가(`V32`, 점검 15차 `I15-1`). 강제 지점이 주석뿐이던 자리라 SQL 을 직접 던진다 —
@@ -15,11 +20,14 @@ import org.springframework.jdbc.core.simple.JdbcClient
  *
  * 실패가 트랜잭션을 깨므로 경우마다 시험 하나다(롤백 바탕). `settlement.settle_at` 은 안 굳힌다 — `SettlementAggregateTest` 가
  * 시계를 당긴다(`D8`), 그래서 여기 없다.
+ *
+ * 행 트리거는 `truncate` 에 안 걸려서 두 표를 통째로 비우는 길은 statement 트리거가 막는다(`V34`, `I15-3`).
  */
 class PolicyFrozenTest : PostgresTestBase() {
 
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var openService: PerformanceOpenService
+    @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     @Test
     fun a_settlement_policy_row_cannot_be_updated() {
@@ -51,6 +59,24 @@ class PolicyFrozenTest : PostgresTestBase() {
 
         assertThatThrownBy { jdbc.sql("delete from refund_fee_tier where refund_fee_tier_id = :id").param("id", id).update() }
             .hasStackTraceContaining(FROZEN_POLICY)
+    }
+
+    // `ticket_app` 에는 `truncate` 권한이 없다 — 막아야 할 것은 소유자 `psql` 이라 역할을 벗고 친다(`AuditImmutabilityTest` 꼴).
+    @Test
+    fun the_settlement_policy_table_cannot_be_truncated() {
+        newSettlementPolicy()
+
+        // 들어오는 FK 가 있어 `cascade` 없이는 FK 검사가 먼저 거절한다 — 트리거가 막는지는 `cascade` 로 잰다.
+        assertThatThrownBy { asOwner { jdbc.sql("truncate settlement_policy cascade").update() } }
+            .hasStackTraceContaining(NO_TRUNCATE)
+    }
+
+    @Test
+    fun the_refund_fee_tier_table_cannot_be_truncated() {
+        newRefundFeeTier()
+
+        assertThatThrownBy { asOwner { jdbc.sql("truncate refund_fee_tier").update() } }
+            .hasStackTraceContaining(NO_TRUNCATE)
     }
 
     @Test
@@ -97,6 +123,24 @@ class PolicyFrozenTest : PostgresTestBase() {
     }
 
     @Test
+    fun an_open_performance_cannot_drop_its_stamp() {
+        val performanceId = openPerformance("frozen-unstamp")
+
+        assertThatThrownBy {
+            jdbc.sql("update performance set settlement_policy_id = null where performance_id = :id").param("id", performanceId).update()
+        }.hasStackTraceContaining("회차의 정산 정책 박제는 고칠 수 없다")
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["days_before = 9", "fee_amount = 1", "refund_amount = 1"])
+    fun a_refund_cannot_change_its_other_stamps(assignment: String) {
+        val refundId = newRefund("frozen-refund-other")
+
+        assertThatThrownBy { jdbc.sql("update refund set $assignment where refund_id = :id").param("id", refundId).update() }
+            .hasStackTraceContaining("환불의 율·일수·금액 박제는 고칠 수 없다")
+    }
+
+    @Test
     fun a_performance_seat_cannot_change_its_price() {
         val performanceId = openPerformance("frozen-price")
         val seatId = EventFixture(jdbc).performanceSeatIds(performanceId).first()
@@ -117,6 +161,16 @@ class PolicyFrozenTest : PostgresTestBase() {
         val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("frozen-draft")), hallId = fixture.hall())
 
         assertThat(fixture.stampDefaultPolicy(performanceId)).isPositive()
+    }
+
+    /** 소유자 역할로 친다. 중첩 트랜잭션이라 실패가 바깥 롤백 바탕을 안 깨고, `set local` 은 세이브포인트와 같이 풀린다 */
+    private fun asOwner(work: () -> Unit) {
+        TransactionTemplate(transactionManager)
+            .apply { propagationBehavior = TransactionDefinition.PROPAGATION_NESTED }
+            .executeWithoutResult {
+                jdbc.sql("set local role none").update()
+                work()
+            }
     }
 
     private fun newSettlementPolicy(): Long =
@@ -160,5 +214,6 @@ class PolicyFrozenTest : PostgresTestBase() {
 
     private companion object {
         const val FROZEN_POLICY = "정책 행은 고치거나 지우지 않는다"
+        const val NO_TRUNCATE = "정책 표는 비우지 않는다"
     }
 }

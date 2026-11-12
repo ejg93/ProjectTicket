@@ -53,20 +53,20 @@ class SettlementQuery(private val jdbc: JdbcClient) {
         val performanceId: Long,
         /** `scheduled`·`pending`·`confirmed`·`paid`(`V16`) */
         val status: String,
-        val amount: Int,
+        val amount: Long,
         val settleAt: OffsetDateTime,
         val settledAt: OffsetDateTime?,
         /** `sale`(+)·`platform_fee`(−)·`cancel_fee`(+)·`adjustment`(±). 합이 [amount] 다 */
         val lines: List<Line>,
     )
 
-    data class Line(val kind: String, val amount: Int)
+    data class Line(val kind: String, val amount: Long)
 
     private data class Head(
         val settlementId: Long,
         val performanceId: Long,
         val status: String,
-        val amount: Int,
+        val amount: Long,
         val settleAt: OffsetDateTime,
         val settledAt: OffsetDateTime?,
     )

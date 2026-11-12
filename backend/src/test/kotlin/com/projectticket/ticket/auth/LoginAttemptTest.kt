@@ -73,11 +73,31 @@ class LoginAttemptTest : PostgresTestBase() {
     }
 
     @Test
+    fun a_counter_left_without_a_lock_time_gets_one() {
+        // `INCR` 와 `EXPIRE` 는 두 명령이라 사이에서 끊기면 TTL 없는 키가 남는다. 계정 키가 100 에 닿으면 맞는 비밀번호도 막혀
+        // `reset` 이 못 돌아 영원히 갇힌다 — 다음 실패가 TTL 을 다시 건다(마무리 34차 독립 리뷰 m3).
+        redis.opsForValue().set("login:fail-account:$EMAIL", "3")
+
+        logIn(WRONG)
+
+        assertThat(redis.getExpire("login:fail-account:$EMAIL")).isBetween(1, LoginAttemptService.LOCK_DURATION.toSeconds())
+    }
+
+    @Test
     fun another_address_is_not_locked_out() {
         repeat(LoginAttemptService.MAX_ATTEMPTS) { logIn(WRONG) }
 
         // 이메일만 세면 남의 계정을 잠글 수 있다. 막히는 것은 그 자리에서 두드리는 쪽이다.
         assertThat(attempts.isBlocked(email = EMAIL, ip = "203.0.113.99")).isFalse()
+    }
+
+    @Test
+    fun an_account_is_locked_after_100_failures_from_any_address() {
+        // 주소를 바꿔 가며 한 계정을 두드리면 이메일·IP 키는 매번 새로 시작한다. NIST SP 800-63B Rev 4 §3.2.2 는 한 계정의
+        // 연속 실패를 100 이하로 묶으라 한다(`I16-5`).
+        repeat(LoginAttemptService.MAX_ACCOUNT_ATTEMPTS) { logIn(WRONG, ip = "198.51.100.${it + 1}") }
+
+        logIn(PASSWORD, ip = "192.0.2.200").andExpect { status { isUnauthorized() } }
     }
 
     private fun signUp() =
@@ -87,12 +107,12 @@ class LoginAttemptTest : PostgresTestBase() {
             content = """{"email":"$EMAIL","password":"$PASSWORD","display_name":"관객","consents":{"terms_of_service":true,"privacy_collect":true}}"""
         }.andExpect { status { isCreated() } }
 
-    private fun logIn(password: String): ResultActionsDsl =
+    private fun logIn(password: String, ip: String = IP): ResultActionsDsl =
         mvc.post("/api/auth/login") {
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
             content = """{"email":"$EMAIL","password":"$password"}"""
-            with { request -> request.apply { remoteAddr = IP } }
+            with { request -> request.apply { remoteAddr = ip } }
         }
 
     /** 응답이 무엇을 말하는가. `trace_id` 는 요청마다 달라서 비교에서 뺀다(`LoginFlowTest` 와 같은 방식) */

@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.simple.JdbcClient
 import com.projectticket.ticket.ConcurrencyTestBase
 import com.projectticket.ticket.event.EventFixture
+import com.projectticket.ticket.event.OrganizerEventController
 import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.outbox.PendingEvents
 import com.projectticket.ticket.payment.MockPaymentGateway
@@ -124,7 +125,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         // 관람일 8일 전 취소 → 10% 수수료 15,400. 기본 정책은 기획사 전부(`cancel_fee_share = 1.00`).
         assertThat(lineOf("sale")).describedAs("취소된 예매는 매출에 안 든다").isEqualTo(154_000)
         assertThat(lineOf("cancel_fee")).isEqualTo(15_400)
-        assertThat(settlementRow().amount).isEqualTo(154_000 - 15_400 + 15_400)
+        assertThat(settlementRow().amount).isEqualTo(154_000L - 15_400 + 15_400)
         assertThat(kept).isPositive()
     }
 
@@ -192,6 +193,23 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun a_sale_over_the_int_range_settles() {
+        // 가격 상한 1천만 원(`V27`) × 240석 = 24억 — 매출 항목도, 수수료를 뺀 정산서 금액(21.6억)도 `int`(약 21.47억)를 넘는다(`I16-2`).
+        performanceId = maxPricePerformance(seats = 240)
+        fixture.performanceSeatIds(performanceId).indices.forEach { index ->
+            val buyer = fixture.account("${PREFIX}big$index@test.local")
+            fixture.reserve(fixture.hold(accountId = buyer, performanceId = performanceId, section = "F1-B", seatNumber = index + 1))
+        }
+        closeWithEvent()
+
+        settleNow()
+
+        assertThat(lineOf("sale")).isEqualTo(2_400_000_000L)
+        assertThat(lineOf("platform_fee")).isEqualTo(-240_000_000L)
+        assertThat(settlementRow().amount).isEqualTo(2_160_000_000L)
+    }
+
+    @Test
     fun a_total_that_differs_from_the_lines_cannot_commit() {
         closeWithEvent()
         settleNow()
@@ -228,6 +246,15 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
 
     private fun seatIds(): List<Long> = fixture.performanceSeatIds(performanceId)
 
+    /** 가격 상한 등급 하나로 연 회차. 홀·공연을 따로 둬 `setUp` 의 회차와 안 섞인다 */
+    private fun maxPricePerformance(seats: Int): Long {
+        val bigEvent = fixture.event(fixture.organizer("${PREFIX}big-org"))
+        val bigHall = fixture.hall(venueName = "${PREFIX}큰홀")
+        fixture.seats(bigHall, "F1-B", seats)
+        fixture.mapSection(bigEvent, "F1-B", fixture.grade(bigEvent, "VIP", OrganizerEventController.MAX_PRICE_WON.toInt()))
+        return fixture.performance(eventId = bigEvent, hallId = bigHall, startsInDays = 8).also { openService.open(it, actorAccountId = null) }
+    }
+
     private fun accountOf(reservationId: Long): Long =
         jdbc.sql("select account_id from reservation where reservation_id = :id").param("id", reservationId).query(Long::class.java).single()
 
@@ -246,11 +273,11 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
             .query(String::class.java)
             .single()
 
-    private fun lineOf(kind: String): Int =
+    private fun lineOf(kind: String): Long =
         jdbc.sql("select l.amount from settlement_line l join settlement s on s.settlement_id = l.settlement_id where s.performance_id = :id and l.kind = :kind")
             .param("id", performanceId)
             .param("kind", kind)
-            .query(Int::class.java)
+            .query(Long::class.java)
             .single()
 
     private fun lineCount(): Long =
@@ -259,7 +286,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
             .query(Long::class.java)
             .single()
 
-    data class Row(val settlementId: Long, val amount: Int, val status: String)
+    data class Row(val settlementId: Long, val amount: Long, val status: String)
 
     /**
      * 안 나간 사건을 **브로커를 건너뛰고** 소비자에게 바로 건넨다(28).

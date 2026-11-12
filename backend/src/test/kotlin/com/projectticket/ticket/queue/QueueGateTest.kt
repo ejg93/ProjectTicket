@@ -5,11 +5,15 @@ import com.projectticket.ticket.auth.AccountRole
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
+import java.net.URI
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.MediaType
@@ -191,6 +195,46 @@ class QueueGateTest : PostgresTestBase() {
         // 조회·결제는 관문을 안 지난다(ADR 0004) — 결제는 이미 좌석을 쥔 사람이다.
         mvc.get("/api/reservations/1") { with(user(buyer)) }
             .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun an_encoded_performance_id_still_meets_the_gate() {
+        // MVC 는 경로 변수를 디코드한다. 관문이 디코드 전 `requestURI` 를 보면 `%31` 같은 경로가 필터를 건너 컨트롤러에 닿는다(`I16-1`).
+        val encoded = performanceId.toString().map { "%%%02X".format(Locale.ROOT, it.code) }.joinToString("")
+
+        mvc.post(URI.create("/api/performances/$encoded/reservations")) {
+            with(user(buyer))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = json.writeValueAsString(mapOf("seat_ids" to seatIds.take(1)))
+            header("Idempotency-Key", UUID.randomUUID().toString())
+        }.andExpect {
+            status { isTooManyRequests() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:admission-required") }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["hex", "leading-space", "trailing-space"])
+    fun a_performance_id_mvc_would_still_read_is_shut_at_the_gate(form: String) {
+        // MVC 의 `Long` 변환은 공백을 걷고 `0x` 16진을 받는다 — 필터가 십진만 알아보고 나머지를 지나보내면 그 표기가 관문을 건넌다.
+        // 패턴이 맞았는데 순수 십진이 아니면 건너뛰지 않고 끊는다(fail closed, 마무리 34차 독립 리뷰 C1).
+        val id = when (form) {
+            "hex" -> "0x" + performanceId.toString(radix = 16)
+            "leading-space" -> "%20$performanceId"
+            else -> "$performanceId%20"
+        }
+
+        mvc.post(URI.create("/api/performances/$id/reservations")) {
+            with(user(buyer))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = json.writeValueAsString(mapOf("seat_ids" to seatIds.take(1)))
+            header("Idempotency-Key", UUID.randomUUID().toString())
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:performance-not-found") }
+        }
     }
 
     /** 줄에 세우고 바로 들인다. 줄이 비어 있으면 진입이 곧 입장이다(`D12` 「항상 켠다」) */

@@ -96,6 +96,14 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
      */
     @ExceptionHandler(Exception::class)
     fun handle(e: Exception, request: HttpServletRequest): ResponseEntity<ProblemDetail> {
+        // 대기열·세션·좌석 버전이 같은 Redis 라 죽으면 예매를 못 받는다 — 관문·필터 그물과 같은 503 + `Retry-After` 다
+        // (`I16-4`, RFC 9110 §15.6.4). 판정은 [isRedisDown] 하나다 — 연결 실패와 명령 시간 초과를 같이 본다.
+        if (e.isRedisDown()) {
+            log.warn("Redis 장애로 요청을 못 받았다: {} {}", request.method, request.requestURI, e)
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, ProblemWriter.RETRY_AFTER_SECONDS)
+                .body(problems.create(ErrorCode.QUEUE_UNAVAILABLE, null, request))
+        }
         log.error("처리하지 못한 예외: {} {}", request.method, request.requestURI, e)
         return respond(problems.create(ErrorCode.INTERNAL, null, request))
     }

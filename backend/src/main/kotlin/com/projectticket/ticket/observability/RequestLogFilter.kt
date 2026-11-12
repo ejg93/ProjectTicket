@@ -43,6 +43,7 @@ class RequestLogFilter : OncePerRequestFilter() {
         } finally {
             // **예외가 여기까지 오면 상태 코드가 아직 안 정해졌다.** 컨테이너가 오류 페이지를 만들면서 그때 500 을 쓰므로
             // 이 자리에서 읽으면 200 이다. 그래서 상태 대신 예외 이름을 찍는다 — 「200 으로 실패했다」는 줄보다 낫다.
+            // 안쪽의 `ProblemFallbackFilter`(+20, `I16-4`)가 예외를 problem 본문으로 바꾸므로 여기까지 오는 것은 이미 커밋된 응답의 예외뿐이다.
             log.info(
                 "{} {} {} {}ms",
                 request.method,

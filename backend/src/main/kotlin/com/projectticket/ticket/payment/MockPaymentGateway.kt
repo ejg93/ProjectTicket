@@ -27,7 +27,10 @@ import java.util.concurrent.ConcurrentHashMap
 @Component
 class MockPaymentGateway {
 
-    /** 카드번호는 여기까지만 온다. 이 값은 저장되지 않고 우리 표 어디에도 안 닿는다(`D9`). 남는 것은 [Result.cardLast4] 뿐이다 */
+    /**
+     * 카드번호는 여기까지만 온다. 이 값은 저장되지 않고 우리 표 어디에도 안 닿는다(`D9`). 남는 것은 [Result.cardLast4] 와
+     * 멱등 지문의 끝 4자리뿐이다 — 지문에 전체 번호를 해시해 넣던 것을 `I16-6` 이 걷었다.
+     */
     data class Request(val idempotencyKey: String, val amount: Int, val cardNumber: String) {
         /** 카드번호를 로그·디버거에 안 찍는다(`D10`) */
         override fun toString(): String = "Request[idempotencyKey=$idempotencyKey, amount=$amount]"
@@ -58,8 +61,7 @@ class MockPaymentGateway {
     fun approve(request: Request): Result {
         byKey[request.idempotencyKey]?.let { return it }
 
-        val digits = digitsOf(request.cardNumber)
-        val last4 = digits.takeLast(4)
+        val last4 = last4Of(request.cardNumber)
         return when (last4) {
             DECLINE_LAST4 -> {
                 Result(approvalNumber = null, cardLast4 = last4, declineReason = DECLINE_REASON).also { byKey[request.idempotencyKey] = it }
@@ -99,10 +101,10 @@ class MockPaymentGateway {
     /** 시각을 앞에 둬서 재기동해도 안 겹친다 — 일련번호만 쓰면 다시 뜬 뒤 1번부터라 `payment_approval_number_key` 에 걸린다 */
     private fun issueApprovalNumber(): String = "M%d%04d".format(Locale.ROOT, System.currentTimeMillis(), random.nextInt(SERIAL_BOUND))
 
-    /** 셈은 [CardNumbers] 가 든다. 여기 `require` 는 **우리 잘못을 잡는 그물**이다 — 입구가 이미 거른 값만 온다 */
-    private fun digitsOf(cardNumber: String): String {
+    /** 셈은 [CardNumbers] 가 든다 — 멱등 지문과 같은 셈이다. 여기 `require` 는 **우리 잘못을 잡는 그물**이다 — 입구가 이미 거른 값만 온다 */
+    private fun last4Of(cardNumber: String): String {
         require(CardNumbers.isWellShaped(cardNumber)) { "카드번호 형식이 아니다" }
-        return CardNumbers.digitsOf(cardNumber)
+        return CardNumbers.last4Of(cardNumber)
     }
 
     companion object {

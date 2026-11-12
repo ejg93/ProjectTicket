@@ -47,4 +47,11 @@ class CardNumberTest {
     fun a_well_shaped_card_number_passes(cardNumber: String) {
         assertThat(validator.validate(PaymentController.PayRequest(cardNumber))).isEmpty()
     }
+
+    @ParameterizedTest
+    // 결제 행·결제사 응답·멱등 지문이 이 셈 하나를 쓴다(`I16-6`) — 구분자가 달라도 같은 네 자리여야 같은 카드다
+    @ValueSource(strings = ["4242424242421234", "4242 4242 4242 1234", "4242-4242-4242-1234"])
+    fun the_last_four_ignore_separators(cardNumber: String) {
+        assertThat(CardNumbers.last4Of(cardNumber)).isEqualTo("1234")
+    }
 }
