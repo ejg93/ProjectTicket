@@ -15,6 +15,7 @@
 **고르는 규칙**: `days_before >= days_before_min` 인 행 중 `days_before_min` 이 가장 큰 것. `days_before` 는 `D7` 이 정한 KST 달력일 차다.
 
 코드 상수가 아니라 행인 이유는 정산 정책과 같다 — 구간을 고치는 것이 배포가 아니어야 하고, `effective_at` 으로 개정 이력이 남아야 한다.
+**DB 가 굳힌다**(`V32`) — 구간 행의 UPDATE·DELETE 와 환불 행의 율·일수·금액 박제를 바꾸는 UPDATE 는 트리거가 거절한다.
 **경계는 KST 자정**이고 `RefundPolicyTest`(17)가 자정 앞뒤 1초를 잰다.
 
 ## 계산 — 예매 단위, 한 번 반올림
