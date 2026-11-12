@@ -148,7 +148,7 @@ class QueueGateFilter(
         } else {
             ServletRequestPathUtils.parseAndCache(request)
         }
-        return HOLD_PATH.matchAndExtract(parsed.pathWithinApplication())?.uriVariables?.get("performanceId")
+        return HOLD_PATH.matchAndExtract(parsed.pathWithinApplication())?.run { uriVariables["performanceId"] }
     }
 
     companion object {
