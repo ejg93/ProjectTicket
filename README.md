@@ -60,6 +60,19 @@ bash scripts/k8s-down.sh    # 지운다
 
 앱 이미지(`backend/Dockerfile`)는 빌드 때 CDS 아카이브를 만든다(`53b`) — 학습 실행·확인 실행이 컨텍스트를 두 번 띄워서 빌드가 20초쯤 길다. 확인 실행이 서면 빌드가 선다.
 
+## Railway 에 띄우기(선택)
+
+백엔드만 Railway 에 올린다(`48`). 프로젝트·Postgres·Redis 애드온은 사람이 만든다 — `railway login` → `railway init --name projectticket` → `railway add --database postgres` → `railway add --database redis`.
+
+```bash
+railway add --service backend                                   # 빈 앱 서비스
+bash scripts/railway-env.sh backend                             # 애드온 참조로 변수를 건다
+railway up backend --path-as-root --service backend --ci        # backend/ 를 굽는다(backend/railway.toml)
+railway domain -s backend                                       # 공개 주소 → /api/health
+```
+
+Kafka 는 없다 — 소비자·토픽 생성을 끈다. 함정은 `doc/reference/stack.md` 「Railway」.
+
 ## 요구 사항
 
 - Docker Desktop

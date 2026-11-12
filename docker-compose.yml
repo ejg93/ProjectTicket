@@ -101,6 +101,8 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       # 가상 스레드 켜고 끄고를 재려고 바깥에서 준다(35a). 기본은 끈 쪽 — 켠 값은 측정이 정한다.
       SPRING_THREADS_VIRTUAL_ENABLED: ${SPRING_THREADS_VIRTUAL_ENABLED:-false}
+      # Hikari 풀 크기(`57`). 기본 10 — k8s 6 대 × 20 이 PG 100 을 넘어서 판(`load-10`)만 20 으로 띄운다.
+      HIKARI_MAX_POOL: ${HIKARI_MAX_POOL:-10}
     healthcheck:
       # 준비됐나를 묻는다(35a) — 살아 있나가 아니라. DB·Redis 가 끊기면 이 대는 문 뒤에서 빠진다.
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness | grep -q UP"]

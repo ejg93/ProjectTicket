@@ -94,6 +94,8 @@ select performance_seat_id
 
 **불변식**: 좌석은 예매를 바꿔 가리키지 않는다 — 포인터는 null→A·A→null 만 간다. 트리거 `performance_seat_no_handover`(`V24`, `51`)가 A→B 를 막는다. 초과 판매의 셋째 겹이다(앞의 둘은 조건부 UPDATE 의 `status` 조건과 갱신 행 수 대조).
 
+**불변식**: 회차 좌석의 가격은 오픈 때 한 번 박제되고 안 바뀐다 — 트리거 `performance_seat_price_frozen`(`V32`, `I15-1`). 기록(`reservation_seat.price`)과 합계(`reservation.total_amount`)가 이 값을 베낀다.
+
 ## 합계 불변식
 
 `reservation.total_amount = Σ reservation_seat.price`. 합계는 원본과 어긋날 수 있는 유일한 종류의 값이다(`D14` 「불변식」).

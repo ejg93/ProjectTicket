@@ -17,6 +17,9 @@ spring:
       # **앱은 붙자마자 제한된 역할을 입는다**(4a). `audit_log` 를 고치거나 지울 권한이 이 역할에는 없다 —
       # `V3` 의 보존 트리거는 표 주인이 끌 수 있어서 트리거만으로는 못 막는다(`D9`).
       connection-init-sql: set role ticket_app
+      # 풀 크기 손잡이(`57`). 기본은 Hikari 기본값 10 그대로 — k8s HPA 최대 6 대 × 20 = 120 이 PG `max_connections` 100 을 넘는다.
+      # 풀 20 한 판(`load-10`)은 못 갈랐다 — 올리는 것은 새 판이 가른 뒤 PG 설정과 같이 한다.
+      maximum-pool-size: ${HIKARI_MAX_POOL:10}
       # PG 의 DETAIL(`Failing row contains (…)`)을 예외 메시지에 안 붙인다(`I13-4`). 붙이면 마지막 그물이 행의 이메일·해시를 로그에 남긴다(`D10`).
       # URL 파라미터가 아니라 드라이버 속성이다 — 시험의 `@ServiceConnection` 이 URL 을 갈아 끼워도 같이 걸린다. 제약 이름은 본문에 남는다.
       data-source-properties:

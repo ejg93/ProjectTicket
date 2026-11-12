@@ -111,7 +111,7 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
-| — | `requested` | 결제당 하나(`refund_payment_id_key`) | 17·17a |
+| — | `requested` | 결제당 하나(`refund_payment_id_key`). 환불은 이 상태로만 태어난다(`V33` 삽입 가드) | 17·17a |
 | `requested` | `done` | 환불 번호가 붙었다 | 17·17a |
 
 ## 정산 `settlement`
@@ -122,7 +122,7 @@ held ──결제 시작──> paying ──승인──> reserved ──취소
 
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
-| — | `scheduled` | 회차 종료·취소 사건. 회차당 하나 | 27 소비자 |
+| — | `scheduled` | 회차 종료·취소 사건. 회차당 하나. 정산서는 이 상태로만 태어난다(`V33` 삽입 가드) | 27 소비자 |
 | `scheduled` | `pending` | `settle_at <= now()`(`V30` 트리거). 항목의 합으로 금액이 선다 | 27 집계 |
 | `pending` | `confirmed` | 관리자 확인. 부르는 코드가 아직 없다(D21 「누가 보나」) | — |
 | `confirmed` | `paid` | 지급. 부르는 코드가 아직 없다 | — |
@@ -169,7 +169,7 @@ draft ──오픈──> open ──판매 마감──> closed
 
 | 에서 | 로 | 조건 | 어디서 |
 |---|---|---|---|
-| — | `pending` | 사건·계정당 하나(`notification_event_account_key`) | 26 |
+| — | `pending` | 사건·계정당 하나(`notification_event_account_key`). 알림은 이 상태로만 태어난다(`V33` 삽입 가드) | 26 |
 | `pending` | `sent` | 발송 성공 | 26 |
 | `pending` | `failed` | 발송 실패 | 26 |
 | `pending` | `skipped` | 받을 계정이 없다 | 26 |

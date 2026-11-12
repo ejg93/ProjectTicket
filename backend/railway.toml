@@ -1,0 +1,11 @@
+# Railway 배포(`48`, 선택). 백엔드만 — `Dockerfile` 을 그대로 굽는다.
+# `backend/` 를 올린다(`railway up backend --path-as-root`) — 저장소 루트를 올리면 빌드 문맥이 루트라 `COPY gradlew` 가 없다.
+# 그래서 이 파일도 `backend/` 에 있다 — Railway 는 올린 묶음의 뿌리에서 이 파일을 찾는다.
+# 배포 성공 조건은 health 하나다 — readiness(db·redis)는 따로 본다.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+restartPolicyType = "ON_FAILURE"

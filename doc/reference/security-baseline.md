@@ -145,6 +145,8 @@
 
 `.env` 는 커밋하지 않는다. `.env.example` 에 이름만. DB 비밀번호는 개발용이고 다른 데 안 쓴다. gitleaks 가 CI 에서 커밋 이력을 훑는다.
 
+**Railway 변수는 저장소 밖이다**(`48`) — `scripts/railway-env.sh` 는 애드온 참조(`${{Postgres.PGPASSWORD}}` 꼴)만 적고 값은 Railway 가 든다. `railway variable list --kv`·`--json` 은 값을 그대로 찍어서 대화·로그에 안 붙인다.
+
 ## 지금 안 하는 것
 
 | 항목 | 왜 |
