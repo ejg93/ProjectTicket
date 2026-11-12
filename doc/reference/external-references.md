@@ -183,6 +183,7 @@ ISO 8601 과 IANA tz 가 전부다. 한국은 서머타임이 없어 `Asia/Seoul
 | 2026-09-15 | `P11` — 티켓 도메인에 맞춰 다시 썼다. **링크를 다시 열지는 않았다.** 다음 `/inspection` 이 연다 |
 | 2026-09-19 | `I5`(점검 5차) — **요건이 코드에 박혔나**를 봤다(가로 · 표준). 링크는 다시 안 열었다 — 그것은 「바깥 근거」 줄이고 `I5-1` 이 선다 |
 | 2026-09-19 | `I5-1` — **전부 열었다(25).** 고친 셋: OWASP Top 10 2025 가 308 로 옮겨졌고(`top10.owasp.org/2025`), W3C Trace Context 는 그 URL 이 Recommendation(2021-11-23)이라 「Level 2 초안」 문구를 고쳤고, Testcontainers 이슈 둘은 닫혔다(`11212` → PR `11216`, `11235` 는 중복). **적힌 그대로인 스물**: RFC 9110(§13.1.2·§15.5.2)·9457(7807 폐기, `status` 는 advisory)·4151(연도만 써도 된다)·5321 §4.5.3.1.3(256 옥텟)·9562(v4 비트), PostgreSQL 17 §13.2.1, Stripe 멱등(24시간·V4 UUID 권장·다른 본문은 오류)과 Connect 셋(세 결제 방식·`pending`→`available`·지급 주기), CloudEvents(Graduated), NIST Rev 4, Zalando, SQL Style Guide(CC BY-SA 4.0), SRE Book, Outbox, Test Pyramid, Money, Spring Boot 문서 셋(**전부 4.1.1** — 우리 판과 같다), Spring Security(7.1.1), Testcontainers 홈(**최신이 2.0.5** — 우리가 쓰는 판이다). **이 방법으로 본문을 못 읽은 둘**: DDD Reference PDF(472KB 가 받아지지만 판독 불가)와 법제처 제17조(본문이 스크립트다) — **링크는 살아 있고 조문 확인은 사람이 연다** |
+| 2026-11-12 | `I16`(점검 16차) — 요건이 코드에 박혔나를 다시 봤다(가로 · 표준, 번들 1~20 뒤). 링크는 안 열었다. 인용이 빠진 표준과 빈 절은 `I16-8` 이 채운다 |
 
 ## 이 문서를 고칠 때
 
