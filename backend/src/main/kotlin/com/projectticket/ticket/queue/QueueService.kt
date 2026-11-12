@@ -150,14 +150,22 @@ class QueueService(
     }
 
     /**
-     * 판매 중인 회차에만 줄이 선다. 닫힌 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`),
-     * 화면은 그 코드로 줄을 걷는다.
+     * 판매 중인 회차에만 줄이 선다(`I16-3`).
+     * - `draft` 는 404 다 — 밖에서는 없는 회차라 410 이면 존재가 샌다(`D5`)
+     * - 판매 시작 전 `open` 은 409 `performance-not-open` 이다 — 곧 열려 영구 상태가 아니고, 관문이 같은 상태에 같은 답을 낸다
+     * - 닫힌·취소된 회차는 410 이다 — 「있었는데 끝났다」가 410 의 뜻이고(`D5`), 화면은 그 코드로 줄을 걷는다
      */
     private fun requireOpen(performanceId: Long, sale: PerformanceSale?) {
         sale ?: throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
 
-        if (!sale.onSale) {
-            throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=${sale.status}")
+        when {
+            sale.onSale -> Unit
+            sale.status == PerformanceStatus.DRAFT.code ->
+                throw TicketException(ErrorCode.PERFORMANCE_NOT_FOUND, "그런 회차가 없다: performance_id=$performanceId")
+            sale.status == PerformanceStatus.OPEN.code ->
+                throw TicketException(ErrorCode.PERFORMANCE_NOT_OPEN, "판매 시작 전이다: performance_id=$performanceId")
+            else ->
+                throw TicketException(ErrorCode.QUEUE_CLOSED, "대기열이 없는 회차다: performance_id=$performanceId status=${sale.status}")
         }
     }
 

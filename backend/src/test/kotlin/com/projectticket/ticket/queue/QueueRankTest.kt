@@ -104,10 +104,20 @@ class QueueRankTest : PostgresTestBase() {
     fun before_sales_open_there_is_no_queue() {
         jdbc.sql("update performance set sales_open_at = now() + interval '1 hour' where performance_id = :id").param("id", performanceId).update()
 
-        // 판매 시작 전에는 줄이 없다(`I13-1`). 관문도 안 지킨다 — 선점 서비스가 409 로 답한다.
+        // 판매 시작 전에는 줄이 없다(`I13-1`). 410 이 아니다 — 곧 열릴 회차라 영구 상태가 아니고(RFC 9110 §15.5.11),
+        // 관문이 같은 상태에 내는 409 `performance-not-open` 과 같은 답이다(`I16-3`).
         assertThatThrownBy { queue.enter(performanceId, first) }
-            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.QUEUE_CLOSED) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.PERFORMANCE_NOT_OPEN) }
         assertThat(queue.gateOf(performanceId)).isEqualTo(QueueService.Gate.BEFORE_SALE)
+    }
+
+    @Test
+    fun a_draft_performance_has_no_queue_and_is_not_found() {
+        val draftId = fixture.performance(eventId, hallId, startsInDays = 3)
+
+        // `draft` 는 밖에서 없는 회차다(`D5`) — 410 이면 「있었다」가 샌다(`I16-3`).
+        assertThatThrownBy { queue.enter(draftId, first) }
+            .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.PERFORMANCE_NOT_FOUND) }
     }
 
     @Test
