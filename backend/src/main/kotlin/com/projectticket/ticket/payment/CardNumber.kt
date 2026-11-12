@@ -41,6 +41,11 @@ object CardNumbers {
     /** 하이픈과 공백은 사람이 읽으라고 넣은 것이라 걷어낸다 */
     fun digitsOf(cardNumber: String): String = cardNumber.filter { it != ' ' && it != '-' }
 
+    /** 끝 4자리. 결제사 응답·결제 행·멱등 지문이 같은 셈을 쓴다 — 갈리면 같은 카드가 자리마다 다른 4자리가 된다(`I16-6`) */
+    fun last4Of(cardNumber: String): String = digitsOf(cardNumber).takeLast(LAST_DIGITS)
+
+    private const val LAST_DIGITS = 4
+
     fun isWellShaped(cardNumber: String): Boolean {
         val digits = digitsOf(cardNumber)
         // **ASCII 만이다.** `Char.isDigit()` 은 유니코드 Nd 를 전부 받아서 아라비아-인도 숫자가 통과하고,

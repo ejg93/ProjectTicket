@@ -119,6 +119,29 @@ class PaymentFlowTest : PostgresTestBase() {
     }
 
     @Test
+    fun the_same_key_with_other_separators_replays() {
+        // 지문은 예매 id + 끝 4자리다(`I16-6`). 사람이 넣는 구분자만 다른 같은 카드를 「다른 요청」으로 보면 재시도가 422 로 막힌다.
+        val key = UUID.randomUUID().toString()
+        val first = pay("4242 4242 4242 4242", key).andReturn().response.contentAsString
+        val second = pay("4242-4242-4242-4242", key).andExpect { status { isCreated() } }.andReturn().response.contentAsString
+
+        assertThat(json.readTree(second)["payment_id"]).isEqualTo(json.readTree(first)["payment_id"])
+        assertThat(paymentCount()).isOne()
+    }
+
+    @Test
+    fun the_same_key_with_another_card_is_rejected() {
+        val key = UUID.randomUUID().toString()
+        pay("4242 4242 4242 4242", key).andExpect { status { isCreated() } }
+
+        pay("4111 1111 1111 1111", key).andExpect {
+            status { isUnprocessableContent() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:idempotency-key-reused") }
+        }
+        assertThat(paymentCount()).isOne()
+    }
+
+    @Test
     fun paying_an_already_reserved_reservation_is_an_invalid_transition() {
         pay("4242 4242 4242 4242").andExpect { status { isCreated() } }
 

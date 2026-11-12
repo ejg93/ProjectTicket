@@ -52,17 +52,20 @@ class PaymentService(
         val reservationStatus: String,
     )
 
-    /** 멱등 본문 비교용. 카드번호는 해시에만 들어가고 저장되지 않는다 */
-    private data class Fingerprint(val reservationId: Long, val cardNumber: String)
+    /**
+     * 멱등 본문 비교용(`I16-6`). **카드번호 칸이 없다** — 무키 해시로 24시간 남는 자리라 전체 번호를 넣으면 `card_last4` 와 함께
+     * 역산이 쉽다. 끝 4자리가 같은 다른 카드는 못 가르는 것을 받아들였다(2026-11-12 사용자). 구분자만 다른 같은 카드는 같은 지문이다.
+     */
+    private data class Fingerprint(val reservationId: Long, val cardLast4: String)
 
     fun pay(accountId: Long, idempotencyKey: String, command: Command): Result {
-        val fingerprint = Fingerprint(command.reservationId, command.cardNumber)
+        val fingerprint = Fingerprint(command.reservationId, CardNumbers.last4Of(command.cardNumber))
         idempotency.replayIfPresent(accountId = accountId, key = idempotencyKey, request = fingerprint, responseType = Result::class.java)?.let { return it }
 
         val paying = transitions.startPaying(accountId, command.reservationId)
         val verdict = askGateway(idempotencyKey, paying, command.cardNumber)
         // 응답이 없어도 카드는 안다 — 요청이 들고 있다. 실패 행에도 뒷 4자리를 적는다.
-        val cardLast4 = verdict?.cardLast4 ?: command.cardNumber.filter { it.isDigit() }.takeLast(4)
+        val cardLast4 = verdict?.cardLast4 ?: fingerprint.cardLast4
 
         return idempotency.run(accountId = accountId, key = idempotencyKey, request = fingerprint, responseType = Result::class.java) {
             val settled = transitions.settle(accountId = accountId, paying = paying, verdict = verdict, cardLast4 = cardLast4)
