@@ -36,7 +36,12 @@ class ProblemFallbackFilter(private val problems: ProblemWriter) : OncePerReques
             response.reset()
             if (e.causedByRedisDown()) {
                 log.warn("Redis 연결 실패로 요청을 못 받았다: {} {}", request.method, request.requestURI, e)
-                problems.write(request, response, ErrorCode.QUEUE_UNAVAILABLE, headers = mapOf("Retry-After" to ProblemWriter.RETRY_AFTER_SECONDS))
+                problems.write(
+                    request = request,
+                    response = response,
+                    code = ErrorCode.QUEUE_UNAVAILABLE,
+                    headers = mapOf("Retry-After" to ProblemWriter.RETRY_AFTER_SECONDS),
+                )
             } else {
                 log.error("필터에서 처리하지 못한 예외: {} {}", request.method, request.requestURI, e)
                 problems.write(request, response, ErrorCode.INTERNAL)

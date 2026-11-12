@@ -57,7 +57,7 @@ class ProblemFallbackFilterTest {
         assertThatThrownBy {
             filter.doFilter(MockHttpServletRequest("GET", "/api/me"), response, FilterChain { _, res ->
                 res.flushBuffer()
-                throw IllegalStateException("late")
+                error("late")
             })
         }.hasMessage("late")
     }

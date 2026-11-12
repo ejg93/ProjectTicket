@@ -252,7 +252,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         val bigHall = fixture.hall(venueName = "${PREFIX}큰홀")
         fixture.seats(bigHall, "F1-B", seats)
         fixture.mapSection(bigEvent, "F1-B", fixture.grade(bigEvent, "VIP", OrganizerEventController.MAX_PRICE_WON.toInt()))
-        return fixture.performance(bigEvent, bigHall, startsInDays = 8).also { openService.open(it, actorAccountId = null) }
+        return fixture.performance(eventId = bigEvent, hallId = bigHall, startsInDays = 8).also { openService.open(it, actorAccountId = null) }
     }
 
     private fun accountOf(reservationId: Long): Long =

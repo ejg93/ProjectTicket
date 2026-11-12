@@ -6,6 +6,7 @@ import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
 import java.net.URI
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
@@ -197,7 +198,7 @@ class QueueGateTest : PostgresTestBase() {
     @Test
     fun an_encoded_performance_id_still_meets_the_gate() {
         // MVC 는 경로 변수를 디코드한다. 관문이 디코드 전 `requestURI` 를 보면 `%31` 같은 경로가 필터를 건너 컨트롤러에 닿는다(`I16-1`).
-        val encoded = performanceId.toString().map { "%%%02X".format(it.code) }.joinToString("")
+        val encoded = performanceId.toString().map { "%%%02X".format(Locale.ROOT, it.code) }.joinToString("")
 
         mvc.post(URI.create("/api/performances/$encoded/reservations")) {
             with(user(buyer))

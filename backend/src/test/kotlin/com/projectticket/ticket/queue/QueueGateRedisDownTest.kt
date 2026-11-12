@@ -88,7 +88,7 @@ class QueueGateRedisDownTest {
 
         mvc.get("/api/queue/$PERFORMANCE").andExpect {
             status { isServiceUnavailable() }
-            header { string("Retry-After", ProblemWriter.RETRY_AFTER_SECONDS) }
+            header { string(name = "Retry-After", value = ProblemWriter.RETRY_AFTER_SECONDS) }
             jsonPath("$.type") { value("tag:projectticket.example,2026:queue-unavailable") }
         }
     }

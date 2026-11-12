@@ -113,8 +113,8 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
         assertThat(lines).anySatisfy { assertThat(it).contains("consumer=${ReservationNotificationListener.GROUP}") }
         assertThat(lines).anySatisfy { assertThat(it).contains("consumer=${SettlementListener.GROUP}") }
         // 식별자만(`D10`) — 페이로드는 안 찍는다
-        assertThat(lines).allSatisfy {
-            assertThat(it).contains("event_id=${envelope.eventId}", "type=reservation.reserved", "aggregate_id=${envelope.aggregateId}")
+        assertThat(lines).allSatisfy { line ->
+            assertThat(line).contains("event_id=${envelope.eventId}", "type=reservation.reserved", "aggregate_id=${envelope.aggregateId}")
                 .doesNotContain("total_amount")
         }
     }

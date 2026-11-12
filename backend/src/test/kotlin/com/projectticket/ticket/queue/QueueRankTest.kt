@@ -116,7 +116,7 @@ class QueueRankTest : PostgresTestBase() {
         val draftId = fixture.performance(eventId, hallId, startsInDays = 3)
 
         // `draft` 는 밖에서 없는 회차다(`D5`) — 410 이면 「있었다」가 샌다(`I16-3`).
-        assertThatThrownBy { queue.enter(draftId, first) }
+        assertThatThrownBy { queue.enter(performanceId = draftId, accountId = first) }
             .isInstanceOfSatisfying(TicketException::class.java) { assertThat(it.code).isEqualTo(ErrorCode.PERFORMANCE_NOT_FOUND) }
     }
 
