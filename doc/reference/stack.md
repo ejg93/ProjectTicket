@@ -36,6 +36,7 @@ API 가 필요하면 아래 공식 문서를 연다. **여기 적는 것은 「�
 | Helm | 4.3.0 | `.github/workflows/ci.yml`(`azure/setup-helm`, 판을 박는다). 차트는 `k8s/chart`, 렌더는 `snapshot.yaml` 로 커밋(`37`) |
 | kubectl | 1.36.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** Docker Desktop 이 준다. 매니페스트는 차트 `k8s/chart`(`37`) |
 | k6 | 2.2.0 | `grafana/k6:2.2.0` 컨테이너 — `load/README.md`, `scripts/k8s-rollout-test.sh`. 쓰는 법의 함정은 아래 「k6」 |
+| Railway CLI | 5.62.1 | **저장소에 박힌 판이 없다 — 로컬 설치, 대조 안 함.** 배포(`48`)가 부른다 — `backend/railway.toml`·`scripts/railway-env.sh`. 쓰는 법의 함정은 아래 「Railway」 |
 | Playwright | 1.65.0 | `frontend/package.json`(`^1.65.0`). e2e(`46b`). 브라우저는 따로 받는다 — `npx playwright install chromium`, 캐시는 `%LOCALAPPDATA%\ms-playwright` |
 | ShellCheck | 0.11.0 | `.github/workflows/ci.yml`(`docs` 잡 — 판과 sha256 을 박는다). 로컬은 winget `koalaman.shellcheck` — 패키지 폴더가 사용자 PATH 에 들어가서 **설치 전에 연 셸은 못 찾는다**(`scripts/shell-lint.sh` 가 그 폴더를 직접 본다) |
 | 패키지 매니저 | npm | 잠금 파일이 `frontend/package-lock.json`. CI 는 `npm ci` 라 잠금과 어긋나면 선다 |
@@ -528,6 +529,16 @@ ProjectShop 의 상주는 Postgres·Redis(1GB 미만), 느린 레인은 Testcont
 | 메모리 상한 | k6 컨테이너에 `--memory=2g` 를 건다 — 넘치면 VM 이 아니라 k6 만 죽는다 |
 | `docker stats --no-stream` | 한 번이 3초쯤 걸린다(컨테이너 열 남짓). 측정 중 CPU 표본은 횟수가 아니라 끝 시각으로 돌린다 — 횟수로 돌리면 앞 구간만 잰다(`35d-재`) |
 | 요약의 섞임 | `setup()` 의 요청도 `http_req_duration` 에 든다. 측정 요청에 꼬리표(`options.tags`)를 달고 그 하위 지표에 문턱을 하나 두면 요약에 따로 나온다(`phase:run`) |
+
+### Railway
+
+| 무엇 | 사실 |
+|---|---|
+| 올리는 뿌리 | `railway up backend --path-as-root --service backend`. 저장소 루트를 올리면 빌드 문맥이 루트라 `backend/Dockerfile` 의 `COPY gradlew` 가 없다 — 그래서 `railway.toml` 도 `backend/` 에 둔다(Railway 는 올린 묶음의 뿌리에서 찾는다) |
+| Kafka 없는 배포 | Railway 에 Kafka 애드온이 없다. 소비자는 `SPRING_KAFKA_LISTENER_AUTO_STARTUP=false`, 토픽 생성은 `SPRING_KAFKA_ADMIN_AUTO_CREATE=false` 로 끈다 — **토픽 생성을 켜 두면 AdminClient 가 없는 브로커(`localhost:9094`)로 재부트스트랩 INFO 줄을 쉬지 않고 찍는다**(2026-11-12 첫 배포). 아웃박스 발행은 행이 생기면 실패 로그로 남는다 — 받아들인 것이다(`48` 결정). readiness 는 db·redis 만 봐서 UP 이다 |
+| Postgres 판 | `railway add --database postgres` 가 `postgres-ssl:18` 을 준다 — compose 는 17. `V1`~`V33` 가 18 에서 그대로 돈다(2026-11-12 `applied_migrations` 33) |
+| 첫 도메인 | `railway domain` 직후 20초쯤은 502 「Application failed to respond」. 배포가 `SUCCESS` 면 기다리면 200 이다 |
+| `railway add` | 플래그를 다 줘도 대화형 질문 줄을 찍는다 — 값은 플래그대로 들어간다 |
 
 ### k8s 앱 파드의 기동
 
