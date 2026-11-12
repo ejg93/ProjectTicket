@@ -16,6 +16,8 @@ import org.springframework.http.HttpMethod
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
+import org.springframework.web.util.ServletRequestPathUtils
+import org.springframework.web.util.pattern.PathPatternParser
 
 /**
  * 문지기(`D12` 「관문」). **선점 요청 하나에만 걸린다** — 결제·취소·조회는 안 지난다(ADR 0004).
@@ -128,17 +130,23 @@ class QueueGateFilter(
         }
     }
 
-    /** 선점 경로에서만 회차 id 가 나온다. 다른 요청은 [shouldNotFilter] 가 걸러 낸다 */
+    /**
+     * 선점 경로에서만 회차 id 가 나온다. 다른 요청은 [shouldNotFilter] 가 걸러 낸다.
+     *
+     * **MVC 와 같은 눈으로 본다**(`PathPattern`, `I16-1`) — 디코드 전 `requestURI` 를 정규식으로 보면 `%31` 같은 경로가
+     * 여기서는 안 걸리고 컨트롤러에는 id 로 닿는다.
+     */
     private fun performanceIdOf(request: HttpServletRequest): Long? {
         if (!HttpMethod.POST.matches(request.method)) return null
-        return HOLD_PATH.matchEntire(request.requestURI)?.run { groupValues[1].toLongOrNull() }
+        val path = ServletRequestPathUtils.parseAndCache(request).pathWithinApplication()
+        return HOLD_PATH.matchAndExtract(path)?.uriVariables?.get("performanceId")?.toLongOrNull()
     }
 
     companion object {
         /** 쿠키가 아니라 헤더다 — 회차 여럿에 줄 선 사람의 토큰이 섞이면 안 된다(`D12`) */
         const val ADMISSION_HEADER = "X-Admission-Token"
 
-        private val HOLD_PATH = Regex("""/api/performances/(\d+)/reservations""")
+        private val HOLD_PATH = PathPatternParser.defaultInstance.parse("/api/performances/{performanceId}/reservations")
         private const val CREATED = 201
         private const val RETRY_AFTER_SECONDS = "5"
     }

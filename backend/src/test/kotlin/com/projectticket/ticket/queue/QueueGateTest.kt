@@ -5,6 +5,7 @@ import com.projectticket.ticket.auth.AccountRole
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
+import java.net.URI
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
@@ -191,6 +192,23 @@ class QueueGateTest : PostgresTestBase() {
         // 조회·결제는 관문을 안 지난다(ADR 0004) — 결제는 이미 좌석을 쥔 사람이다.
         mvc.get("/api/reservations/1") { with(user(buyer)) }
             .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun an_encoded_performance_id_still_meets_the_gate() {
+        // MVC 는 경로 변수를 디코드한다. 관문이 디코드 전 `requestURI` 를 보면 `%31` 같은 경로가 필터를 건너 컨트롤러에 닿는다(`I16-1`).
+        val encoded = performanceId.toString().map { "%%%02X".format(it.code) }.joinToString("")
+
+        mvc.post(URI.create("/api/performances/$encoded/reservations")) {
+            with(user(buyer))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = json.writeValueAsString(mapOf("seat_ids" to seatIds.take(1)))
+            header("Idempotency-Key", UUID.randomUUID().toString())
+        }.andExpect {
+            status { isTooManyRequests() }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:admission-required") }
+        }
     }
 
     /** 줄에 세우고 바로 들인다. 줄이 비어 있으면 진입이 곧 입장이다(`D12` 「항상 켠다」) */
