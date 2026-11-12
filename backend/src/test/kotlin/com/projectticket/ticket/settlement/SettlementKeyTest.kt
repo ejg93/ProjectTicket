@@ -38,7 +38,7 @@ class SettlementKeyTest : PostgresTestBase() {
         val fixture = EventFixture(jdbc)
         val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("settle-key")), hallId = fixture.hall())
         val policyId = fixture.stampDefaultPolicy(performanceId)
-        val settlementId = pendingSettlement(jdbc, performanceId, policyId, amount = 100000)
+        val settlementId = pendingSettlement(jdbc = jdbc, performanceId = performanceId, policyId = policyId, amount = 100_000)
         val line = "insert into settlement_line (settlement_id, kind, amount) values (:id, 'sale', 100000)"
         jdbc.sql(line).param("id", settlementId).update()
 

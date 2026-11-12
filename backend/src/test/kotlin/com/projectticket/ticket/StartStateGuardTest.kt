@@ -27,7 +27,7 @@ class StartStateGuardTest : PostgresTestBase() {
         fixture.seats(hallId, "F1-A", 1)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
         val performanceId = fixture.performance(eventId, hallId, startsInDays = 8).also { openService.open(it, actorAccountId = null) }
-        val reservationId = fixture.hold(fixture.account("start-refund@test.local"), performanceId, "F1-A", 1)
+        val reservationId = fixture.hold(accountId = fixture.account("start-refund@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
         fixture.reserve(reservationId)
 
         assertThatThrownBy {

@@ -60,7 +60,9 @@ class PolicyFrozenTest : PostgresTestBase() {
 
         assertThatThrownBy {
             jdbc.sql("update performance set settlement_policy_id = :policy where performance_id = :id")
-                .param("policy", other).param("id", performanceId).update()
+                .param("policy", other)
+                .param("id", performanceId)
+                .update()
         }.hasStackTraceContaining("회차의 정산 정책 박제는 고칠 수 없다")
     }
 
@@ -68,15 +70,21 @@ class PolicyFrozenTest : PostgresTestBase() {
     fun a_settlement_cannot_switch_its_policy() {
         val performanceId = openPerformance("frozen-settle")
         val stamp = jdbc.sql("select settlement_policy_id from performance where performance_id = :id").param("id", performanceId)
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
         val settlementId = jdbc.sql("insert into settlement (performance_id, settlement_policy_id, settle_at) values (:p, :policy, now()) returning settlement_id")
-            .param("p", performanceId).param("policy", stamp).query(Long::class.java).single()
+            .param("p", performanceId)
+            .param("policy", stamp)
+            .query(Long::class.java)
+            .single()
         val other = newSettlementPolicy()
 
         // `V23` 은 넣을 때만 회차와 대조한다 — 넣은 뒤 바꾸면 `takeDue` 가 남의 요율로 센다.
         assertThatThrownBy {
             jdbc.sql("update settlement set settlement_policy_id = :policy where settlement_id = :id")
-                .param("policy", other).param("id", settlementId).update()
+                .param("policy", other)
+                .param("id", settlementId)
+                .update()
         }.hasStackTraceContaining("정산서의 정책은 고칠 수 없다")
     }
 
@@ -122,7 +130,8 @@ class PolicyFrozenTest : PostgresTestBase() {
 
     private fun newRefundFeeTier(): Long =
         jdbc.sql("insert into refund_fee_tier (days_before_min, rate, effective_at) values (0, 0.10, '2099-01-01T00:00:00Z') returning refund_fee_tier_id")
-            .query(Long::class.java).single()
+            .query(Long::class.java)
+            .single()
 
     /** 좌석 하나·등급 하나로 연 회차. `open` 이 정책을 박제하고 좌석 가격을 베낀다 */
     private fun openPerformance(organizerCode: String): Long {
@@ -138,7 +147,7 @@ class PolicyFrozenTest : PostgresTestBase() {
     private fun newRefund(organizerCode: String): Long {
         val fixture = EventFixture(jdbc)
         val performanceId = openPerformance(organizerCode)
-        val reservationId = fixture.hold(fixture.account("$organizerCode@test.local"), performanceId, "F1-A", 1)
+        val reservationId = fixture.hold(accountId = fixture.account("$organizerCode@test.local"), performanceId = performanceId, section = "F1-A", seatNumber = 1)
         fixture.reserve(reservationId)
         return jdbc.sql(
             """

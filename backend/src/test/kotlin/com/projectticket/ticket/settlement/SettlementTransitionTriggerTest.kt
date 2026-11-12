@@ -24,7 +24,7 @@ class SettlementTransitionTriggerTest : PostgresTestBase() {
     fun setUp() {
         val fixture = EventFixture(jdbc)
         val performanceId = fixture.performance(eventId = fixture.event(fixture.organizer("settle-transition")), hallId = fixture.hall())
-        settlementId = pendingSettlement(jdbc, performanceId, fixture.stampDefaultPolicy(performanceId), amount = 0)
+        settlementId = pendingSettlement(jdbc = jdbc, performanceId = performanceId, policyId = fixture.stampDefaultPolicy(performanceId), amount = 0)
     }
 
     @Test

@@ -68,7 +68,7 @@ class SettlementReadTest : PostgresTestBase() {
 
     private fun settle() {
         val policyId = fixture.stampDefaultPolicy(performanceId)
-        val settlementId = pendingSettlement(jdbc, performanceId, policyId, amount = 90000)
+        val settlementId = pendingSettlement(jdbc = jdbc, performanceId = performanceId, policyId = policyId, amount = 90_000)
         jdbc.sql("insert into settlement_line (settlement_id, kind, amount) values (:id, 'sale', 100000), (:id, 'platform_fee', -10000)")
             .param("id", settlementId)
             .update()
