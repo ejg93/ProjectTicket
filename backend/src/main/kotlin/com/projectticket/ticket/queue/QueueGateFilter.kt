@@ -112,7 +112,7 @@ class QueueGateFilter(
     /** Redis 가 죽었다. **관문을 닫는다** — 열어 두면 대기열이 막으려던 폭발이 그대로 DB 로 간다(`D12`) */
     private fun closeGate(request: HttpServletRequest, response: HttpServletResponse, cause: RuntimeException) {
         logger.warn("대기열 관문이 Redis 를 못 본다 — 선점을 막는다 이유=${cause.javaClass.simpleName}")
-        reject(request = request, response = response, code = ErrorCode.QUEUE_UNAVAILABLE, headers = mapOf("Retry-After" to RETRY_AFTER_SECONDS))
+        reject(request = request, response = response, code = ErrorCode.QUEUE_UNAVAILABLE, headers = mapOf("Retry-After" to ProblemWriter.RETRY_AFTER_SECONDS))
     }
 
     /**
@@ -148,7 +148,6 @@ class QueueGateFilter(
 
         private val HOLD_PATH = PathPatternParser.defaultInstance.parse("/api/performances/{performanceId}/reservations")
         private const val CREATED = 201
-        private const val RETRY_AFTER_SECONDS = "5"
     }
 }
 

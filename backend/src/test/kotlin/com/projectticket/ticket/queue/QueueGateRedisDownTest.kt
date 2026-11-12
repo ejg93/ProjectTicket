@@ -2,6 +2,7 @@ package com.projectticket.ticket.queue
 
 import com.projectticket.ticket.auth.AccountRole
 import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
+import com.projectticket.ticket.error.ApiExceptionHandler
 import com.projectticket.ticket.error.ProblemFactory
 import com.projectticket.ticket.error.ProblemWriter
 import com.projectticket.ticket.observability.TicketMetrics
@@ -21,6 +22,9 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver
+import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import tools.jackson.databind.json.JsonMapper
 
 /**
@@ -71,6 +75,22 @@ class QueueGateRedisDownTest {
         val response = hold(token = "any-token")
 
         assertClosed(response)
+    }
+
+    @Test
+    fun a_dead_redis_behind_the_filters_is_503_too() {
+        // 관문을 지난 뒤 MVC 안에서 Redis 가 죽어도 같은 503 이다 — 전에는 마지막 그물이 500 `internal` 로 냈다(`I16-4`).
+        `when`(queue.position(anyLong(), anyLong())).thenThrow(RedisConnectionFailureException("down"))
+        val mvc = MockMvcBuilders.standaloneSetup(QueueController(queue))
+            .setControllerAdvice(ApiExceptionHandler(ProblemFactory(Tracer.NOOP)))
+            .setCustomArgumentResolvers(AuthenticationPrincipalArgumentResolver())
+            .build()
+
+        mvc.get("/api/queue/$PERFORMANCE").andExpect {
+            status { isServiceUnavailable() }
+            header { string("Retry-After", ProblemWriter.RETRY_AFTER_SECONDS) }
+            jsonPath("$.type") { value("tag:projectticket.example,2026:queue-unavailable") }
+        }
     }
 
     private fun hold(token: String?): MockHttpServletResponse {

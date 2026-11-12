@@ -89,7 +89,7 @@
 | 410 | 있었는데 사라졌다 | 델타 로그 밖의 `since`, 닫힌 회차의 대기열 |
 | 422 | 형식은 맞는데 **입력칸 하나로 못 푸는** 규칙 위반 | 필수 동의 빠짐, 4매 초과 |
 | 429 | 지금은 안 되지만 나중엔 된다 | 활성 토큰 없음 — 대기열로 |
-| 503 | 우리가 지금 못 한다 | Redis 가 죽어 관문이 닫힘 |
+| 503 | 우리가 지금 못 한다 | Redis 가 죽어 관문이 닫힘 — 필터·MVC 어디서 드러나도 같은 503(`I16-4`) |
 
 **409 와 422 의 경계**: 「다른 시점이면 통과했나」로 가른다. 좌석은 남이 놓으면 되고 당일은 어제였으면 됐다 → 409. 5매는 언제 해도 안 된다 → 422.
 
@@ -154,7 +154,7 @@
 | **`admission-mismatch`** | 403 | 토큰이 다른 계정·회차 것 | | 23 |
 | **`queue-closed`** | 410 | 회차가 닫혀 대기열이 없다 — 닫힌·취소된 회차만. 판매 시작 전은 409 `performance-not-open` 이다 | | 21·I16-3 |
 | **`not-in-queue`** | 404 | 순번을 물었는데 줄에 없다 | | 21 |
-| **`queue-unavailable`** | 503 | Redis 가 죽어 관문이 닫혔다 | `Retry-After` 헤더 | 23 |
+| **`queue-unavailable`** | 503 | Redis 가 죽어 관문이 닫혔다. 세션 필터·컨트롤러에서 드러난 Redis 연결 실패도 이것이다(`ProblemFallbackFilter`·`ApiExceptionHandler`) | `Retry-After` 헤더 | 23·I16-4 |
 | **`seat-changes-expired`** | 410 | `since` 가 변경 로그 밖이다. 전체를 다시 받아라 | `version` | 10a |
 | **`idempotency-in-progress`** | 409 | 같은 키가 처리 중 | | 13 |
 | **`idempotency-key-reused`** | 422 | 같은 키인데 본문이 다르다 | | 13 |

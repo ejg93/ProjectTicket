@@ -2,6 +2,7 @@ package com.projectticket.ticket.error
 
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
+import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
@@ -88,6 +89,18 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
             return super.createResponseEntity(ours, headers, statusCode, request)
         }
         return super.createResponseEntity(body, headers, statusCode, request)
+    }
+
+    /**
+     * 대기열·세션·좌석 버전이 같은 Redis 라 죽으면 예매를 못 받는다 — 관문·필터 그물([ProblemFallbackFilter])과 같은
+     * 503 `queue-unavailable` + `Retry-After` 다(`I16-4`, RFC 9110 §15.6.4). 전에는 마지막 그물이 500 `internal` 로 냈다.
+     */
+    @ExceptionHandler(RedisConnectionFailureException::class)
+    fun handle(e: RedisConnectionFailureException, request: HttpServletRequest): ResponseEntity<ProblemDetail> {
+        log.warn("Redis 연결 실패로 요청을 못 받았다: {} {}", request.method, request.requestURI, e)
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .header(HttpHeaders.RETRY_AFTER, ProblemWriter.RETRY_AFTER_SECONDS)
+            .body(problems.create(ErrorCode.QUEUE_UNAVAILABLE, null, request))
     }
 
     /**

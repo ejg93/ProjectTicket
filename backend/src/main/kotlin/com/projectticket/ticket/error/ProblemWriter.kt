@@ -38,4 +38,9 @@ class ProblemWriter(
         headers.forEach(response::setHeader)
         objectMapper.writeValue(response.writer, problem)
     }
+
+    companion object {
+        /** 503 의 `Retry-After`(RFC 9110 §10.2.3). 관문·필터 그물·MVC 핸들러가 같은 값을 낸다(`I16-4`) */
+        const val RETRY_AFTER_SECONDS = "5"
+    }
 }
