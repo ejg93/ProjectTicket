@@ -207,7 +207,7 @@ commit                 ← 앞의 예약분이 null 로 터진다
 
 `MockPaymentGateway` 는 키별 결과를 메모리 `ConcurrentHashMap` 에 든다. 대사(`PaymentReconciler`, `I17-1`)는 락을 잡은 한 파드에서 돌아
 다른 파드가 PG 에 보낸 시도는 `inquire` 가 null 이고, 그 시도를 「PG 가 모른다」로 닫는다 — 파드 N 대면 복구가 1/N 이다. 시험은 한 JVM 이라 안 드러난다.
-실물 PG 는 가맹점 단위로 기억해 풀린다. 모르는 키를 바로 닫지 않고 기다리는 길은 `I17-11` 이 본다.
+실물 PG 는 가맹점 단위로 기억해 풀린다. 모르는 키는 `started_at` 뒤 30분이 지나야 닫는다(`I17-11`) — 그 안에 시도를 낸 파드가 같은 키로 `settle` 하거나 그 파드가 대사 락을 잡으면 풀린다.
 
 ### Postgres 의 데드락은 `DeadlockLoserDataAccessException` 이 아니다
 
