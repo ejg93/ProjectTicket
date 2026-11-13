@@ -9,8 +9,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean
+import org.springframework.boot.autoconfigure.AutoConfigurations
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.boot.convert.DurationStyle
 import org.springframework.core.io.ClassPathResource
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import java.net.ServerSocket
 import java.time.Duration
 
@@ -34,6 +39,21 @@ class RedisTimeoutTest {
     fun the_command_and_connect_timeouts_are_set() {
         assertThat(duration("spring.data.redis.timeout")).isEqualTo(Duration.ofSeconds(2))
         assertThat(duration("spring.data.redis.connect-timeout")).isEqualTo(Duration.ofSeconds(1))
+    }
+
+    @Test
+    fun the_boot_wired_connection_factory_carries_both_timeouts() {
+        // 이름만 묶으면 커스텀 빈이 설정을 무시해도 초록이다 — Boot 자동 설정이 실제로 세운 빈을 본다(`I17-10`, 마무리 35차 독립 리뷰 I3).
+        // 명령 상한은 소켓으로 따로 못 잰다(아래 시험) — 빈의 `commandTimeout` 이 Lettuce 가 쓰는 그 값이다.
+        ApplicationContextRunner()
+            .withInitializer(ConfigDataApplicationContextInitializer())
+            .withConfiguration(AutoConfigurations.of(DataRedisAutoConfiguration::class.java))
+            .run { context ->
+                val factory = context.getBean(LettuceConnectionFactory::class.java)
+                assertThat(factory.clientConfiguration.commandTimeout).isEqualTo(Duration.ofSeconds(2))
+                val socket = factory.clientConfiguration.clientOptions.map { it.socketOptions }.orElseThrow()
+                assertThat(socket.connectTimeout).isEqualTo(Duration.ofSeconds(1))
+            }
     }
 
     @Test
