@@ -43,11 +43,16 @@ class OutboxCleaner(private val jdbc: JdbcClient) {
                         and published_at < now() - make_interval(days => :days)
                       order by published_at
                       limit :batch)
+                   and published_at is not null
+                   and published_at < now() - make_interval(days => :days)
                 """,
             )
                 .param("days", RETENTION_DAYS)
                 .param("batch", batch)
                 .update()
+            // 바깥에도 같은 조건을 건다 — 잠금을 기다린 뒤 다시 보는 것은 바깥 `where` 뿐이라, 그사이 `published_at` 을 비운 봉투를 안 지운다.
+            // 배치보다 많이 지웠으면 `limit` 이 빠진 것이다 — 시험이 이 줄로 상한을 문다(마무리 37차 독립 리뷰 I2).
+            check(round <= batch) { "한 문장이 배치보다 많이 지웠다 — limit 이 빠졌다: $round > $batch" }
             deleted += round
         } while (round == batch)
 

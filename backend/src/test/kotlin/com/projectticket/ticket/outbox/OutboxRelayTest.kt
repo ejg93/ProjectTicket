@@ -177,7 +177,7 @@ class OutboxRelayTest : PostgresTestBase() {
         assertThat(failureOf(poison).attempts).isEqualTo(OutboxRelay.PARK_AFTER)
     }
 
-    /** 순서대로 결과를 돌려주는 가짜 브로커. 그보다 더 부르면 시험이 깨진다 */
+    /** 순서대로 결과를 돌려주는 가짜 브로커. 더 부르면 Mockito 가 마지막 답을 되풀이한다 — 몇 번 불렀나는 `verify(times(…))` 가 본다 */
     @Suppress("UNCHECKED_CAST")
     private fun brokerThat(vararg results: CompletableFuture<SendResult<String, String>>): KafkaTemplate<String, String> {
         val kafka = mock(KafkaTemplate::class.java) as KafkaTemplate<String, String>

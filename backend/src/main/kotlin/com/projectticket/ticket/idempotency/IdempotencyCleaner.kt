@@ -46,11 +46,14 @@ class IdempotencyCleaner(private val jdbc: JdbcClient) {
                       where created_at < now() - make_interval(hours => :hours)
                       order by created_at
                       limit :batch)
+                   and created_at < now() - make_interval(hours => :hours)
                 """,
             )
                 .param("hours", RETENTION_HOURS)
                 .param("batch", batch)
                 .update()
+            // 배치보다 많이 지웠으면 `limit` 이 빠진 것이다 — 시험이 이 줄로 상한을 문다(마무리 37차 독립 리뷰 I2).
+            check(round <= batch) { "한 문장이 배치보다 많이 지웠다 — limit 이 빠졌다: $round > $batch" }
             deleted += round
         } while (round == batch)
 

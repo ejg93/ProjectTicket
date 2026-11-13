@@ -154,7 +154,7 @@ class PaymentTransitionService(
         }
         val paymentId = insertPayment(paying = paying, status = status, verdict = verdict, cardLast4 = cardLast4)
         closeAttempt(paying.gatewayKey)
-        if (paymentId == null) return alreadyApproved(paying.reservationId)
+        if (paymentId == null) return alreadyApproved(paying.reservationId, verdict?.approvalNumber)
 
         val reservationStatus = if (status == PaymentStatus.APPROVED) {
             confirm(accountId, paying.reservationId)
@@ -240,12 +240,16 @@ class PaymentTransitionService(
      * 먼저 적힌 승인을 그대로 돌려준다. 확정·사건·감사는 먼저 적은 쪽이 했다 — 다시 안 한다.
      * 예매가 `reserved` 가 아니면 그 승인은 `late` 였다.
      */
-    private fun alreadyApproved(reservationId: Long): Settled {
-        val paymentId = jdbc.sql("select payment_id from payment where reservation_id = :id and status = :approved")
+    private fun alreadyApproved(reservationId: Long, approvalNumber: String?): Settled {
+        val (paymentId, recordedApproval) = jdbc.sql("select payment_id, approval_number from payment where reservation_id = :id and status = :approved")
             .param("id", reservationId)
             .param("approved", PaymentStatus.APPROVED.code)
-            .query(Long::class.java)
+            .query { rs, _ -> rs.getLong("payment_id") to rs.getString("approval_number") }
             .single()
+        if (recordedApproval != approvalNumber) {
+            // 같은 예매에 승인이 둘이다 — 지금 상태 기계로는 못 닿는 자리라 사람이 볼 것이다. 둘째 승인은 결제 행이 없다(마무리 37차 m4).
+            log.warn("이미 다른 승인이 적힌 예매다 reservation_id={} payment_id={}", reservationId, paymentId)
+        }
         val reservationStatus = statusOf(reservationId)
         return Settled(paymentId, reservationStatus, late = reservationStatus != ReservationStatus.RESERVED.code, alreadyRecorded = true)
     }

@@ -43,6 +43,7 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
     @Transactional
     fun purgeDue(batch: Int = BATCH_SIZE): Purged {
         // 기준 시각은 DB 다(`D7`). 이미 비운 계정은 `email is not null` 이 걸러서 두 번 돌아도 같은 결과다.
+        // 그 조건을 바깥에도 건다 — 잠금을 기다린 뒤 다시 보는 것은 바깥 `where` 뿐이라, 겹친 파드가 이미 비운 계정을 다시 세지 않는다(마무리 37차 m1).
         val purged = jdbc.sql(
             """
             update account
@@ -53,6 +54,7 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
                     and email is not null
                   order by account_id
                   limit :batch)
+               and email is not null
             returning account_id
             """,
         )
@@ -72,6 +74,7 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
                   where created_at < now() - make_interval(years => :years)
                   order by created_at
                   limit :batch)
+               and created_at < now() - make_interval(years => :years)
             """,
         )
             .param("years", AUDIT_RETENTION_YEARS)

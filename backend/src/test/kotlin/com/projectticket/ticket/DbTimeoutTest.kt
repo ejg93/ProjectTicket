@@ -10,6 +10,7 @@ import com.projectticket.ticket.queue.AdmissionService
 import com.projectticket.ticket.queue.QueueGateFilter
 import com.projectticket.ticket.queue.QueueService
 import com.zaxxer.hikari.HikariDataSource
+import java.sql.Connection
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -102,8 +103,10 @@ class DbTimeoutTest : ConcurrencyTestBase() {
         val pool = dataSource.unwrap(HikariDataSource::class.java)
 
         // 풀의 연결을 전부 빌려 쥔다 — 손으로 만든 예외가 아니라 Hikari 가 실제로 3초 기다리고 포기하는 것을 본다(`I17-13`).
-        val borrowed = (1..pool.maximumPoolSize).map { pool.connection }
+        val borrowed = mutableListOf<Connection>()
         val response = try {
+            // 빌리는 것도 `try` 안이다 — 중간에 던지면 앞서 빌린 것이 새어 뒤 시험이 줄어든 풀로 돈다(마무리 37차 m2).
+            repeat(pool.maximumPoolSize) { borrowed += pool.connection }
             val started = System.nanoTime()
             hold.send().also {
                 val tookMs = (System.nanoTime() - started) / 1_000_000
