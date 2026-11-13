@@ -63,6 +63,10 @@ select performance_seat_id
 
 **교착이 그래도 나면 1회 재시도한다.** `40P01` 은 「다시 하면 될 수 있다」의 뜻이고 0행과 다르다(아래 「재시도」).
 
+**만료 스윕은 기다리지 않는다**(`I17-8`). `HoldSweeper` 는 만료된 예매를 `order by reservation_id limit 500 for update skip locked` 로 먼저 잡고 그것만 옮긴다.
+회차 취소·종료가 회차 행을 잡은 뒤 예매를 id 순으로 잠그는 동안 스윕이 임의 순서로 기다리면 `40P01` 이 났다 — 안 기다리는 쪽은 교착 고리에 못 든다.
+남이 쥔 예매는 그쪽이 끝내고, 500 을 넘는 나머지는 다음 회(30초)다. 종료 ↔ 취소는 같은 회차면 회차 행에서 줄을 서고 다른 회차면 예매가 안 겹쳐 교착이 없다.
+
 ### 선점의 문장 순서 — check 제약이 정했다
 
 `performance_seat_held_fields_check`(`V6`)가 `held` 행에 `reservation_id` 를 요구한다. 그래서 순서는 이렇다:
@@ -91,6 +95,8 @@ select performance_seat_id
 
 **불변식**: 예매가 `held`·`paying`·`reserved` 면 그 예매의 `reservation_seat` 좌석 집합 = `performance_seat` 에서 `reservation_id` 가 그 예매인 집합.
 `ReservationSeatConsistencyTest`(13)가 매 전이 뒤에 대조한다. 트리거로 안 내리는 이유는 두 표를 잇는 조건이라 행 트리거가 볼 자리가 없어서다.
+**확정은 앱에서 수를 맞춘다**(`I17-8`) — `confirm` 이 `reserved` 로 바꾼 좌석 수가 `reservation_seat` 수와 다르면 던져 결과 반영 전체를 롤백한다.
+예매는 `paying` 으로 남아 만료되고, 대사가 그 승인을 `late` → 환불로 잇는다(`I17-1`).
 
 **불변식**: 좌석은 예매를 바꿔 가리키지 않는다 — 포인터는 null→A·A→null 만 간다. 트리거 `performance_seat_no_handover`(`V24`, `51`)가 A→B 를 막는다. 초과 판매의 셋째 겹이다(앞의 둘은 조건부 UPDATE 의 `status` 조건과 갱신 행 수 대조).
 

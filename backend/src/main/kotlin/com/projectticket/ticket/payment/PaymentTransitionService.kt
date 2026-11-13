@@ -161,12 +161,13 @@ class PaymentTransitionService(
         val late = status == PaymentStatus.APPROVED && reservationStatus != ReservationStatus.RESERVED.code
         if (status == PaymentStatus.APPROVED && !late) {
             // 확정과 **같은 트랜잭션**에서 사건을 커밋한다(`D11`). 좌석을 못 준 승인(late)은 예매가 성립 안 했으니 사건도 없다 — 되돌리는 것은 환불(17b)이다.
-            val shape = jdbc.sql(
-                """
-                select r.performance_id, (select count(*) from reservation_seat rs where rs.reservation_id = r.reservation_id) as seat_count
-                  from reservation r where r.reservation_id = :id
-                """,
-            ).param("id", paying.reservationId).query(ReservedShape::class.java).single()
+            val shape = ReservedShape(
+                performanceId = jdbc.sql("select performance_id from reservation where reservation_id = :id")
+                    .param("id", paying.reservationId)
+                    .query(Long::class.java)
+                    .single(),
+                seatCount = seatCountOf(paying.reservationId),
+            )
             outbox.append(
                 EventType.RESERVATION_RESERVED,
                 paying.reservationId,
@@ -202,6 +203,10 @@ class PaymentTransitionService(
         jdbc.sql("update payment_attempt set settled_at = now() where gateway_key = :key and settled_at is null")
             .param("key", gatewayKey)
             .update() == 1
+
+    /** 예매의 좌석 수. 확정의 대조와 사건 페이로드가 같이 쓴다 — 둘이 다른 셈을 하면 대조가 뜻이 없다 */
+    private fun seatCountOf(reservationId: Long): Int =
+        jdbc.sql("select count(*) from reservation_seat where reservation_id = :id").param("id", reservationId).query(Int::class.java).single()
 
     private fun insertPayment(paying: Paying, status: PaymentStatus, verdict: MockPaymentGateway.Result?, cardLast4: String): Long =
         jdbc.sql(
@@ -253,6 +258,12 @@ class PaymentTransitionService(
             .query(SeatVersions.Row::class.java)
             .list()
             .filterNotNull()
+        // **확정한 좌석 수가 예매 좌석 수와 같아야 한다**(`I17-8`). 다르면 좌석이 예매 밖으로 풀렸다(생 SQL·버그) — 그대로 가면
+        // 「예매는 `reserved`, 좌석은 `available`」이고 그 좌석을 남이 또 산다. 던져서 [settle] 을 통째로 롤백한다 —
+        // 예매는 `paying` 으로 남아 만료되고, 대사(`PaymentReconciler`)가 그 승인을 `late` → 환불로 잇는다.
+        check(confirmedSeats.size == seatCountOf(reservationId)) {
+            "확정한 좌석 수가 예매 좌석 수와 다르다: reservation_id=$reservationId, confirmed=${confirmedSeats.size}"
+        }
         // 커밋 뒤에 판이 오른다(`D20`). 커밋 전에 올리면 롤백된 확정이 화면에 팔린 자리로 보인다.
         seatVersions.publishAfterCommit(confirmedSeats, PerformanceSeatStatus.RESERVED)
         metrics.reservationConfirmed()

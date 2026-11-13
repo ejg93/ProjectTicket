@@ -7,6 +7,7 @@ import com.projectticket.ticket.reservation.HoldSweeper
 import com.projectticket.ticket.reservation.SeatHoldService
 import java.util.UUID
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 
@@ -85,6 +86,30 @@ class PaymentReconcileTest : ConcurrencyTestBase() {
 
         assertThat(attemptSettled(paying.gatewayKey)).isTrue()
     }
+
+    @Test
+    fun a_confirm_that_finds_a_released_seat_rolls_back_and_is_reconciled_late() {
+        val (accountId, reservationId) = held()
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
+        // 좌석이 `reserved` 예매 밖으로 풀린 모양 — 생 SQL·버그. 이대로 확정하면 「예매는 reserved, 좌석은 available」이다(`I17-8`).
+        jdbc.sql("update performance_seat set status = 'available', held_until = null, reservation_id = null where reservation_id = :id")
+            .param("id", reservationId)
+            .update()
+        val verdict = gateway.approve(MockPaymentGateway.Request(paying.gatewayKey, paying.amount, CARD))
+
+        assertThatThrownBy { payments.settle(accountId, paying, verdict) }.isInstanceOf(IllegalStateException::class.java)
+
+        // 결과 반영이 통째로 롤백됐다 — 결제 행이 없고 예매는 `paying` 이다.
+        assertThat(paymentCount(reservationId)).isZero()
+        assertThat(statusOf(reservationId)).isEqualTo("paying")
+        // 기한이 지나 만료되면 대사가 그 승인을 `late` 로 적는다 — 환불로 잇는다(`I17-1`).
+        expire(reservationId)
+        reconciler.reconcile()
+        assertThat(approvedPaymentOf(reservationId)).isNotNull()
+    }
+
+    private fun statusOf(reservationId: Long): String =
+        jdbc.sql("select status from reservation where reservation_id = :id").param("id", reservationId).query(String::class.java).single()
 
     private fun approvedButNeverSettled(): PaymentTransitionService.Paying {
         val (accountId, reservationId) = held()
