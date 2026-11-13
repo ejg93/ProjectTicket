@@ -24,7 +24,7 @@ import java.util.UUID
  * **한 회가 한 트랜잭션이고, 행마다 격리한다**(`I17-4`). 한 행이 던져도(봉투를 못 만든다·`RecordTooLargeException`) 그 행만
  * `attempts + 1`·`last_error`·`next_attempt_at`(1초부터 두 배, 최대 5분)을 적고 다음 행으로 간다. 10회째에 주차한다(ERROR 로그) —
  * 푸는 것은 사람이다(`event-catalog.md` 「발행」). **일시 오류는 안 센다** — 원인 사슬에 Kafka `RetriableException` 이 있으면
- * 브로커 탓이라 그 회를 멈추고 다음 회에 그대로 다시 간다. 세면 브로커 장애 13분에 모든 사건이 주차된다.
+ * 브로커 탓이라 그 회를 멈추고 다음 회에 그대로 다시 간다. 세면 브로커 장애 8분 30초에 모든 사건이 주차된다.
  *
  * **집합체마다 맨 앞 미발행 행만 잡는다.** 같은 집합체의 사건이 순서를 지킨다(`event-catalog.md`) — 독 행 뒤의 같은 집합체 사건이
  * 서고, `skip locked` 로 두 파드가 같은 집합체의 앞뒤 행을 나눠 잡아 순서가 뒤집히던 틈도 같이 닫힌다. 값은 한 집합체에 사건이
@@ -192,14 +192,18 @@ class OutboxRelay(
         /** 한 회에 가져가는 수. 트랜잭션이 길어지면 그동안 잡은 행을 남이 못 가져간다 */
         const val BATCH_SIZE = 100
 
-        /** 이만큼 실패하면 주차한다. 1초부터 두 배·최대 5분이라 약 13분이다 */
+        /** 이만큼 실패하면 주차한다. 1초부터 두 배라 열째 실패가 첫 실패 뒤 약 8분 30초(1 + 2 + … + 256초)다 */
         const val PARK_AFTER = 10
 
         /** 지수 대기의 상한(초) */
         const val MAX_BACKOFF_SECONDS = 300
 
-        /** 한 회의 시간 상한. 넘으면 남은 행은 다음 회다 — 잡은 행을 쥔 트랜잭션이 길어지지 않게 한다 */
-        val ROUND_BUDGET: Duration = Duration.ofSeconds(10)
+        /**
+         * 한 회의 시간 상한. 넘으면 남은 행은 다음 회다 — 잡은 행을 쥔 트랜잭션이 길어지지 않게 한다.
+         * 행 **사이**에서만 보므로 최악은 예산 + 한 건의 `max.block.ms` 5초 + `delivery.timeout.ms` 15초다. 고른 뒤 끝 UPDATE 까지 문장이 없어
+         * 그 최악이 `idle_in_transaction_session_timeout` 30초(`I17-6`) 안이어야 한다 — 5 + 20 = 25초(`SchedulingConfigTest`, 마무리 36차).
+         */
+        val ROUND_BUDGET: Duration = Duration.ofSeconds(5)
 
         /** 브로커 탓이라 사건을 세지 않는 실패. 원인 사슬에 Kafka `RetriableException` 이 있다 */
         fun isTransient(e: Throwable): Boolean = generateSequence(e) { it.cause }.any { it is RetriableException }

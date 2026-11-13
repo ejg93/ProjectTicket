@@ -81,8 +81,8 @@
 - 릴레이가 `for update skip locked` 로 가져가 발행한다. 인스턴스 셋이 같은 행을 두 번 안 민다
 - **보내고 나서 표시한다.** 표시부터 하면 보내기가 실패했을 때 그 사건이 영영 안 나간다
 - 발행은 **at-least-once** 다. 릴레이가 발행 뒤 표시 전에 죽으면 같은 사건이 다시 나간다 — 그래서 소비자가 `event_id` 로 멱등이어야 한다
-- **독 행은 그 행만 선다**(`I17-4`). 보낼 수 없는 행(봉투를 못 만든다·`RecordTooLargeException`)은 `attempts`·`last_error`(예외 클래스 이름)·`next_attempt_at`(1초부터 두 배, 최대 5분)을 적고 다음 행으로 간다. 브로커 일시 오류(`RetriableException`)는 안 세고 그 회를 멈춘다. 한 회는 10초 안이다
-- **10회 실패면 주차한다**(ERROR 로그). 같은 집합체의 뒤 사건도 같이 선다 — 순서를 지키려는 값이다. 원인을 고친 뒤 사람이 푼다: `update outbox set attempts = 0, next_attempt_at = null where outbox_id = …`. 주차된 행은 `select outbox_id, type, aggregate_id, last_error from outbox where published_at is null and attempts >= 10` 로 찾는다
+- **독 행은 그 행만 선다**(`I17-4`). 보낼 수 없는 행(봉투를 못 만든다·`RecordTooLargeException`)은 `attempts`·`last_error`(예외 클래스 이름)·`next_attempt_at`(1초부터 두 배, 최대 5분)을 적고 다음 행으로 간다. 브로커 일시 오류(`RetriableException`)는 안 세고 그 회를 멈춘다. 한 회 예산은 5초다(최악 25초 — `concurrency-rules.md` 시간 상한 표)
+- **10회 실패면 주차한다**(ERROR 로그). 같은 집합체의 뒤 사건도 같이 선다 — 순서를 지키려는 값이다. 원인을 고친 뒤 사람이 푼다: `update outbox set attempts = 0, next_attempt_at = null where outbox_id = …`. 주차된 행은 `select outbox_id, type, aggregate_id, last_error from outbox where published_at is null and attempts >= 10` 로 찾는다. 한꺼번에 풀 때는 같은 조건으로 `update outbox set attempts = 0, next_attempt_at = null where published_at is null and attempts >= 10`. **원인을 못 고치는 행**(페이로드가 커서 — 보존 트리거가 페이로드를 못 고치게 막는다)은 보내지 않고 건너뛴다: `update outbox set published_at = now() where outbox_id = …` — 소비자가 그 사건을 영영 못 받으므로 그 사실(알림·정산)을 사람이 맞춘다. 주차 신호는 ERROR 로그 한 줄이다
 
 ## 소비 — 26·27·29
 

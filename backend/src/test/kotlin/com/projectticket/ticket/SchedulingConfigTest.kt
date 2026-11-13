@@ -1,5 +1,6 @@
 package com.projectticket.ticket
 
+import com.projectticket.ticket.outbox.OutboxRelay
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -85,6 +86,21 @@ class SchedulingConfigTest {
             checkNotNull(binder.bind("spring.lifecycle.timeout-per-shutdown-phase", String::class.java).orElse(null)) { "종료 단계 상한이 없다" },
         )
         assertThat(delivery).isLessThan(shutdownPhase.toMillis())
+    }
+
+    @Test
+    fun a_relay_round_fits_inside_the_idle_transaction_limit() {
+        // 릴레이는 한 트랜잭션에서 고른 뒤 끝 UPDATE 까지 문장이 없다. 예산은 행 사이에서만 보므로 최악은
+        // 예산 + 한 건의 `max.block.ms` + `delivery.timeout.ms` 다 — 이것이 유휴 상한에 닿으면 서버가 연결을 끊고 회 전체가 롤백된다(마무리 36차 I1).
+        val options = checkNotNull(binder.bind("spring.datasource.hikari.data-source-properties.options", String::class.java).orElse(null)) {
+            "드라이버 속성 options 가 없다(I17-6)"
+        }
+        val idle = checkNotNull(Regex("""idle_in_transaction_session_timeout=(\d+)""").find(options)) { "유휴 상한이 없다" }.groupValues[1].toLong()
+        val worst = OutboxRelay.ROUND_BUDGET.toMillis() +
+            producerMillis(ProducerConfig.MAX_BLOCK_MS_CONFIG) +
+            producerMillis(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG)
+
+        assertThat(worst).isLessThan(idle)
     }
 
     private companion object {

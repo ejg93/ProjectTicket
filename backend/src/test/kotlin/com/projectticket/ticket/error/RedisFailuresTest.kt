@@ -30,6 +30,19 @@ class RedisFailuresTest {
     }
 
     @Test
+    fun a_server_that_refuses_writes_is_an_outage() {
+        // 디스크가 차 RDB·AOF 를 못 쓰면(`MISCONF`)·메모리가 차면(`OOM`)·복제본이면(`READONLY`) 서버가 오류로 답한다.
+        // 우리 버그가 아니라 장애다 — 버그로 보면 락이 던져 DB 만 쓰는 선점 만료까지 선다(`I17-5`, 마무리 36차 I2).
+        listOf(
+            "MISCONF Redis is configured to save RDB snapshots, but it's currently unable to persist to disk",
+            "OOM command not allowed when used memory > 'maxmemory'",
+            "READONLY You can't write against a read only replica.",
+        ).forEach { reply ->
+            assertThat(RedisSystemException("쓰기 거부", RedisCommandExecutionException(reply)).isRedisDown()).describedAs(reply).isTrue()
+        }
+    }
+
+    @Test
     fun a_lost_connection_or_timeout_is_an_outage() {
         assertThat(RedisConnectionFailureException("연결 실패").isRedisDown()).isTrue()
         assertThat(QueryTimeoutException("명령 시간 초과", RedisCommandTimeoutException("2초")).isRedisDown()).isTrue()

@@ -203,6 +203,12 @@ commit                 ← 앞의 예약분이 null 로 터진다
 되돌리면 그 트랜잭션의 나머지가 무제한이 된다. 드라이버 속성 `options`(`-c lock_timeout=3000 …`)로 걸면 reset 값이 3초라 3초로 돌아온다(`I17-6`, `DbTimeoutTest`).
 `alter role ticket_app set …` 도 안 된다 — 역할 설정은 **로그인 역할**에만 실린다. 앱은 `ticket` 으로 붙고 `set role ticket_app` 을 입어서 그 값이 안 실린다.
 
+### 모의 PG 의 기억은 JVM 마다다 — 대사는 다른 파드의 시도를 모른다
+
+`MockPaymentGateway` 는 키별 결과를 메모리 `ConcurrentHashMap` 에 든다. 대사(`PaymentReconciler`, `I17-1`)는 락을 잡은 한 파드에서 돌아
+다른 파드가 PG 에 보낸 시도는 `inquire` 가 null 이고, 그 시도를 「PG 가 모른다」로 닫는다 — 파드 N 대면 복구가 1/N 이다. 시험은 한 JVM 이라 안 드러난다.
+실물 PG 는 가맹점 단위로 기억해 풀린다. 모르는 키를 바로 닫지 않고 기다리는 길은 `I17-11` 이 본다.
+
 ### Postgres 의 데드락은 `DeadlockLoserDataAccessException` 이 아니다
 
 `40P01` 이 **`PessimisticLockingFailureException`** 으로 온다. Spring 은 SQLSTATE 앞 두 자리(`40` = 트랜잭션 롤백)로 번역해 상위 타입에 멈춘다.
