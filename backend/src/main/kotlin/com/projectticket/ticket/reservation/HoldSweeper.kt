@@ -34,9 +34,9 @@ class HoldSweeper(
      * 타임아웃(`paying_until < now()`)은 결제 승인의 조건부 UPDATE(`where paying_until >= now()`)와 같은 행을 두고 다투지만
      * 둘 다 조건부라 한쪽만 이긴다 — 승인이 지면 `payment_late` 다(`D4`).
      *
-     * **남이 쥔 예매는 건너뛴다**(`I17-8`, `D4` 「여러 행을 잠글 때」). 만료된 예매를 `order by reservation_id … skip locked` 로 먼저 잡는다 —
+     * **남이 쥔 예매는 건너뛴다**(`I17-8`, `D4` 「여러 행을 잠글 때」). 만료된 예매를 기한이 오래 지난 것부터 `skip locked` 로 먼저 잡는다 —
      * 회차 취소·종료는 회차 행을 잡은 뒤 예매를 `order by reservation_id for update` 로 잠가서, 스윕이 임의 순서로 기다리면 `40P01` 이 났다.
-     * 안 기다리는 쪽은 교착 고리에 못 든다. 남이 쥔 행은 그쪽(취소·종료·확정)이 끝내고, [batch] 를 넘는 나머지는 다음 회(30초)다.
+     * 안 기다리는 쪽은 교착 고리에 못 든다(순서와 무관하다). 남이 쥔 행은 그쪽(취소·종료·확정)이 끝내고, 가지마다 [batch] 를 넘는 나머지는 다음 회(30초)다.
      *
      * @return 만료시킨 예매 수
      */
@@ -44,16 +44,27 @@ class HoldSweeper(
     fun sweep(batch: Int = BATCH_SIZE): Int {
         // 상태를 **리터럴로 박는다** — 부분 인덱스(`reservation_held_until_idx`·`reservation_paying_until_idx`)의 조건과 글자로 같아야
         // generic plan 에서도 그 인덱스를 쓴다. 바인딩하면 Seq Scan 이다(`coding-rules.md` 「SQL」, `I9-4` 실측).
+        // **가지마다 CTE 를 두고 그 인덱스의 열로 정렬한다**(`I17-15`). 두 조건을 `or` 로 묶어 `order by reservation_id limit` 하면
+        // 만료가 id 끝에 몰린 판에서 PK 를 처음부터 훑는다 — 30만 행 표에서 500 건에 30만 행을 읽었다. 한 회는 가지마다 [batch] 까지다.
         // 바깥 UPDATE 도 같은 조건을 다시 건다 — 고른 뒤 바뀐 행을 옮기지 않는 조건부 UPDATE 다(`D4`). 여기는 PK 로 붙어 인덱스와 상관없어 바인딩한다.
         val expired = jdbc.sql(
             """
-            with due as (
+            with due_held as (
                 select reservation_id from reservation
                  where status = 'held' and held_until < now()
-                    or status = 'paying' and paying_until < now()
-                 order by reservation_id
+                 order by held_until
                  limit :batch
                    for update skip locked
+            ), due_paying as (
+                select reservation_id from reservation
+                 where status = 'paying' and paying_until < now()
+                 order by paying_until
+                 limit :batch
+                   for update skip locked
+            ), due as (
+                select reservation_id from due_held
+                union all
+                select reservation_id from due_paying
             )
             update reservation r
                set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by

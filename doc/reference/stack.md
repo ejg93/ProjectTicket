@@ -221,6 +221,8 @@ commit                 ← 앞의 예약분이 null 로 터진다
 `on conflict` 의 `where` 는 부분 인덱스의 조건과 **글자까지 같은 리터럴**이어야 한다 — 바인딩하면 플래너가 인덱스를 못 맞춘다.
 **부분 인덱스를 타려는 질의도 같다.** `where status = 'held'` 인덱스 위에서 `status = $1` 의 `explain (generic_plan)` 은 Seq Scan, 리터럴·custom plan 은 Index Scan 이다(Postgres 17.10, 번들 7 설계 실측). JDBC 는 같은 문장을 다섯 번 넘게 돌리면 서버 쪽 준비 문장으로 넘어가고, 그 뒤 generic plan 으로 갈지는 `plan_cache_mode = auto` 의 비용 비교라 **리터럴만이 확정이다.** 그 자리 목록은 `SqlTextTest.INDEXED_LITERALS`.
 
+**`order by <PK> limit` 은 리터럴이어도 부분 인덱스를 버린다.** 두 부분 인덱스 조건을 `or` 로 묶고 `order by reservation_id limit $1` 하면 generic plan 은 `reservation_pkey` 순회 + Filter 고, 만료가 id 끝에 몰리면 리터럴 `limit 500` 이어도 같다 — 30만 행 표에서 500 건에 301,002 행을 읽었다(`HoldSweepReadsTest`, `I17-15`). **가지마다 CTE 를 두고 그 인덱스의 열로 정렬한다**(`order by held_until`) — 같은 자료에서 두 판 다 부분 인덱스의 Index Scan 이다(설계 실측 32ms → 4ms).
+
 ### 부분 유일 인덱스가 앱 검증을 경합에서 지킨다
 
 `reservation_live_hold_idx`(계정·회차당 살아있는 선점 하나)가 있으면 같은 계정의 둘째 선점은 **첫째의 커밋을 insert 에서 기다린다.** 그 사이 첫째가 센 「이미 잡은 매수」는 다른 트랜잭션이 못 바꾼다.
