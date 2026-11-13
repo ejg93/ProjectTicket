@@ -58,7 +58,10 @@ class RedisTimeoutTest {
     }
 
     private companion object {
-        /** 명령 2초 + 연결 1초. 이것을 넘기면 기본값(60초)으로 돌아간 것이다 */
-        val UPPER_BOUND: Duration = Duration.ofSeconds(3)
+        /**
+         * 기본값(60초)으로 돌아갔나를 가르는 선. 명령 2초 + 연결 1초에 Netty 첫 기동이 얹힌다 —
+         * 빠른 레인 전체와 같이 돌면 3.8초까지 쟀다(`I17-3` 판). 3초로 두면 부하에 흔들린다
+         */
+        val UPPER_BOUND: Duration = Duration.ofSeconds(10)
     }
 }
