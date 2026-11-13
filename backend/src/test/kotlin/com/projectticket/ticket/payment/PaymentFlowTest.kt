@@ -153,7 +153,7 @@ class PaymentFlowTest : PostgresTestBase() {
         val otherReservation = seatHold.hold(other.id, SeatHoldService.Command(otherPerformance, fixture.performanceSeatIds(otherPerformance).take(1)))
 
         val first = pay("4242 4242 4242 4242", key).andExpect { status { isCreated() } }.andReturn().response.contentAsString
-        val second = pay("4242 4242 4242 4242", key, other, otherReservation).andExpect {
+        val second = pay(cardNumber = "4242 4242 4242 4242", key = key, principal = other, reservation = otherReservation).andExpect {
             status { isCreated() }
             jsonPath("$.status") { value("approved") }
             jsonPath("$.amount") { value(154_000) }
