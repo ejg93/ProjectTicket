@@ -169,7 +169,8 @@ class RefundTransitionService(
      *
      * `days_before` 는 회차 취소와 같은 KST 달력일 차다(`D6` 「환불 행」) — 0 은 구간표에서 「당일」이라 섞으면 안 된다.
      *
-     * **`not exists` 로 멱등이다.** 두 번 돌아도 둘째는 0행이고, 뚫려도 결제당 하나라는 유일 제약이 받는다.
+     * **`not exists` 로 멱등이다.** 두 번 돌아도 둘째는 0행이다. 두 대가 동시에 돌면 `not exists` 를 둘 다 지나므로
+     * `on conflict` 가 뒤엣것을 0행으로 만든다 — 유일 위반으로 던지면 그 회의 발송까지 끊긴다(`I17-5`).
      */
     @Transactional
     fun queueLatePayments(): List<Long> =
@@ -186,6 +187,7 @@ class RefundTransitionService(
              where p.status = :approved
                and r.status in (:expired, :cancelled)
                and not exists (select 1 from refund rf where rf.payment_id = p.payment_id)
+                on conflict (payment_id) do nothing
             returning refund_id
             """,
         )

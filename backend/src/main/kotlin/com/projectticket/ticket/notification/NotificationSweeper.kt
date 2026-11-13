@@ -1,5 +1,6 @@
 package com.projectticket.ticket.notification
 
+import com.projectticket.ticket.SchedulerLock
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -15,14 +16,24 @@ import org.springframework.stereotype.Component
  *
  * 발송과 표시 사이에 남이 같은 행을 집어 가면 **같은 메일이 두 번 나갈 수 있다**(at-least-once). 돈이 안 움직이는 자리라 그 대가를 받아들인다 —
  * 한 번만 보내려면 보내기 전에 `sending` 으로 옮겨야 하고, 그러면 그 상태에서 죽은 행을 되살리는 자리가 또 필요하다.
+ *
+ * **대수만큼 겹치지는 않는다**(`I17-5`). `takePending` 의 `skip locked` 는 반환과 함께 풀려 파드 N 대가 같은 행을 N 번 보냈다 —
+ * 스케줄러 입구([sweepDue])가 락을 든다. [sweep] 은 테스트가 직접 부르는 자리라 락을 안 든다.
  */
 @Component
-class NotificationSweeper(private val store: NotificationStore, private val sender: MockNotificationSender) {
+class NotificationSweeper(
+    private val store: NotificationStore,
+    private val sender: MockNotificationSender,
+    private val lock: SchedulerLock,
+) {
 
     private val log = LoggerFactory.getLogger(NotificationSweeper::class.java)
 
-    /** @return 보낸 수(실패·건너뜀 제외) */
+    /** @return 보낸 수. 락을 남이 쥐고 있으면 0 */
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
+    fun sweepDue(): Int = lock.runExclusively(LOCK_NAME) { sweep() } ?: 0
+
+    /** @return 보낸 수(실패·건너뜀 제외) */
     fun sweep(): Int {
         val pending = store.takePending(BATCH_SIZE)
         if (pending.isEmpty()) {
@@ -61,6 +72,9 @@ class NotificationSweeper(private val store: NotificationStore, private val send
     companion object {
         /** 사람이 기다리는 자리라 짧다. 스윕 셋(선점 30초·릴레이 1초·알림 5초) 중 가운데다 */
         const val SWEEP_INTERVAL = "PT5S"
+
+        /** 락 이름. 인스턴스가 여럿이어도 이 이름 하나를 두고 다툰다(`I17-5`) */
+        const val LOCK_NAME = "notification-sweeper"
 
         const val BATCH_SIZE = 100
     }

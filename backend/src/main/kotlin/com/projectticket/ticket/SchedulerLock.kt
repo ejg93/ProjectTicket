@@ -1,5 +1,6 @@
 package com.projectticket.ticket
 
+import com.projectticket.ticket.error.isRedisDown
 import java.time.Duration
 import java.util.UUID
 import org.slf4j.LoggerFactory
@@ -32,7 +33,14 @@ class SchedulerLock(private val redis: StringRedisTemplate) {
     fun <T> runExclusively(name: String, ttl: Duration = DEFAULT_TTL, work: () -> T): T? {
         val key = "lock:$name"
         val token = UUID.randomUUID().toString()
-        val taken = redis.opsForValue().setIfAbsent(key, token, ttl) == true
+        // **Redis 가 죽으면 락 없이 돈다**(`I17-5`). 락은 절약이라 겹쳐도 결과가 같고, 던지면 DB 만 쓰는 선점 만료가 Redis 장애 내내 선다.
+        val taken = try {
+            redis.opsForValue().setIfAbsent(key, token, ttl) == true
+        } catch (e: RuntimeException) {
+            if (!e.isRedisDown()) throw e
+            log.warn("Redis 가 안 받아 스케줄러를 락 없이 돌린다 name={}", name, e)
+            return work()
+        }
         if (!taken) {
             log.debug("스케줄러 락을 남이 쥐고 있다 name={}", name)
             return null
@@ -41,7 +49,17 @@ class SchedulerLock(private val redis: StringRedisTemplate) {
         return try {
             work()
         } finally {
+            release(name, key, token)
+        }
+    }
+
+    /** 일하는 사이 Redis 가 죽었으면 놓기도 실패한다 — 그것이 일의 결과를 덮으면 안 된다. 락은 TTL 이 지운다 */
+    private fun release(name: String, key: String, token: String) {
+        try {
             redis.execute(RELEASE, listOf(key), token)
+        } catch (e: RuntimeException) {
+            if (!e.isRedisDown()) throw e
+            log.warn("Redis 가 안 받아 락을 못 놓았다 — TTL 이 지운다 name={}", name, e)
         }
     }
 
