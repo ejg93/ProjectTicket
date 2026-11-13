@@ -71,7 +71,7 @@ if [ "$restart" = 1 ]; then
   kubectl -n "$NS" rollout status deployment/app --timeout=600s
 fi
 
-# 문턱(`rate==0`)을 넘으면 k6 가 0 이 아닌 코드로 끝나 Job 이 Failed 다 — 그것도 결과라 둘 다 기다린다.
+# 문턱(`http_req_failed` `rate==0` · `service_busy` `rate<0.01` · `unexpected_503` `rate==0`, `I17-16`)을 넘으면 k6 가 0 이 아닌 코드로 끝나 Job 이 Failed 다 — 그것도 결과라 둘 다 기다린다.
 for _ in $(seq 1 180); do
   done_=$(kubectl -n "$NS" get job k6 -o jsonpath='{.status.succeeded}{.status.failed}')
   [ -n "$done_" ] && break
@@ -84,4 +84,4 @@ echo "== 앱 대수 최대: $(sort -n "$samples" | tail -1) · Job: $(kubectl -n
 
 # 판의 판정(`54`) — Job 이 Failed 여도 exit 0 이면 롤링 중 5xx 가 나도 초록으로 끝난다
 [ "$(kubectl -n "$NS" get job k6 -o jsonpath='{.status.succeeded}')" = 1 ] \
-  || { echo "k6 Job 이 성공이 아니다 — 롤링 중 5xx·연결 오류가 났거나(rate==0) 시간 안에 안 끝났다" >&2; exit 1; }
+  || { echo "k6 Job 이 성공이 아니다 — 롤링 중 5xx·연결 오류·그 밖 503 이 났거나 service-busy 가 1% 를 넘었거나 시간 안에 안 끝났다" >&2; exit 1; }

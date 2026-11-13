@@ -11,7 +11,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { SharedArray } from "k6/data";
 import { Counter, Trend } from "k6/metrics";
-import { jarFor } from "./lib/session.js";
+import { BUSY_THRESHOLDS, counted, jarFor } from "./lib/session.js";
 
 const BASE = __ENV.BASE_URL || "http://nginx:80";
 const PERFORMANCE_ID = __ENV.PERFORMANCE_ID || "1";
@@ -60,6 +60,7 @@ export const options = {
   // 문턱은 `D13` 칸이다. 이긴 선점은 「오픈 순간」 칸 — 22 vCPU ≤ 105ms(`load-4`) · 10 vCPU ≤ 272ms(`load-9`). 초과 판매 0 은 k6 가 못 본다 — `README.md` 「오픈 순간」의 SQL.
   thresholds: {
     http_req_failed: ["rate==0"],
+    ...BUSY_THRESHOLDS,
     "http_req_duration{phase:run}": ["p(95)>=0"],
     // 기본은 compose 셋 · Docker 22 vCPU 칸(`D13`). 10 vCPU 면 `HOLD_WON_P95=272`·`POLL_P95=301`(`README.md`). k8s 판은 `k8s-hpa-test.sh` 가 k8s 칸을 넘긴다(`54`) — nginx 없이 kind 3~6대가 한 기계를 나눈다.
     poll_latency_ms: [`p(95)<${__ENV.POLL_P95 || 140}`],
@@ -69,7 +70,7 @@ export const options = {
 };
 
 // 실패는 5xx 와 연결 오류뿐이다(`38`) — 409·429 는 정상 흐름이다
-http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }, 503));
 
 /** 멱등키는 UUIDv4 여야 한다(`IdempotencyKeys`) */
 function uuid() {
@@ -94,7 +95,7 @@ function mine_() {
 }
 
 function release(a) {
-  const res = http.del(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
+  const res = counted.del(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
   check(res, { "반납 204": (r) => r.status === 204 });
   if (res.status === 204) left.add(1);
   else releaseFailed.add(1);
@@ -108,7 +109,7 @@ function hold(a, token) {
   a.done = true;
 
   const started = Date.now();
-  const res = http.post(`${BASE}/api/performances/${PERFORMANCE_ID}/reservations`, JSON.stringify({ seat_ids: [a.seatId] }), {
+  const res = counted.post(`${BASE}/api/performances/${PERFORMANCE_ID}/reservations`, JSON.stringify({ seat_ids: [a.seatId] }), {
     jar: a.jar,
     headers: {
       "Content-Type": "application/json",
@@ -135,7 +136,7 @@ function hold(a, token) {
 }
 
 function enter(a) {
-  const res = http.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
+  const res = counted.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
   check(res, { "대기열 진입 200": (r) => r.status === 200 });
   if (res.status !== 200) {
     enterFailed.add(1);
@@ -152,7 +153,7 @@ function enter(a) {
 
 function poll(a) {
   const started = Date.now();
-  const res = http.get(`${BASE}/api/queue/${PERFORMANCE_ID}`, { jar: a.jar });
+  const res = counted.get(`${BASE}/api/queue/${PERFORMANCE_ID}`, { jar: a.jar });
   pollLatency.add(Date.now() - started);
   if (res.status === 404) {
     dropped.add(1);

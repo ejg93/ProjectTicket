@@ -10,7 +10,22 @@
 // 이 파일 하나만 configmap 으로 싣기 때문이다. 기본(`PRELOGIN` 없음)은 반복마다 로그인한다.
 import http from "k6/http";
 import { check, sleep } from "k6";
-import { Counter, Trend } from "k6/metrics";
+import { Counter, Rate, Trend } from "k6/metrics";
+
+// 503 을 본문으로 가른다(`I17-16`) — `lib/session.js` 의 `seen`·`counted` 와 같아야 한다. configmap 이 이 파일 하나만 실어 안에 든다.
+const serviceBusy = new Rate("service_busy");
+const unexpected503 = new Rate("unexpected_503");
+function seen(res) {
+  const unavailable = res.status === 503;
+  const busy = unavailable && typeof res.body === "string" && res.body.includes("service-busy");
+  serviceBusy.add(busy);
+  unexpected503.add(unavailable && !busy);
+  return res;
+}
+const counted = {
+  get: (...args) => seen(http.get(...args)),
+  post: (...args) => seen(http.post(...args)),
+};
 
 const BASE = __ENV.BASE_URL || "http://nginx:80";
 const PERFORMANCE_ID = __ENV.PERFORMANCE_ID || "1";
@@ -48,11 +63,13 @@ export const options = {
   // 기본값이면 4xx 까지 실패로 세서 「오류율 0」을 못 쓴다. 31·35 의 표는 옛 정의(0.5 문턱)로 이미 적혔다.
   thresholds: {
     http_req_failed: ["rate==0"],
+    service_busy: ["rate<0.01"],
+    unexpected_503: ["rate==0"],
     "http_req_duration{phase:run}": ["p(95)>=0"],
   },
 };
 
-http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }, 503));
 
 /** 멱등키는 **UUIDv4 여야 한다**(13 의 `IdempotencyKeys`). 아무 문자열이나 보내면 400 이다 */
 function uuid() {
@@ -65,7 +82,7 @@ function uuid() {
 
 /** 쿠키에 들어온 CSRF 토큰. 아무 GET 이나 한 번 치면 내려온다 */
 function csrfToken(jar) {
-  http.get(`${BASE}/api/health`, { jar });
+  counted.get(`${BASE}/api/health`, { jar });
   const cookies = jar.cookiesForURL(`${BASE}/`)["XSRF-TOKEN"];
   return cookies ? cookies[0] : null;
 }
@@ -77,7 +94,7 @@ function csrfToken(jar) {
  * 안 받으면 다음 POST 가 토큰 없이 403 이다.
  */
 function logIn(jar, index) {
-  const res = http.post(
+  const res = counted.post(
     `${BASE}/api/auth/login`,
     JSON.stringify({ email: `load${index}@test.local`, password: PASSWORD }),
     { jar, headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": csrfToken(jar) } },
@@ -93,15 +110,15 @@ function preloginAll(count) {
   const started = Date.now();
   for (let i = 1; i <= count; i++) {
     const jar = new http.CookieJar();
-    http.get(`${BASE}/api/health`, { jar, tags });
+    counted.get(`${BASE}/api/health`, { jar, tags });
     const xsrf = jar.cookiesForURL(`${BASE}/`)["XSRF-TOKEN"];
-    const res = http.post(
+    const res = counted.post(
       `${BASE}/api/auth/login`,
       JSON.stringify({ email: `load${i}@test.local`, password: PASSWORD }),
       { jar, tags, headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": xsrf ? xsrf[0] : "" } },
     );
     check(res, { "미리 로그인 200": (r) => r.status === 200 }, tags);
-    http.get(`${BASE}/api/health`, { jar, tags });
+    counted.get(`${BASE}/api/health`, { jar, tags });
     const cookies = jar.cookiesForURL(`${BASE}/`);
     out.push({ session: cookies.TICKETSESSION ? cookies.TICKETSESSION[0] : null, xsrf: cookies["XSRF-TOKEN"] ? cookies["XSRF-TOKEN"][0] : null });
   }
@@ -116,7 +133,7 @@ export function setup() {
 /** 줄에 서고 토큰이 나올 때까지 2초마다 묻는다(ADR 0003 — 폴링이 하트비트를 겸한다) */
 function waitForAdmission(jar, csrf) {
   const started = Date.now();
-  const entered = http.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, {
+  const entered = counted.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, {
     jar,
     headers: { "X-XSRF-TOKEN": csrf },
   });
@@ -126,7 +143,7 @@ function waitForAdmission(jar, csrf) {
   let tries = 0;
   while (body && body.state === "waiting" && tries < 30) {
     sleep(2);
-    const polled = http.get(`${BASE}/api/queue/${PERFORMANCE_ID}`, { jar });
+    const polled = counted.get(`${BASE}/api/queue/${PERFORMANCE_ID}`, { jar });
     if (polled.status !== 200) break;
     body = polled.json();
     tries += 1;
@@ -164,7 +181,7 @@ export default function (data) {
   const slot = ROTATE ? __VU * 7 + __ITER * vus : __VU * 7;
   const seatId = Number(__ENV.FIRST_SEAT_ID || 1) + (slot % Number(__ENV.SEATS || 1000));
   const started = Date.now();
-  const res = http.post(
+  const res = counted.post(
     `${BASE}/api/performances/${PERFORMANCE_ID}/reservations`,
     JSON.stringify({ seat_ids: [seatId] }),
     {

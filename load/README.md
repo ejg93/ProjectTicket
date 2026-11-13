@@ -8,7 +8,8 @@
 | 이름 | 무엇 | 어디서 |
 |---|---|---|
 | `http_req_duration` | 전체 응답 시간 | k6 기본 |
-| `http_req_failed` | **5xx 와 연결 오류만**(`38`). 409·429 는 정상 흐름이라 안 센다 — 문턱 `rate==0` | k6 기본 + 응답 콜백 |
+| `http_req_failed` | **5xx 와 연결 오류만**(`38`). 409·429 는 정상 흐름이라 안 센다. 503 도 안 센다 — 아래 둘이 가른다. 문턱 `rate==0` | k6 기본 + 응답 콜백 |
+| `service_busy` · `unexpected_503` | 503 을 본문의 `type` 으로 가른다(`I17-16`) — `service-busy`(DB 상한) 비율은 문턱 `rate<0.01`(2026-11-13 사용자), 그 밖 503(`queue-unavailable` 등)은 `rate==0` | `lib/session.js` 의 `seen` |
 | `hold_latency_ms` | 선점 요청 하나 | 스크립트 |
 | `admission_wait_ms` | 줄에 서서 토큰을 받기까지 | 스크립트 |
 | `seats_won` · `seats_taken` | 좌석을 잡았나 남이 먼저 잡았나 | 스크립트 |
@@ -112,7 +113,7 @@ MSYS_NO_PATHCONV=1 docker run --rm --memory=2g --network projectticket_default -
 ```
 
 요약에서 읽을 것: `entered`(= 계정 수) · `seats_won` ·
-`seats_won + seats_taken + hold_other + gate_rejected + dropped + closed = entered`(`closed` 는 줄이 걷힌 410 — 판 중 회차 취소 때만) · `left + release_failed = 진 쪽` · `hold_won_ms`·`hold_lost_ms` · 문턱 셋(`http_req_failed`·`poll_latency_ms`·`wait_over_expected`).
+`seats_won + seats_taken + hold_other + gate_rejected + dropped + closed = entered`(`closed` 는 줄이 걷힌 410 — 판 중 회차 취소 때만) · `left + release_failed = 진 쪽` · `hold_won_ms`·`hold_lost_ms` · 문턱 다섯(`http_req_failed`·`service_busy`·`unexpected_503`·`poll_latency_ms`·`wait_over_expected`).
 문턱 기본값은 Docker 22 vCPU 칸이다 — 10 vCPU 면 `-e HOLD_WON_P95=272 -e POLL_P95=301`(`D13`, `load-9`).
 풀 크기는 앱 env `HIKARI_MAX_POOL`(기본 10)이다 — 1 의 `up` 앞에 `export HIKARI_MAX_POOL=20` 이면 대마다 20(`load-10`). `hikaricp_connections_max` 로 확인한다.
 **`seats_won` 이 좌석 수를 넘어도 초과 판매가 아니다** — 판이 선점 수명(5분)보다 길면 만료된 좌석을 줄 뒤쪽이 다시 잡는다(`load-4`). 초과 판매는 DB 로 본다 — 결제·취소가 없는 이 판에서는 다음 선점이 앞 선점의 만료 시각보다 늦어야 하고, 0 이라야 한다:
