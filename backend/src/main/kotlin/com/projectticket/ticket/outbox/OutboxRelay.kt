@@ -63,7 +63,13 @@ class OutboxRelay(
     /** @return 발행한 사건 수 */
     @Scheduled(fixedDelayString = RELAY_INTERVAL)
     @Transactional
-    fun relay(): Int {
+    fun relay(): Int = relay(ROUND_BUDGET)
+
+    /**
+     * 한 회. [budget] 은 시험이 예산을 줄이는 입구다(`I17-13`) — 시간을 `sleep` 으로 흘리지 않고 인자로 줄인다(`testing-strategy.md`).
+     * 트랜잭션은 부르는 쪽이 든다 — 스케줄러 입구 [relay] 가 `@Transactional` 이다.
+     */
+    internal fun relay(budget: Duration): Int {
         val rows = jdbc.sql(
             """
             select o.outbox_id, o.event_id, o.type, o.version, o.occurred_at, o.aggregate_type, o.aggregate_id,
@@ -92,7 +98,7 @@ class OutboxRelay(
         // 시퀀스라 앞에서부터 하나씩 돈다 — 시간 예산이 다 되거나 브로커가 일시 오류를 내면 남은 행은 손대지 않고 다음 회다.
         val started = System.nanoTime()
         val sent = rows.asSequence()
-            .takeWhile { System.nanoTime() - started < ROUND_BUDGET.toNanos() }
+            .takeWhile { System.nanoTime() - started < budget.toNanos() }
             .map { row -> row to publish(row) }
             .takeWhile { (_, outcome) -> outcome != Outcome.HALTED }
             .filter { (_, outcome) -> outcome == Outcome.SENT }

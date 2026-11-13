@@ -9,15 +9,20 @@ import com.projectticket.ticket.outbox.ConsumerErrorHandling
 import com.projectticket.ticket.queue.AdmissionService
 import com.projectticket.ticket.queue.QueueGateFilter
 import com.projectticket.ticket.queue.QueueService
+import com.zaxxer.hikari.HikariDataSource
+import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.http.MediaType
 import org.springframework.kafka.listener.ListenerExecutionFailedException
+import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
@@ -43,6 +48,8 @@ class DbTimeoutTest : ConcurrencyTestBase() {
     @Autowired lateinit var admission: AdmissionService
     @Autowired lateinit var openService: PerformanceOpenService
     @Autowired lateinit var json: ObjectMapper
+    @Autowired lateinit var dataSource: DataSource
+    @Autowired lateinit var redis: LettuceConnectionFactory
 
     @Test
     fun every_app_connection_carries_the_three_limits() {
@@ -67,8 +74,61 @@ class DbTimeoutTest : ConcurrencyTestBase() {
 
     @Test
     fun a_hold_behind_a_locked_performance_gets_503_service_busy() {
+        val hold = readyToHold()
+
+        // 회차 취소·종료가 회차 행을 쥔 모양이다. 상한이 없으면 선점이 연결을 쥐고 4초를 기다린다.
+        val locked = CountDownLatch(1)
+        val holder = Executors.newSingleThreadExecutor()
+        val holding = holder.submit {
+            TransactionTemplate(txManager).executeWithoutResult {
+                jdbc.sql("select 1 from performance where performance_id = :id for update").param("id", hold.performanceId).query(Int::class.java).single()
+                locked.countDown()
+                Thread.sleep(HOLD_MS)
+            }
+        }
+        try {
+            check(locked.await(10, TimeUnit.SECONDS)) { "회차 행을 못 잡았다" }
+
+            assertServiceBusy(hold.send())
+        } finally {
+            holding.get(30, TimeUnit.SECONDS)
+            holder.shutdown()
+        }
+    }
+
+    @Test
+    fun a_request_behind_an_empty_pool_gets_503_after_three_seconds() {
+        val hold = readyToHold()
+        val pool = dataSource.unwrap(HikariDataSource::class.java)
+
+        // 풀의 연결을 전부 빌려 쥔다 — 손으로 만든 예외가 아니라 Hikari 가 실제로 3초 기다리고 포기하는 것을 본다(`I17-13`).
+        val borrowed = (1..pool.maximumPoolSize).map { pool.connection }
+        val response = try {
+            val started = System.nanoTime()
+            hold.send().also {
+                val tookMs = (System.nanoTime() - started) / 1_000_000
+                assertThat(tookMs).describedAs("Hikari connection-timeout 3초").isBetween(POOL_WAIT_FLOOR_MS, POOL_WAIT_CEILING_MS)
+            }
+        } finally {
+            borrowed.forEach { it.close() }
+        }
+
+        assertServiceBusy(response)
+    }
+
+    @Test
+    fun the_real_beans_carry_the_limits() {
+        // 이름만 묶으면 커스텀 빈이 설정을 무시해도 초록이다 — 전체 컨텍스트가 실제로 주입한 빈을 본다(`I17-13`).
+        assertThat(dataSource.unwrap(HikariDataSource::class.java).connectionTimeout).isEqualTo(3_000)
+        assertThat(redis.clientConfiguration.commandTimeout).isEqualTo(Duration.ofSeconds(2))
+        val socket = redis.clientConfiguration.clientOptions.map { it.socketOptions }.orElseThrow()
+        assertThat(socket.connectTimeout).isEqualTo(Duration.ofSeconds(1))
+    }
+
+    /** 선점 직전까지 — 열린 회차, 대기열을 지난 구매자, 좌석 하나 */
+    private fun readyToHold(): Hold {
         val fixture = EventFixture(jdbc)
-        val eventId = fixture.event(fixture.organizer("${PREFIX}db-timeout"))
+        val eventId = fixture.event(fixture.organizer("${PREFIX}t${System.nanoTime() % 1_000_000_000}"))
         val hallId = fixture.hall(venueName = "${PREFIX}db-timeout-${System.nanoTime()}")
         fixture.seats(hallId, "F1-A", 2)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
@@ -79,21 +139,12 @@ class DbTimeoutTest : ConcurrencyTestBase() {
         val buyer = TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
         queue.enter(performanceId, buyer.id)
         val token = checkNotNull(admission.tokenFor(performanceId, buyer.id)) { "진입했는데 토큰이 없다" }
+        return Hold(performanceId, seatId, buyer, token)
+    }
 
-        // 회차 취소·종료가 회차 행을 쥔 모양이다. 상한이 없으면 선점이 연결을 쥐고 4초를 기다린다.
-        val locked = CountDownLatch(1)
-        val holder = Executors.newSingleThreadExecutor()
-        val holding = holder.submit {
-            TransactionTemplate(txManager).executeWithoutResult {
-                jdbc.sql("select 1 from performance where performance_id = :id for update").param("id", performanceId).query(Int::class.java).single()
-                locked.countDown()
-                Thread.sleep(HOLD_MS)
-            }
-        }
-        try {
-            check(locked.await(10, TimeUnit.SECONDS)) { "회차 행을 못 잡았다" }
-
-            val response = mvc.post("/api/performances/$performanceId/reservations") {
+    private inner class Hold(val performanceId: Long, val seatId: Long, val buyer: TicketUser, val token: String) {
+        fun send(): MockHttpServletResponse =
+            mvc.post("/api/performances/$performanceId/reservations") {
                 with(user(buyer))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -101,14 +152,12 @@ class DbTimeoutTest : ConcurrencyTestBase() {
                 header("Idempotency-Key", UUID.randomUUID().toString())
                 header(QueueGateFilter.ADMISSION_HEADER, token)
             }.andReturn().response
+    }
 
-            assertThat(response.status).isEqualTo(503)
-            assertThat(response.getHeader("Retry-After")).isNotBlank()
-            assertThat(response.contentAsString).contains("service-busy")
-        } finally {
-            holding.get(30, TimeUnit.SECONDS)
-            holder.shutdown()
-        }
+    private fun assertServiceBusy(response: MockHttpServletResponse) {
+        assertThat(response.status).isEqualTo(503)
+        assertThat(response.getHeader("Retry-After")).isNotBlank()
+        assertThat(response.contentAsString).contains("service-busy")
     }
 
     @Test
@@ -170,5 +219,9 @@ class DbTimeoutTest : ConcurrencyTestBase() {
     private companion object {
         /** `lock_timeout` 3초보다 길다 — 상한이 없으면 선점이 이만큼 기다린 뒤 201 이다 */
         const val HOLD_MS = 4_000L
+
+        /** 풀 대기 3초의 앞뒤 — 응답 조립 몫을 뒤에 더 준다. `connection-timeout` 이 5초면 뒤를 넘는다 */
+        const val POOL_WAIT_FLOOR_MS = 2_500L
+        const val POOL_WAIT_CEILING_MS = 4_500L
     }
 }

@@ -1,13 +1,24 @@
 package com.projectticket.ticket.outbox
 
 import com.projectticket.ticket.PostgresTestBase
+import org.apache.kafka.common.errors.TimeoutException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.support.SendResult
+import tools.jackson.databind.ObjectMapper
+import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 
 /**
  * 릴레이가 안 나간 것만 가져가 발행하고 표시하는가(`D11`).
@@ -21,6 +32,7 @@ class OutboxRelayTest : PostgresTestBase() {
 
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var relay: OutboxRelay
+    @Autowired lateinit var json: ObjectMapper
 
     /**
      * **커밋 레인이 남긴 사건을 이 테스트의 회차에서 뺀다.**
@@ -112,6 +124,69 @@ class OutboxRelayTest : PostgresTestBase() {
         assertThat(relay.relay()).isZero()
     }
 
+    @Test
+    fun a_broker_timeout_halts_the_round_without_counting_an_attempt() {
+        insertEvent(aggregateId = 7_011)
+        val halted = insertEvent(aggregateId = 7_012)
+        val untouched = insertEvent(aggregateId = 7_013)
+        val kafka = brokerThat(
+            sent(),
+            CompletableFuture.failedFuture(TimeoutException("브로커가 답이 없다")),
+        )
+
+        // 일시 오류는 브로커 탓이라 행을 안 센다 — 회를 멈추고 다음 회에 그대로 다시 간다(`I17-4`).
+        assertThat(OutboxRelay(jdbc, json, kafka).relay(OutboxRelay.ROUND_BUDGET)).isEqualTo(1)
+
+        val failure = failureOf(halted)
+        assertThat(failure.published).isFalse()
+        assertThat(failure.attempts).isZero()
+        assertThat(failure.lastError).isNull()
+        assertThat(publishedAtIsSet(untouched)).isFalse()
+        verify(kafka, times(2)).send(anyString(), anyString(), anyString())
+    }
+
+    @Test
+    fun a_spent_budget_stops_before_the_next_row() {
+        insertEvent(aggregateId = 7_021)
+        val next = insertEvent(aggregateId = 7_022)
+        @Suppress("UNCHECKED_CAST")
+        val kafka = mock(KafkaTemplate::class.java) as KafkaTemplate<String, String>
+        `when`(kafka.send(anyString(), anyString(), anyString())).thenAnswer {
+            // 느린 브로커 — 예산(50ms)을 이 한 건이 다 쓴다. 예산은 행 사이에서만 본다.
+            Thread.sleep(SLOW_SEND_MS)
+            sent()
+        }
+
+        assertThat(OutboxRelay(jdbc, json, kafka).relay(Duration.ofMillis(50))).isEqualTo(1)
+
+        assertThat(publishedAtIsSet(next)).describedAs("남은 행은 다음 회다").isFalse()
+        verify(kafka, times(1)).send(anyString(), anyString(), anyString())
+    }
+
+    @Test
+    fun the_tenth_failure_parks_the_row() {
+        val poison = insertPoison(aggregateId = 7_031)
+        jdbc.sql("update outbox set attempts = 9, next_attempt_at = null where event_id = :id").param("id", poison).update()
+
+        relay.relay()
+        assertThat(failureOf(poison).attempts).isEqualTo(OutboxRelay.PARK_AFTER)
+
+        // 주차된 행은 다시 안 잡힌다 — 푸는 것은 사람이다(`event-catalog.md` 「발행」).
+        jdbc.sql("update outbox set next_attempt_at = null where event_id = :id").param("id", poison).update()
+        relay.relay()
+        assertThat(failureOf(poison).attempts).isEqualTo(OutboxRelay.PARK_AFTER)
+    }
+
+    /** 순서대로 결과를 돌려주는 가짜 브로커. 그보다 더 부르면 시험이 깨진다 */
+    @Suppress("UNCHECKED_CAST")
+    private fun brokerThat(vararg results: CompletableFuture<SendResult<String, String>>): KafkaTemplate<String, String> {
+        val kafka = mock(KafkaTemplate::class.java) as KafkaTemplate<String, String>
+        `when`(kafka.send(anyString(), anyString(), anyString())).thenReturn(results.first(), *results.drop(1).toTypedArray())
+        return kafka
+    }
+
+    private fun sent(): CompletableFuture<SendResult<String, String>> = CompletableFuture.completedFuture(null)
+
     private fun insertPoison(aggregateId: Long): UUID {
         val eventId = UUID.randomUUID()
         // 2MB — 프로듀서 `max.request.size`(1MB)를 넘어 `RecordTooLargeException` 이다. 몇 번을 다시 보내도 같다.
@@ -161,4 +236,7 @@ class OutboxRelayTest : PostgresTestBase() {
             .query(Boolean::class.java)
             .single()
 
+    private companion object {
+        const val SLOW_SEND_MS = 100L
+    }
 }
