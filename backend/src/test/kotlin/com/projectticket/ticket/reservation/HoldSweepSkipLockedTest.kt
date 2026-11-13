@@ -78,10 +78,18 @@ class HoldSweepSkipLockedTest : ConcurrencyTestBase() {
     }
 
     @Test
-    fun one_round_takes_at_most_the_batch_in_id_order() {
+    fun one_round_takes_at_most_the_batch_oldest_deadline_first() {
+        // id 가 앞선 예매의 기한이 가장 덜 지났다 — id 순서로 고르면 그것부터 간다(`I17-15`).
+        listOf(1, 3, 2).zip(reservations).forEach { (secondsAgo, id) ->
+            jdbc.sql("update reservation set held_until = now() - make_interval(secs => :secs) where reservation_id = :id")
+                .param("secs", secondsAgo)
+                .param("id", id)
+                .update()
+        }
+
         sweeper.sweep(batch = 2)
 
-        assertThat(reservations.map(::statusOf)).containsExactly("expired", "expired", "held")
+        assertThat(reservations.map(::statusOf)).containsExactly("held", "expired", "expired")
     }
 
     private fun statusOf(reservationId: Long): String =

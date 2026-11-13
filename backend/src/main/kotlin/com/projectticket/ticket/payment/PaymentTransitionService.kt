@@ -42,8 +42,11 @@ class PaymentTransitionService(
      */
     data class Paying(val reservationId: Long, val amount: Int, val gatewayKey: String)
 
-    /** ③ 의 결과. [late] 면 승인은 났는데 좌석을 못 줬다 — 감사 `payment.late` 가 남고 환불 행(17b)이 되돌린다 */
-    data class Settled(val paymentId: Long, val reservationStatus: String, val late: Boolean)
+    /**
+     * ③ 의 결과. [late] 면 승인은 났는데 좌석을 못 줬다 — 감사 `payment.late` 가 남고 환불 행(17b)이 되돌린다.
+     * [alreadyRecorded] 면 같은 예매의 승인을 다른 쪽(대사·원 요청)이 먼저 적었다 — 이 호출은 그 행을 읽기만 했다(`I17-11`).
+     */
+    data class Settled(val paymentId: Long, val reservationStatus: String, val late: Boolean, val alreadyRecorded: Boolean = false)
 
     /** 사건 페이로드에 드는 것 — 회차와 좌석 수(`D11` 카탈로그) */
     data class ReservedShape(val performanceId: Long, val seatCount: Int)
@@ -151,6 +154,7 @@ class PaymentTransitionService(
         }
         val paymentId = insertPayment(paying = paying, status = status, verdict = verdict, cardLast4 = cardLast4)
         closeAttempt(paying.gatewayKey)
+        if (paymentId == null) return alreadyApproved(paying.reservationId, verdict?.approvalNumber)
 
         val reservationStatus = if (status == PaymentStatus.APPROVED) {
             confirm(accountId, paying.reservationId)
@@ -208,11 +212,17 @@ class PaymentTransitionService(
     private fun seatCountOf(reservationId: Long): Int =
         jdbc.sql("select count(*) from reservation_seat where reservation_id = :id").param("id", reservationId).query(Int::class.java).single()
 
-    private fun insertPayment(paying: Paying, status: PaymentStatus, verdict: MockPaymentGateway.Result?, cardLast4: String): Long =
+    /**
+     * 결제 행. 같은 예매의 승인이 이미 있으면 null 이다 — 대사와 원 요청이 같이 ③ 을 하면 늦은 쪽이 여기서 진다(`I17-11`).
+     * 유일 위반을 예외로 받으면 `25P02` 라 같은 트랜잭션에서 못 읽는다 — `on conflict` 의 0행으로 받는다(`stack.md`).
+     * `where` 는 `payment_approved_idx`(V9)와 글자로 같은 리터럴이다(`SqlTextTest.INDEXED_LITERALS`).
+     */
+    private fun insertPayment(paying: Paying, status: PaymentStatus, verdict: MockPaymentGateway.Result?, cardLast4: String): Long? =
         jdbc.sql(
             """
             insert into payment (reservation_id, status, amount, approval_number, decline_reason, card_last4)
             values (:reservation, :status, :amount, :approval, :reason, :last4)
+            on conflict (reservation_id) where status = 'approved' do nothing
             returning payment_id
             """,
         )
@@ -223,7 +233,26 @@ class PaymentTransitionService(
             .param("reason", if (verdict == null) NO_RESPONSE else verdict.declineReason)
             .param("last4", cardLast4)
             .query(Long::class.java)
+            .optional()
+            .orElse(null)
+
+    /**
+     * 먼저 적힌 승인을 그대로 돌려준다. 확정·사건·감사는 먼저 적은 쪽이 했다 — 다시 안 한다.
+     * 예매가 `reserved` 가 아니면 그 승인은 `late` 였다.
+     */
+    private fun alreadyApproved(reservationId: Long, approvalNumber: String?): Settled {
+        val (paymentId, recordedApproval) = jdbc.sql("select payment_id, approval_number from payment where reservation_id = :id and status = :approved")
+            .param("id", reservationId)
+            .param("approved", PaymentStatus.APPROVED.code)
+            .query { rs, _ -> rs.getLong("payment_id") to rs.getString("approval_number") }
             .single()
+        if (recordedApproval != approvalNumber) {
+            // 같은 예매에 승인이 둘이다 — 지금 상태 기계로는 못 닿는 자리라 사람이 볼 것이다. 둘째 승인은 결제 행이 없다(마무리 37차 m4).
+            log.warn("이미 다른 승인이 적힌 예매다 reservation_id={} payment_id={}", reservationId, paymentId)
+        }
+        val reservationStatus = statusOf(reservationId)
+        return Settled(paymentId = paymentId, reservationStatus = reservationStatus, late = reservationStatus != ReservationStatus.RESERVED.code, alreadyRecorded = true)
+    }
 
     /**
      * 승인 반영. **`paying_until` 이 안 지났을 때만** — 지났으면 타임아웃이 곧 (또는 이미) `expired` 로 옮긴다(`D4` 「스윕과 확정의 경합」).

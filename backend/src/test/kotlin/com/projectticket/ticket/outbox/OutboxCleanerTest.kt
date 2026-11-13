@@ -50,6 +50,15 @@ class OutboxCleanerTest : PostgresTestBase() {
         assertThat(cleaner.cleanPublished()).isZero()
     }
 
+    @Test
+    fun a_backlog_is_cleaned_in_batches_until_none_is_left() {
+        val old = (1..5).map { envelope(publishedDaysAgo = OutboxCleaner.RETENTION_DAYS + 1) }
+
+        // 한 문장에 배치만큼만 지운다 — 쌓인 것을 한 문장으로 지우면 문장 상한 10초에 걸려 매번 실패한다(`I17-14`).
+        assertThat(cleaner.clean(batch = 2)).isEqualTo(5)
+        assertThat(old.none { exists(it) }).isTrue()
+    }
+
     /** @param publishedDaysAgo null 이면 아직 안 나간 봉투 */
     private fun envelope(publishedDaysAgo: Int?): UUID {
         val eventId = UUID.randomUUID()

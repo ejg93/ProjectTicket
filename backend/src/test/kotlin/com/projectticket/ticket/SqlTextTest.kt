@@ -279,6 +279,8 @@ class SqlTextTest {
             "SeatHoldService.kt" to listOf("held", "paying"),
             // `reservation_held_until_idx` · `reservation_paying_until_idx`(V7)
             "HoldSweeper.kt" to listOf("held", "paying"),
+            // `on conflict … where` — `payment_approved_idx`(V9)와 글자로 같아야 한다(`I17-11`)
+            "PaymentTransitionService.kt" to listOf("approved"),
         )
 
         /**

@@ -27,8 +27,12 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
 
     private val log = LoggerFactory.getLogger(AccountPurgeBatch::class.java)
 
+    /** 한 배치가 파기한 계정 수와 지운 감사 수 */
+    data class Purged(val accounts: Int, val audits: Int)
+
     /**
-     * @return 이번에 파기한 계정 수
+     * 한 배치 — 계정도 감사도 한 문장에 [batch] 행까지다(`I17-14`). 쌓인 것을 한 문장으로 다루면 문장 상한 10초에 걸려 매번 실패한다.
+     * 반복은 [AccountPurgeScheduler.drain] 이 든다 — `set local role` 때문에 트랜잭션이 있어야 해서 이 함수는 배치 하나다.
      *
      * **감사를 지우는 동안만 역할을 바꾼다**(4a). 앱이 입는 `ticket_app` 에는 그 권한이 없다 —
      * 지울 수 있는 자리를 코드에서 **한 곳으로 좁히는 것**이 이 두 줄의 목적이다. `set local` 이라 트랜잭션이 끝나면 되돌아간다.
@@ -37,32 +41,51 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
      * **앱 전체가 그 연결을 쓰게 된다** — 실제로 그렇게 됐다가 되돌렸다(`stack.md`).
      */
     @Transactional
-    fun purgeDue(): Int {
+    fun purgeDue(batch: Int = BATCH_SIZE): Purged {
         // 기준 시각은 DB 다(`D7`). 이미 비운 계정은 `email is not null` 이 걸러서 두 번 돌아도 같은 결과다.
+        // 그 조건을 바깥에도 건다 — 잠금을 기다린 뒤 다시 보는 것은 바깥 `where` 뿐이라, 겹친 파드가 이미 비운 계정을 다시 세지 않는다(마무리 37차 m1).
         val purged = jdbc.sql(
             """
             update account
                set email = null, password_hash = null, display_name = null
-             where deleted_at < now() - make_interval(days => :days)
+             where account_id in (
+                 select account_id from account
+                  where deleted_at < now() - make_interval(days => :days)
+                    and email is not null
+                  order by account_id
+                  limit :batch)
                and email is not null
             returning account_id
             """,
         )
             .param("days", GRACE_DAYS)
+            .param("batch", batch)
             .query(Long::class.java)
             .list()
             .size
 
         jdbc.sql("set local role ticket_purge").update()
-        val audits = jdbc.sql("delete from audit_log where created_at < now() - make_interval(years => :years)")
+        // `ticket_purge` 는 `select`·`delete` 만 있다(`V20`) — 부속 질의에 `for update` 를 못 쓴다. 두 파드가 겹치면 늦은 쪽이 덜 지운다.
+        val audits = jdbc.sql(
+            """
+            delete from audit_log
+             where audit_log_id in (
+                 select audit_log_id from audit_log
+                  where created_at < now() - make_interval(years => :years)
+                  order by created_at
+                  limit :batch)
+               and created_at < now() - make_interval(years => :years)
+            """,
+        )
             .param("years", AUDIT_RETENTION_YEARS)
+            .param("batch", batch)
             .update()
         jdbc.sql("set local role ticket_app").update()
 
         if (purged > 0 || audits > 0) {
             log.info("개인정보 파기 계정={}건 감사={}건", purged, audits)
         }
-        return purged
+        return Purged(purged, audits)
     }
 
     companion object {
@@ -74,5 +97,8 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
 
         /** 하루 한 번. 파기가 몇 시간 늦는 것은 문제가 안 되고, 자주 돌아도 지우는 총량은 같다 */
         const val PURGE_INTERVAL = "PT24H"
+
+        /** 한 문장에 다루는 행 수(`I17-14`). 문장 상한 10초 안에 넉넉히 끝난다 */
+        const val BATCH_SIZE = 1_000
     }
 }

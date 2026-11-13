@@ -12,8 +12,13 @@ import java.sql.SQLTransientConnectionException
  * [ProblemFallbackFilter] 와 [ApiExceptionHandler] 가 같이 부른다 — 둘이 갈리면 한 상한에 답이 둘이다.
  */
 fun Throwable.isDbBusy(): Boolean =
-    generateSequence(this) { it.cause }.any {
-        it is SQLTransientConnectionException || it is SQLException && it.sqlState in BUSY_SQL_STATES
-    }
+    generateSequence(this) { it.cause }.any { it is SQLTransientConnectionException } || hitStatementLimit()
+
+/**
+ * 원인 사슬에 문장 상한(잠금 대기 `55P03`·문장 시간 `57014`)이 있나. [isDbBusy] 와 소비자 재시도(`ConsumerErrorHandling`, `I17-12`)가
+ * 같은 집합을 쓴다 — `55` 는 Spring 이 번역하지 못하고 `57` 은 판마다 번역이 갈려 이름으로는 못 가른다.
+ */
+fun Throwable.hitStatementLimit(): Boolean =
+    generateSequence(this) { it.cause }.any { it is SQLException && it.sqlState in BUSY_SQL_STATES }
 
 private val BUSY_SQL_STATES = setOf("55P03", "57014")

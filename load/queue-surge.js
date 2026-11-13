@@ -13,7 +13,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { SharedArray } from "k6/data";
 import { Counter, Trend } from "k6/metrics";
-import { jarFor } from "./lib/session.js";
+import { BUSY_THRESHOLDS, counted, jarFor } from "./lib/session.js";
 
 const BASE = __ENV.BASE_URL || "http://nginx:80";
 const PERFORMANCE_ID = __ENV.PERFORMANCE_ID || "1";
@@ -51,11 +51,12 @@ export const options = {
   tags: { phase: "run" },
   thresholds: {
     http_req_failed: ["rate==0"],
+    ...BUSY_THRESHOLDS,
     "http_req_duration{phase:run}": ["p(95)>=0"],
   },
 };
 
-http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }, 503));
 
 // VU 지역 상태. k6 는 VU 사이에 바뀌는 상태를 못 나눈다 — 계정을 VU 마다 나눠 들고 각자 관리한다.
 let mine = null;
@@ -75,7 +76,7 @@ function finish(a, body) {
   const waited = Date.now() - a.enteredAt;
   admissionWait.add(waited);
   if (a.rank > BATCH) waitOverExpected.add(waited / 1000 / (a.rank / R));
-  const res = http.del(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
+  const res = counted.del(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
   check(res, { "반납 204": (r) => r.status === 204 });
   // 반납이 안 됐으면 자리를 쥔 채다 — 셈을 따로 둔다. `left + release_failed + dropped = entered` 가 VU 상태 관리가 안 샜다는 뜻이다
   if (res.status === 204) left.add(1);
@@ -84,7 +85,7 @@ function finish(a, body) {
 }
 
 function enter(a) {
-  const res = http.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
+  const res = counted.post(`${BASE}/api/queue/${PERFORMANCE_ID}`, null, { jar: a.jar, headers: { "X-XSRF-TOKEN": a.s.xsrf } });
   check(res, { "대기열 진입 200": (r) => r.status === 200 });
   if (res.status !== 200) {
     enterFailed.add(1);
@@ -101,7 +102,7 @@ function enter(a) {
 
 function poll(a) {
   const started = Date.now();
-  const res = http.get(`${BASE}/api/queue/${PERFORMANCE_ID}`, { jar: a.jar });
+  const res = counted.get(`${BASE}/api/queue/${PERFORMANCE_ID}`, { jar: a.jar });
   pollLatency.add(Date.now() - started);
   if (res.status === 404) {
     // 하트비트가 90초 끊겨 줄에서 빠졌다 — 폴링 간격이 2초를 크게 넘었다는 뜻이다

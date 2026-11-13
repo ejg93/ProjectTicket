@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
  * 결제 대사의 스케줄러 입구(`I17-1`). `HoldSweepScheduler` 와 같은 꼴이다 — 락은 바깥 고리에만 두고,
  * [PaymentReconciler.reconcile] 은 시험이 직접 부르는 자리라 락을 안 든다.
  *
- * 대수만큼 겹치면 같은 시도를 PG 에 여러 번 묻고 `settle` 이 겹친다 — 막는 것은 `payment_approved_idx` 지만 WARN 이 대수만큼 난다.
+ * 대수만큼 겹치면 같은 시도를 PG 에 여러 번 묻고 `settle` 이 겹친다 — `payment_approved_idx` 가 하나만 적게 하고 진 쪽은 기존 행을 읽는다(`I17-11`).
  */
 @Component
 class PaymentReconcileScheduler(

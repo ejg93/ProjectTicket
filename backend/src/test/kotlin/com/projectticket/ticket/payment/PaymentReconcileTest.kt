@@ -44,15 +44,69 @@ class PaymentReconcileTest : ConcurrencyTestBase() {
     }
 
     @Test
-    fun a_key_the_gateway_never_saw_only_closes_the_attempt() {
+    fun the_original_request_that_loses_to_the_reconciler_gets_the_late_payment_back() {
+        val (accountId, reservationId) = held()
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
+        gateway.approve(MockPaymentGateway.Request(paying.gatewayKey, paying.amount, CARD))
+        expire(reservationId)
+        reconciler.reconcile()
+        val recorded = checkNotNull(approvedPaymentOf(reservationId)) { "대사가 late 를 먼저 적어야 이 시험의 전제다" }
+
+        // 원 요청이 늦게 돌아와 같은 승인으로 ③ 을 한다 — 유일 위반으로 500 이 아니라 기존 행을 읽는다(`I17-11`).
+        val settled = payments.settle(accountId, paying, gateway.inquire(paying.gatewayKey))
+
+        assertThat(settled.paymentId).isEqualTo(recorded)
+        assertThat(settled.late).isTrue()
+        assertThat(settled.reservationStatus).isEqualTo("expired")
+        assertThat(settled.alreadyRecorded).isTrue()
+        assertThat(paymentCount(reservationId)).isOne()
+        assertThat(auditCount("payment.late", recorded)).describedAs("확정·감사는 먼저 적은 쪽이 했다").isOne()
+    }
+
+    @Test
+    fun a_key_the_gateway_never_saw_stays_open_within_the_grace() {
         val (accountId, reservationId) = held()
         val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         expire(reservationId)
 
         reconciler.reconcile()
+        reconciler.reconcile()
+
+        // 다른 파드가 낸 시도일 수 있다 — `started_at` 뒤 30분까지 매 회 다시 묻는다(`I17-11`).
+        assertThat(attemptSettled(paying.gatewayKey)).isFalse()
+        assertThat(paymentCount(reservationId)).isZero()
+    }
+
+    @Test
+    fun a_key_the_gateway_never_saw_closes_after_the_grace() {
+        val (accountId, reservationId) = held()
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
+        expire(reservationId)
+        jdbc.sql("update payment_attempt set started_at = now() - interval '31 minutes' where gateway_key = :key")
+            .param("key", paying.gatewayKey)
+            .update()
+
+        reconciler.reconcile()
 
         assertThat(attemptSettled(paying.gatewayKey)).isTrue()
         assertThat(paymentCount(reservationId)).isZero()
+    }
+
+    @Test
+    fun an_open_unknown_key_does_not_starve_the_attempt_behind_it() {
+        val (accountId, reservationId) = held()
+        val unknown = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
+        expire(reservationId)
+        val approved = approvedButNeverSettled()
+        expire(approved.reservationId)
+
+        // 배치가 하나면 유예 안의 모르는 키가 머리를 채운다 — 다음 회는 그 뒤부터 읽는다.
+        reconciler.reconcile(batch = 1)
+        reconciler.reconcile(batch = 1)
+
+        assertThat(attemptSettled(unknown.gatewayKey)).isFalse()
+        assertThat(approvedPaymentOf(approved.reservationId)).describedAs("뒤 시도가 굶지 않고 late 로 적힌다").isNotNull()
+        reconciler.reconcile()
     }
 
     @Test
@@ -132,7 +186,7 @@ class PaymentReconcileTest : ConcurrencyTestBase() {
 
     private fun held(): Pair<Long, Long> {
         val fixture = EventFixture(jdbc)
-        val eventId = fixture.event(fixture.organizer("${PREFIX}reconcile"))
+        val eventId = fixture.event(fixture.organizer("${PREFIX}r${System.nanoTime() % 1_000_000_000}"))
         val hallId = fixture.hall(venueName = "${PREFIX}reconcile-${System.nanoTime()}")
         fixture.seats(hallId, "F1-A", 2)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))

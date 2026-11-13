@@ -152,14 +152,14 @@ for p in $(kubectl -n "$NS" get pods -l app=app -o jsonpath='{.items[*].metadata
 done >> "$out/started.log"
 
 echo "== k6 요약"
-grep -E "✓|✗|entered|seats_won|seats_taken|hold_won_ms|poll_latency_ms|wait_over_expected|http_req_failed|http_reqs" "$out/k6.log" || true
+grep -E "✓|✗|entered|seats_won|seats_taken|hold_won_ms|poll_latency_ms|wait_over_expected|http_req_failed|service_busy|unexpected_503|http_reqs" "$out/k6.log" || true
 echo "== 대수 최대: $(awk '/^==/{print $3}' "$out/samples.log" | sort -n | tail -1) · Job: $(kubectl -n "$NS" get job k6-hpa -o jsonpath='{.status.conditions[0].type}') · 표본 $out"
 cat "$out/started.log"
 
 # 판의 판정(`54`). 예전에는 Job 이 Failed 여도 exit 0 이라 5xx 가 나도 같은 모양이었다
 rc=0
 [ "$(kubectl -n "$NS" get job k6-hpa -o jsonpath='{.status.succeeded}')" = 1 ] \
-  || { echo "k6 Job 이 성공이 아니다 — 문턱(폴링 p95<$POLL_P95 · 이긴 선점 p95<$HOLD_WON_P95 · 5xx 0)을 넘었거나 시간 안에 안 끝났다" >&2; rc=1; }
+  || { echo "k6 Job 이 성공이 아니다 — 문턱(폴링 p95<$POLL_P95 · 이긴 선점 p95<$HOLD_WON_P95 · 5xx 0 · service-busy 1% 미만 · 그 밖 503 0)을 넘었거나 시간 안에 안 끝났다" >&2; rc=1; }
 # 파드마다 기동 줄을 한 번은 건져야 한다 — 빈 칸이 남으면 「생성 → Started」를 못 가른 판이다
 blank=$(awk '{seen[$1]=1} /process running for/{ok[$1]=1} END{for (p in seen) if (!(p in ok)) print p}' "$out/started.log")
 [ -z "$blank" ] || { echo "기동 줄을 못 건진 파드: $(echo "$blank" | tr '\n' ' ')" >&2; rc=1; }

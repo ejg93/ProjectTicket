@@ -7,6 +7,7 @@
 // 세션이 필요 없다 — 좌석 현황은 공개 GET 이고 관문도 없다.
 import http from "k6/http";
 import { Counter, Trend } from "k6/metrics";
+import { BUSY_THRESHOLDS, counted } from "./lib/session.js";
 
 const BASE = __ENV.BASE_URL || "http://nginx:80";
 const PERFORMANCE_ID = __ENV.PERFORMANCE_ID || "1";
@@ -40,7 +41,7 @@ const STEPS = [
 export const options = {
   scenarios: Object.fromEntries(STEPS.map(([name, start, rate, pre]) => [`r${name}`, step(name, start, rate, pre)])),
   thresholds: Object.assign(
-    { http_req_failed: ["rate==0"] },
+    { http_req_failed: ["rate==0"], ...BUSY_THRESHOLDS },
     ...STEPS.map(([name]) => ({
       [`poll_latency_ms{step:${name}}`]: ["p(95)>=0"],
       [`poll_200{step:${name}}`]: ["count>=0"],
@@ -49,7 +50,7 @@ export const options = {
   ),
 };
 
-http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }, 503));
 
 // VU 지역 — 화면이 하는 것과 같다. 받은 판을 들고 다음에 「이 판이면 본문 필요 없다」고 묻는다.
 let etag = null;
@@ -57,7 +58,7 @@ let etag = null;
 export default function () {
   const headers = etag ? { "If-None-Match": etag } : {};
   const started = Date.now();
-  const res = http.get(`${BASE}/api/performances/${PERFORMANCE_ID}/seats`, { headers });
+  const res = counted.get(`${BASE}/api/performances/${PERFORMANCE_ID}/seats`, { headers });
   pollLatency.add(Date.now() - started);
   if (res.status === 304) poll304.add(1);
   else if (res.status === 200) poll200.add(1);

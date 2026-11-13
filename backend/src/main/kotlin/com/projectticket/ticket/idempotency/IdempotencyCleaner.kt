@@ -4,7 +4,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * 수명이 다한 멱등키를 지운다(`D4` 「멱등키 — 보관 24시간」, `13b`).
@@ -19,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional
  * **지운 뒤 같은 키가 다시 오면 새 요청으로 처리된다.** 그것이 맞다 — 그 시점에는 원래 예매가 이미
  * 확정이든 만료든 끝나 있어서, 좌석 쪽 제약(`reservation_live_hold_idx`)이 두 번째를 받아 낸다.
  *
- * **배치 상한이 없다.** 한 회가 그 시점의 지난 키를 전부 한 트랜잭션에서 지운다 — 이 표가 오래 안 치워져 있었으니(`13b` 가 세운 자리다) 첫 회가 제일 크다.
- * 로컬 규모에서는 문제가 아니고, 커지면 `limit` 를 건 반복으로 바꾼다(마무리 7차 독립 리뷰가 짚었다).
+ * **한 문장에 [BATCH_SIZE] 행씩, 덜 지울 때까지 되풀이한다**(`I17-14`). 쌓인 것을 한 문장으로 지우면 문장 상한 10초에 걸려 매번 실패하고 더 쌓인다.
+ * 트랜잭션을 안 건다 — 문장 하나가 곧 트랜잭션이라 배치마다 커밋되고 긴 트랜잭션이 안 남는다.
  *
  * 락을 안 쓴다. [com.projectticket.ticket.outbox.OutboxCleaner] 와 같은 이유다 — 시각 조건이 붙은 `DELETE` 는
  * 두 대가 같이 돌아도 결과가 같고, 늦은 쪽이 0행을 지운다. 락은 정확성이 아니라 절약이라(33) 여기서는 아낄 것이 없다.
@@ -32,17 +31,31 @@ class IdempotencyCleaner(private val jdbc: JdbcClient) {
 
     /** @return 지운 키 수 */
     @Scheduled(fixedDelayString = CLEAN_INTERVAL)
-    @Transactional
-    fun cleanExpired(): Int {
-        // 기준은 DB 시계다(`D7`). 앱 시계로 재면 인스턴스마다 다른 경계를 쓴다.
-        val deleted = jdbc.sql(
-            """
-            delete from idempotency_key
-             where created_at < now() - make_interval(hours => :hours)
-            """,
-        )
-            .param("hours", RETENTION_HOURS)
-            .update()
+    fun cleanExpired(): Int = clean(BATCH_SIZE)
+
+    /** 한 문장에 [batch] 행씩, 지운 수가 [batch] 보다 적을 때까지. @return 지운 키 수 */
+    fun clean(batch: Int): Int {
+        var deleted = 0
+        do {
+            // 기준은 DB 시계다(`D7`). 앱 시계로 재면 인스턴스마다 다른 경계를 쓴다.
+            val round = jdbc.sql(
+                """
+                delete from idempotency_key
+                 where idempotency_key_id in (
+                     select idempotency_key_id from idempotency_key
+                      where created_at < now() - make_interval(hours => :hours)
+                      order by created_at
+                      limit :batch)
+                   and created_at < now() - make_interval(hours => :hours)
+                """,
+            )
+                .param("hours", RETENTION_HOURS)
+                .param("batch", batch)
+                .update()
+            // 배치보다 많이 지웠으면 `limit` 이 빠진 것이다 — 시험이 이 줄로 상한을 문다(마무리 37차 독립 리뷰 I2).
+            check(round <= batch) { "한 문장이 배치보다 많이 지웠다 — limit 이 빠졌다: $round > $batch" }
+            deleted += round
+        } while (round == batch)
 
         if (deleted > 0) {
             log.info("멱등키 청소 삭제={}건 보존={}시간", deleted, RETENTION_HOURS)
@@ -56,5 +69,8 @@ class IdempotencyCleaner(private val jdbc: JdbcClient) {
 
         /** 한 시간에 한 번. 아웃박스 청소와 같은 주기다 — 표가 한 시간에 폭발하지 않는다 */
         const val CLEAN_INTERVAL = "PT1H"
+
+        /** 한 문장에 지우는 행 수(`I17-14`). 문장 상한 10초 안에 넉넉히 끝난다 */
+        const val BATCH_SIZE = 1_000
     }
 }

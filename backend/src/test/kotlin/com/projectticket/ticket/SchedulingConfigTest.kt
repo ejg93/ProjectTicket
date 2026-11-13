@@ -14,9 +14,7 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
 import org.springframework.boot.convert.DurationStyle
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
-import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.ClassPathResource
-import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 
 /**
@@ -52,18 +50,14 @@ class SchedulingConfigTest {
         // 속성 클래스에 묶어도 스케줄러 빈이 그 값을 안 쓰면 초록이다 — 자동 설정이 세운 빈의 코어 수를 본다(`I17-10`).
         ApplicationContextRunner()
             .withInitializer(ConfigDataApplicationContextInitializer())
-            .withUserConfiguration(Scheduling::class.java)
+            // 시험 안의 스텁이 아니라 앱의 스위치를 싣는다 — 그것이 `@EnableScheduling` 을 들고, 자동 설정은 그때만 스케줄러를 세운다(`I17-13`).
+            .withUserConfiguration(SchedulingConfig::class.java)
             .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration::class.java))
             .run { context ->
                 val scheduler = context.getBean(ThreadPoolTaskScheduler::class.java)
                 assertThat(scheduler.scheduledThreadPoolExecutor.corePoolSize).isEqualTo(4)
             }
     }
-
-    /** 자동 설정은 `@EnableScheduling` 이 있을 때만 스케줄러를 세운다 */
-    @Configuration(proxyBeanMethods = false)
-    @EnableScheduling
-    class Scheduling
 
     @Test
     fun producer_settings_are_real_kafka_names() {
