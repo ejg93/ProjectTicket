@@ -1,5 +1,6 @@
 package com.projectticket.ticket.settlement
 
+import com.projectticket.ticket.outbox.AggregateType
 import com.projectticket.ticket.outbox.EventType
 import com.projectticket.ticket.outbox.OutboxRelay
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -60,6 +61,38 @@ class SettlementStore(private val jdbc: JdbcClient) {
                 }
             }
     }
+
+    /**
+     * 사건을 잃은 정산을 세운다(`I17-7`). 정산은 `performance.closed`·`performance.cancelled` 봉투가 와야 섰다 —
+     * 그 사건이 DLT 로 가고 보존(7일)이 지나면 그 회차는 영영 정산서가 없다.
+     *
+     * 회차 상태는 글자로 쓴다 — 정산이 맨 아래 계층이라 `event.PerformanceStatus` 를 못 본다(`ArchitectureTest`, `SqlTextTest` 에 등록).
+     * 대상은 닫혔거나 취소됐는데 정산서가 없고 **한 시간 안의 회차 사건이 없는** 회차다 — 사건이 방금 나갔으면 소비자가 먼저다.
+     * `settle_at` 은 `greatest(now(), starts_at)` + 지급 지연이다. 사건 시각을 모르니 지금을 쓴다 — 늦어질 뿐 빨라지지 않는다.
+     * 소비자와 겹치면 `settlement_performance_id_key` 가 하나를 0행으로 만든다.
+     *
+     * @return 새로 세운 정산서 수
+     */
+    @Transactional
+    fun scheduleMissing(): Int =
+        jdbc.sql(
+            """
+            insert into settlement (performance_id, settlement_policy_id, settle_at)
+            select p.performance_id, p.settlement_policy_id,
+                   greatest(now(), p.starts_at) + make_interval(days => sp.payout_delay_days)
+              from performance p join settlement_policy sp on sp.settlement_policy_id = p.settlement_policy_id
+             where p.status in ('closed', 'cancelled')
+               and not exists (select 1 from settlement s where s.performance_id = p.performance_id)
+               and not exists (
+                   select 1 from outbox o
+                    where o.aggregate_type = :aggregate and o.aggregate_id = p.performance_id
+                      and o.occurred_at > now() - make_interval(hours => :graceHours))
+            on conflict (performance_id) do nothing
+            """,
+        )
+            .param("aggregate", AggregateType.PERFORMANCE.code)
+            .param("graceHours", CONSUMER_GRACE_HOURS)
+            .update()
 
     private fun isScheduled(performanceId: Long): Boolean =
         jdbc.sql("select count(*) from settlement where performance_id = :id").param("id", performanceId).query(Long::class.java).single() > 0
@@ -151,4 +184,9 @@ class SettlementStore(private val jdbc: JdbcClient) {
         BigDecimal(base).multiply(rate).setScale(0, RoundingMode.HALF_UP).longValueExact()
 
     data class Due(val settlementId: Long, val performanceId: Long, val commissionRate: BigDecimal, val cancelFeeShare: BigDecimal)
+
+    companion object {
+        /** 회차 사건이 이 시간 안이면 스윕이 안 세운다 — 소비자가 먼저다. 소비자 재시도(최대 30초 간격)보다 넉넉하다 */
+        const val CONSUMER_GRACE_HOURS = 1
+    }
 }

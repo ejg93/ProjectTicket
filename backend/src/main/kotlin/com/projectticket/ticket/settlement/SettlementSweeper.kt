@@ -18,6 +18,12 @@ class SettlementSweeper(private val store: SettlementStore) {
     /** @return 만든 정산서 수 */
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
     fun sweep(): Int {
+        // 사건을 잃은 회차를 먼저 세운다(`I17-7`). 세운 것은 `settle_at` 이 관람 뒤라 이 회에 집계되지 않는다.
+        val recovered = store.scheduleMissing()
+        if (recovered > 0) {
+            log.warn("사건 없이 정산을 세웠다 {}건 — 회차 사건이 DLT 로 갔는지 본다", recovered)
+        }
+
         val due = store.takeDue(BATCH_SIZE)
         if (due.isEmpty()) {
             log.debug("정산 집계 — 대상 없음")

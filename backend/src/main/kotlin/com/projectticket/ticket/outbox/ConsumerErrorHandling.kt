@@ -6,8 +6,14 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
+import org.springframework.dao.DataAccessResourceFailureException
+import org.springframework.dao.TransientDataAccessException
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.transaction.TransactionException
+import org.springframework.util.backoff.BackOff
+import org.springframework.util.backoff.ExponentialBackOff
 import org.springframework.util.backoff.FixedBackOff
+import tools.jackson.core.JacksonException
 
 /**
  * 소비가 실패하면 어떻게 되나(29, `D11` 「처리 실패는 재시도, 초과하면 DLQ」).
@@ -17,7 +23,9 @@ import org.springframework.util.backoff.FixedBackOff
  *
  * | 무엇 | 값 | 왜 |
  * |---|---|---|
- * | 재시도 | 2초 간격 3회 | 잠깐 끊긴 DB·잠금 경합은 그 사이에 풀린다. 더 길게 끌면 뒤 사건이 밀린다 |
+ * | 재시도 | 2초 간격 3회 | 사건 탓으로 보이는 실패. 더 길게 끌면 뒤 사건이 밀린다 |
+ * | DB 일시 오류 | 2초부터 두 배, 최대 30초, **횟수 무제한** | DB 가 3회 창보다 오래 죽으면 그동안 소비한 사건이 전부 DLT 로 갔다(`I17-7`). 30초는 `max.poll.interval.ms` 300초 안이다 |
+ * | 깨진 봉투 | 재시도 없이 바로 DLT | JSON 이 깨진 것은 다시 읽어도 깨져 있다(`I17-7`) |
  * | 초과하면 | `<토픽>.DLT` 로 보낸다 | 그 줄이 막히면 **소비자 하나의 결함이 발행자를 멈춘다** — `D11` 이 막으라고 한 것이다 |
  * | 오프셋 | DLT 로 보낸 뒤 넘어간다 | 안 넘기면 같은 사건을 영원히 다시 읽는다 |
  *
@@ -47,11 +55,30 @@ class ConsumerErrorHandling {
             TopicPartition("${record.topic()}${KafkaTopicsConfig.DEAD_LETTER_SUFFIX}", 0)
         }
 
-        return DefaultErrorHandler(recoverer, FixedBackOff(RETRY_INTERVAL_MS, RETRY_COUNT))
+        return DefaultErrorHandler(recoverer, FixedBackOff(RETRY_INTERVAL_MS, RETRY_COUNT)).apply {
+            setBackOffFunction { _, exception -> backOffFor(exception) }
+        }
     }
 
-    private companion object {
-        const val RETRY_INTERVAL_MS = 2_000L
-        const val RETRY_COUNT = 3L
+    companion object {
+        private const val RETRY_INTERVAL_MS = 2_000L
+        private const val RETRY_COUNT = 3L
+        private const val TRANSIENT_INITIAL_MS = 2_000L
+        private const val TRANSIENT_MAX_MS = 30_000L
+        private const val TRANSIENT_MULTIPLIER = 2.0
+
+        /**
+         * 실패한 기록마다 기다림을 고른다. 원인 사슬로 가른다 — 리스너 예외는 `ListenerExecutionFailedException` 에 싸여 온다.
+         * 분류를 이 함수 하나에 둔다(`addNotRetryableExceptions` 를 따로 안 쓴다) — 시험이 고르는 자리를 그대로 잰다.
+         */
+        fun backOffFor(exception: Exception): BackOff {
+            val chain = generateSequence<Throwable>(exception) { it.cause }.toList()
+            return when {
+                chain.any { it is JacksonException } -> FixedBackOff(0, 0)
+                chain.any { it is TransientDataAccessException || it is DataAccessResourceFailureException || it is TransactionException } ->
+                    ExponentialBackOff(TRANSIENT_INITIAL_MS, TRANSIENT_MULTIPLIER).apply { maxInterval = TRANSIENT_MAX_MS }
+                else -> FixedBackOff(RETRY_INTERVAL_MS, RETRY_COUNT)
+            }
+        }
     }
 }
