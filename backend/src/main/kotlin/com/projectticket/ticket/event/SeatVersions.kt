@@ -1,6 +1,7 @@
 package com.projectticket.ticket.event
 
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
@@ -16,8 +17,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * **버전을 Redis 가 세고**, 같은 버전의 스냅샷은 Redis 가 답한다. DB 를 읽는 것은 버전이 바뀐 직후 한 번뿐이다.
  *
  * **올리는 시점은 커밋 뒤다**(`D4` 「트랜잭션 경계」). 커밋 전에 올리면 롤백된 선점이 화면에 `H` 로 보인다.
- * 올리기가 실패하면(Redis 다운) 버전이 안 올라 폴링이 304 를 받는다 — **화면이 늦을 뿐 틀리지 않는다.**
- * 스냅샷은 언제나 DB 에서 만들기 때문이다.
+ * 올리기가 실패하면(Redis 다운) 버전이 안 올라 폴링이 304 를 받고, 놓친 좌석은 로그에 없어 뒤 델타 어디에도 안 나온다 —
+ * 다음 쓰기는 **그 쓰기의 좌석만** 적어서 따라잡지 못한다. 그래서 못 올린 회차를 이 파드 메모리에 표시하고
+ * [repairDirty] 가 RESET(로그를 비우고 판을 올린다)을 될 때까지 다시 건다(`I17-9`). 로그가 비면 델타가 410 을 내고 받는 쪽이
+ * 스냅샷을 다시 읽는다 — 스냅샷은 언제나 DB 에서 만든다. 파드가 죽으면 표시도 죽는다(`D20` 「쓰기 쪽이 하는 일」).
  */
 @Component
 class SeatVersions(
@@ -26,6 +29,9 @@ class SeatVersions(
 ) {
 
     private val log = LoggerFactory.getLogger(SeatVersions::class.java)
+
+    /** 판을 못 올린 회차. 이 파드의 것만 안다 — Redis 가 죽은 동안 적을 곳이 메모리뿐이다 */
+    private val dirty: MutableSet<Long> = ConcurrentHashMap.newKeySet()
 
     /**
      * 지금 판. 없으면 **DB 의 `max(updated_at)` 으로 씨를 뿌린다**(`SET NX`).
@@ -101,11 +107,43 @@ class SeatVersions(
                     seats.flatMap { listOf(it.performanceSeatId.toString(), status.letter) }
                 redis.execute(BUMP, listOf(key(performanceId), logKey(performanceId)), *args.toTypedArray())
             } catch (e: RuntimeException) {
-                // 다음 쓰기가 따라잡는다. 화면은 그때까지 한 판 늦다(`D20` 「장애」).
+                // 다음 쓰기는 제 좌석만 적어 이 좌석들을 못 따라잡는다 — 고침 회가 RESET 한다(`D20` 「쓰기 쪽이 하는 일」, `I17-9`).
                 log.warn("좌석 판을 못 올렸다 performance_id={} 이유={}", performanceId, e.javaClass.simpleName)
+                markDirty(performanceId)
             }
         }
     }
+
+    /** 판을 못 올린 회차를 표시한다. [repairDirty] 가 고친다 */
+    internal fun markDirty(performanceId: Long) {
+        dirty += performanceId
+    }
+
+    /**
+     * 표시된 회차마다 RESET — 변경 로그를 비우고 판을 올린다. 옛 `since` 로 묻는 화면은 410 을 받아 스냅샷을 다시 읽는다.
+     * 실패하면 표시를 되돌려 다음 회에 다시 건다. 표시를 먼저 지우는 이유는 RESET 과 새 실패가 겹칠 때 새 표시를 안 지우려는 것이다.
+     *
+     * @return 이번 회에 고친 회차 수
+     */
+    fun repairDirty(): Int =
+        dirty.toList().count { performanceId ->
+            dirty.remove(performanceId) && runCatchingRedis(performanceId) {
+                // 씨를 먼저 뿌린다 — 키가 사라졌으면 INCR 이 1 을 만들어 클라이언트의 옛 `since` 보다 작아진다.
+                current(performanceId)
+                redis.execute(RESET, listOf(key(performanceId), logKey(performanceId)))
+            }
+        }
+
+    private fun runCatchingRedis(performanceId: Long, work: () -> Unit): Boolean =
+        try {
+            work()
+            log.info("좌석 판을 고쳤다 performance_id={}", performanceId)
+            true
+        } catch (e: RuntimeException) {
+            log.warn("좌석 판 고치기 실패 performance_id={} 이유={} — 다음 회에 다시", performanceId, e.javaClass.simpleName)
+            markDirty(performanceId)
+            false
+        }
 
     /** Redis 가 비었을 때 쓰는 값(`D20`). 좌석이 하나라도 바뀌면 느는 마이크로초 epoch 다 — `set_updated_at` 트리거가 올린다 */
     private fun databaseVersion(performanceId: Long): Long =
@@ -139,6 +177,15 @@ class SeatVersions(
         val SNAPSHOT_TTL: Duration = Duration.ofSeconds(10)
 
         private const val GONE = "gone"
+
+        /** 로그를 비우고 판을 올린다. 비운 로그를 물으면 CHANGES 가 `gone` 을 낸다 */
+        private val RESET = DefaultRedisScript<Long>(
+            """
+                redis.call('DEL', KEYS[2])
+                return redis.call('INCR', KEYS[1])
+            """.trimIndent(),
+            Long::class.java,
+        )
 
         /**
          * 판을 올리고 바뀐 좌석을 로그에 적는다. **스트림 id 를 버전으로 쓴다** — 그러면 `since` 로 자르는 것이

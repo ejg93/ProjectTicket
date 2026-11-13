@@ -104,6 +104,7 @@
 | 무엇을 | `reservation.reserved` → 확정(좌석·금액·티켓 번호), `reservation.cancelled` → 취소(환불 금액·일수), `performance.cancelled` → 회차 취소(예매자 전원, 전액 환불) |
 | 받는 사람 | 사건의 `account_id` 로 **보낼 때** 표에서 읽는다. 탈퇴(`deleted_at`)면 안 보낸다 |
 | 멱등 | `(event_id, account_id)` 유일 — 회차 취소는 사건 하나에 수신자 여럿이라 계정이 키에 든다 |
+| 재시도 | 일시 실패(실물 SMTP 4xx·발송기가 던짐)는 `pending` 에 둔 채 `attempts + 1`·`next_attempt_at`(30초부터 두 배), 5회째가 `failed`(`temporary_failure`). 반송(`unknown_recipient`)은 바로 `failed`. 끝 상태에서 나가는 길은 없다(`V29`) — `I17-9` |
 | 문구 | 존댓말, 화면 규약(`D17`)과 같은 문체. 본문은 이력이라 고치지 않는다 |
 | 안 하는 것 | 선점·만료 알림(화면의 카운트다운이 그 자리다), 마케팅(동의 항목은 있으나 보낼 것이 없다) |
 

@@ -173,9 +173,11 @@ update performance_seat set status = 'available', held_until = null, reservation
 | 지난다 | `hold-sweeper`·`performance-closer`·`admission-scheduler`·`queue-sweeper` | 위 이유 — 겹치면 스캔과 로그가 두 벌이다 |
 | 지난다 | `notification-sweeper` | 겹치면 결과가 달라진다(`I17-5`) — `skip locked` 는 고르기와 함께 풀려 대수만큼 같은 메일이 나갔다 |
 | 지난다 | `payment-reconciler` | 절약이다 — 겹치면 같은 시도를 PG 에 대수만큼 묻고 `settle` 이 겹친다. 승자는 `payment_approved_idx` 가 하나로 만든다(`I17-1`) |
+| 지난다 | `account-purge` | 절약이다 — 두 문장이 조건부라 결과는 같지만 파드가 뜰 때마다 모든 파드가 같은 행을 잠그고 훑었다. 첫 회는 기동 10분 뒤(`I17-9`) |
 | 지난다 | `refund-sweeper` | 절약이다 — 늦은 승인 환불 행을 두 대가 같이 만들면 한쪽 회가 끊겼고(지금은 `on conflict`), 같은 행을 두 대가 PG 로 보냈다(`I17-5`) |
 | 안 지난다 | `SettlementSweeper`·`OutboxRelay` | 승자를 하나로 만드는 것이 따로 있다 — 정산은 `skip locked` 와 조건부 UPDATE, 발행은 트랜잭션이 쥔 `skip locked` 와 at-least-once(`D11`) |
-| 안 지난다 | `OutboxCleaner`·`IdempotencyCleaner`·`AccountPurgeBatch` | 두 번 돌아도 지울 것·비울 것이 이미 없다 — 보존 기한 `delete` 와 `email is not null` 조건 |
+| 안 지난다 | `OutboxCleaner`·`IdempotencyCleaner` | 두 번 돌아도 지울 것이 이미 없다 — 보존 기한 `delete` |
+| 안 지난다 | `SeatVersionRepairScheduler` | 고칠 표시가 파드마다 제 메모리다 — 남의 것을 못 고친다(`I17-9`) |
 
 ## 재시도 — 다시 해서 달라지는 것만
 

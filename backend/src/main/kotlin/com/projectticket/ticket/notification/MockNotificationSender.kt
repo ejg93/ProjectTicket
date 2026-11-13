@@ -16,19 +16,30 @@ class MockNotificationSender {
 
     private val log = LoggerFactory.getLogger(MockNotificationSender::class.java)
 
-    /** [failureReason] 은 못 나갔으면 종류, 나갔으면 null 이다 */
-    data class Result(val succeeded: Boolean, val failureReason: String?) {
+    /**
+     * [failureReason] 은 못 나갔으면 종류, 나갔으면 null 이다. [transient] 면 다시 하면 될 수 있는 실패다(`I17-9`) —
+     * 스윕이 `pending` 에 두고 다시 시도한다. 반송은 다시 해도 같아서 `false` 다.
+     */
+    data class Result(val succeeded: Boolean, val failureReason: String?, val transient: Boolean = false) {
         companion object {
             fun sent() = Result(true, null)
             fun failed(reason: String) = Result(false, reason)
+            fun failedForNow(reason: String) = Result(false, reason, transient = true)
         }
     }
 
-    /** 주소가 `@bounce.invalid` 로 끝나면 실패한다 — 실패 경로가 실제로 도는지 보는 자리다(카드번호가 결과를 정하는 것과 같은 방식) */
+    /**
+     * 주소가 `@bounce.invalid` 로 끝나면 반송, `@flaky.invalid` 로 끝나면 일시 실패다 — 실패 경로가 실제로 도는지 보는 자리다
+     * (카드번호가 결과를 정하는 것과 같은 방식). 실물 SMTP 면 4xx 응답이 일시, 5xx 가 반송이다.
+     */
     fun send(address: String, subject: String, body: String): Result {
         if (address.endsWith(FAILING_DOMAIN)) {
             log.info("모의 발송 실패 이유={}", FAILURE_REASON)
             return Result.failed(FAILURE_REASON)
+        }
+        if (address.endsWith(FLAKY_DOMAIN)) {
+            log.info("모의 발송 일시 실패 이유={}", TRANSIENT_REASON)
+            return Result.failedForNow(TRANSIENT_REASON)
         }
 
         log.info("모의 발송 성공 제목길이={} 본문길이={}", subject.length, body.length)
@@ -40,6 +51,12 @@ class MockNotificationSender {
 
         /** 받는 곳이 없다는 뜻 */
         const val FAILURE_REASON = "unknown_recipient"
+
+        /** 이 도메인은 늘 일시 실패한다 — 재시도 경로가 도는지 보는 자리다 */
+        const val FLAKY_DOMAIN = "@flaky.invalid"
+
+        /** 받는 쪽이 잠깐 안 받았다는 뜻. 5회째 실패면 이 사유로 `failed` 다 */
+        const val TRANSIENT_REASON = "temporary_failure"
 
         /** 탈퇴한 계정이라 보낼 곳이 없다. 다시 해도 같아서 재시도가 아니라 `skipped` 다 */
         const val WITHDRAWN_REASON = "withdrawn_account"
