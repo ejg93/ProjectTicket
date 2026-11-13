@@ -432,6 +432,10 @@ Git for Windows 2.45.1 에서 재현했다(마무리 12차) — 워크트리 안
 `StackVersionConsistencyTest` 가 이 표와 빌드 파일을 대조하는데 Dependabot 은 이 표를 안 고친다 — Next·ArchUnit·Gradle 을 올린 PR(#34·#30)이 `backend` 잡에서 그 시험으로 섰다(점검 9차). **설계대로다.** 판을 올리는 것은 작업 가지의 청크가 표와 같이 하고, 그 PR 은 닫는다.
 `npm audit` 의 전이 의존성은 Dependabot 그룹 PR 이 안 고친다 — 직접 의존만 올린다. 잠금 파일은 `npm audit fix` 가 고친다. **고친 판이 없는 권고**(`braces *`)는 둘 다 못 고친다.
 
+### Lettuce 의 시간 초과는 값을 안 주면 60초다
+
+`spring.data.redis.timeout` 이 `RedisURI` 의 명령 시간 초과, `connect-timeout` 이 소켓 연결 시간 초과다. 둘 다 없으면 명령은 60초를 기다린다 — 연결은 받고 대답을 안 하는 Redis 앞에서 요청이 그만큼 매달린다. 연결 인사(`HELLO`)에서 막히든 `PING` 에서 막히든 두 값 안에 끝난다 — `RedisTimeoutTest` 가 3초 상한으로 잰다(`I16-15`).
+
 ### Redis 는 테스트 롤백이 안 되돌린다
 
 `PostgresTestBase` 가 `@Transactional` 이라 DB 는 테스트마다 깨끗한데 Redis 에 쓴 것은 남는다. 그래서 그 바탕이 `@BeforeEach` 에서 `flushDb()` 를 부른다(`20a`) — 세션은 계정 이름으로 색인돼서, 남기면 다음 테스트가 남의 세션을 자기 것으로 센다.

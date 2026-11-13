@@ -34,6 +34,10 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # 대답이 없는 Redis 에 요청이 매달리는 상한(`I16-15`). 없으면 Lettuce 기본 60초 — 그동안 세션 필터·대기열 요청이 스레드를 쥔다.
+      # 명령 2초는 멱등키 `lock_timeout` 과 같다. 넘기면 `isRedisDown` 이 503 `queue-unavailable` 로 바꾼다.
+      timeout: 2s
+      connect-timeout: 1s
   kafka:
     # 컨테이너 안이면 `kafka:9092`, 호스트에서 띄우면 `localhost:9094`(ProjectShop 이 9092 를 쥔다).
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9094}
