@@ -1,6 +1,7 @@
 package com.projectticket.ticket.account
 
 import com.projectticket.ticket.PostgresTestBase
+import com.projectticket.ticket.event.EventFixture
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -27,6 +28,7 @@ class AccountPurgeTest : PostgresTestBase() {
     @Autowired lateinit var mvc: MockMvc
     @Autowired lateinit var jdbc: JdbcClient
     @Autowired lateinit var purge: AccountPurgeBatch
+    @Autowired lateinit var scheduler: AccountPurgeScheduler
     @Autowired lateinit var sessionRegistry: SessionRegistry
 
     private var accountId: Long = 0
@@ -41,7 +43,7 @@ class AccountPurgeTest : PostgresTestBase() {
         withdraw(logIn())
         agedOut(days = AccountPurgeBatch.GRACE_DAYS + 1)
 
-        assertThat(purge.purgeDue()).isEqualTo(1)
+        assertThat(purge.purgeDue().accounts).isEqualTo(1)
 
         // 행은 남는다 — 예매·결제가 이 계정을 외래키로 잡고 있고, 남겨야 할 것은 「누가」가 아니라 「무슨 일이 있었나」다.
         val row = identityOf()
@@ -57,7 +59,7 @@ class AccountPurgeTest : PostgresTestBase() {
         agedOut(days = AccountPurgeBatch.GRACE_DAYS - 1)
 
         // 되돌려 달라는 요청이 오는 기간이다. 하루 일찍 지우면 그 요청에 답할 것이 없다.
-        assertThat(purge.purgeDue()).isZero()
+        assertThat(purge.purgeDue().accounts).isZero()
         assertThat(identityOf().email).isNotNull()
     }
 
@@ -66,7 +68,7 @@ class AccountPurgeTest : PostgresTestBase() {
         agedOut(days = AccountPurgeBatch.GRACE_DAYS + 1)
 
         // 탈퇴하지 않았으면 `deleted_at` 이 null 이라 애초에 안 걸린다. 걸렸다면 DB 제약이 막는다(`V2`).
-        assertThat(purge.purgeDue()).isZero()
+        assertThat(purge.purgeDue().accounts).isZero()
         assertThat(identityOf().email).isNotNull()
     }
 
@@ -93,8 +95,8 @@ class AccountPurgeTest : PostgresTestBase() {
         withdraw(logIn())
         agedOut(days = AccountPurgeBatch.GRACE_DAYS + 1)
 
-        assertThat(purge.purgeDue()).isEqualTo(1)
-        assertThat(purge.purgeDue()).isZero()
+        assertThat(purge.purgeDue().accounts).isEqualTo(1)
+        assertThat(purge.purgeDue().accounts).isZero()
     }
 
     @Test
@@ -112,6 +114,35 @@ class AccountPurgeTest : PostgresTestBase() {
         // 보존 3년(`D9`). 그 안쪽은 `audit_log` 의 가드 트리거가 삭제 자체를 막는다(`V3`).
         assertThat(auditCount()).isLessThan(before)
     }
+
+    @Test
+    fun one_batch_deletes_at_most_the_batch_of_old_audits() {
+        repeat(3) { oldAudit() }
+
+        // 감사 삭제도 한 문장에 배치만큼이다(`I17-14`).
+        assertThat(purge.purgeDue(batch = 2).audits).isEqualTo(2)
+    }
+
+    @Test
+    fun the_scheduler_drains_the_backlog_in_batches() {
+        val fixture = EventFixture(jdbc)
+        val withdrawn = (1..5).map { fixture.account("purge-drain-${System.nanoTime()}@test.local") }
+        jdbc.sql("update account set deleted_at = now() - make_interval(days => :days) where account_id in (:ids)")
+            .param("days", AccountPurgeBatch.GRACE_DAYS + 1)
+            .param("ids", withdrawn)
+            .update()
+
+        // 배치가 찰 때마다 다시 부른다 — 한 회에 하루치가 다 지워진다.
+        assertThat(scheduler.drain(batch = 2)).isEqualTo(5)
+    }
+
+    private fun oldAudit() =
+        jdbc.sql(
+            """
+            insert into audit_log (event_type, actor_account_id, created_at)
+            values ('account.logged_in', :id, now() - make_interval(years => :years))
+            """,
+        ).param("id", accountId).param("years", AccountPurgeBatch.AUDIT_RETENTION_YEARS + 1).update()
 
     private fun agedOut(days: Int) =
         jdbc.sql(

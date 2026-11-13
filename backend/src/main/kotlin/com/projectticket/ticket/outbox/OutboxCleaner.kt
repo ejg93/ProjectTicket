@@ -4,7 +4,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * 발행이 끝난 봉투를 지운다(`D2` 수명표 — 「발행 후 보존 기간 뒤 삭제」).
@@ -17,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional
  *
  * **안 나간 봉투는 안 건드린다.** `published_at is null` 은 릴레이가 아직 할 일이 있는 것이고,
  * 그것을 지우면 사건이 조용히 사라진다 — 계속 실패하는 봉투는 릴레이가 10회 뒤 주차하고 사람이 푼다(`I17-4`, `event-catalog.md` 「발행」).
+ *
+ * **한 문장에 [BATCH_SIZE] 행씩, 덜 지울 때까지 되풀이한다**(`I17-14`). 쌓인 것을 한 문장으로 지우면 문장 상한 10초에 걸려 매번 실패하고 더 쌓인다.
+ * 트랜잭션을 안 건다 — 문장 하나가 곧 트랜잭션이라 배치마다 커밋되고 긴 트랜잭션이 안 남는다.
  */
 @Component
 class OutboxCleaner(private val jdbc: JdbcClient) {
@@ -25,18 +27,29 @@ class OutboxCleaner(private val jdbc: JdbcClient) {
 
     /** @return 지운 봉투 수 */
     @Scheduled(fixedDelayString = CLEAN_INTERVAL)
-    @Transactional
-    fun cleanPublished(): Int {
-        // 기준은 DB 시계다(`D7`). 앱 시계로 재면 인스턴스마다 다른 날을 지운다.
-        val deleted = jdbc.sql(
-            """
-            delete from outbox
-             where published_at is not null
-               and published_at < now() - make_interval(days => :days)
-            """,
-        )
-            .param("days", RETENTION_DAYS)
-            .update()
+    fun cleanPublished(): Int = clean(BATCH_SIZE)
+
+    /** 한 문장에 [batch] 행씩, 지운 수가 [batch] 보다 적을 때까지. @return 지운 봉투 수 */
+    fun clean(batch: Int): Int {
+        var deleted = 0
+        do {
+            // 기준은 DB 시계다(`D7`). 앱 시계로 재면 인스턴스마다 다른 날을 지운다.
+            val round = jdbc.sql(
+                """
+                delete from outbox
+                 where outbox_id in (
+                     select outbox_id from outbox
+                      where published_at is not null
+                        and published_at < now() - make_interval(days => :days)
+                      order by published_at
+                      limit :batch)
+                """,
+            )
+                .param("days", RETENTION_DAYS)
+                .param("batch", batch)
+                .update()
+            deleted += round
+        } while (round == batch)
 
         if (deleted > 0) {
             log.info("아웃박스 청소 삭제={}건 보존={}일", deleted, RETENTION_DAYS)
@@ -50,5 +63,8 @@ class OutboxCleaner(private val jdbc: JdbcClient) {
 
         /** 하루에 한 번이면 충분하다 — 표가 한 시간에 폭발하지 않는다. 주기를 줄여도 지우는 총량은 같다 */
         const val CLEAN_INTERVAL = "PT1H"
+
+        /** 한 문장에 지우는 행 수(`I17-14`). 문장 상한 10초 안에 넉넉히 끝난다 */
+        const val BATCH_SIZE = 1_000
     }
 }

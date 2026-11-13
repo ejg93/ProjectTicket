@@ -10,6 +10,9 @@ import org.springframework.stereotype.Component
  *
  * 전에는 `@Scheduled` 가 배치에 바로 붙어 `initialDelay` 없이 파드가 뜰 때마다 모든 파드에서 돌았다. 두 문장이 조건부라 결과는 같지만
  * 같은 행을 대수만큼 잠그고 훑는다. 그래서 락을 지나고 기동 10분 뒤 첫 회다 — 배포가 파드를 줄줄이 띄울 때 겹치지 않는다.
+ *
+ * **배치를 되풀이하는 것도 여기다**(`I17-14`). 배치마다 제 트랜잭션이라 긴 트랜잭션이 안 남는다. 반복이 락 TTL 30초를 넘겨
+ * 다른 파드가 겹쳐도 두 문장이 조건부라 결과가 같다.
  */
 @Component
 class AccountPurgeScheduler(
@@ -19,7 +22,17 @@ class AccountPurgeScheduler(
 
     /** @return 이번 회에 파기한 계정 수. 락을 남이 쥐고 있으면 0 */
     @Scheduled(fixedDelayString = AccountPurgeBatch.PURGE_INTERVAL, initialDelayString = INITIAL_DELAY)
-    fun purgeDueExclusively(): Int = lock.runExclusively(LOCK_NAME) { batch.purgeDue() } ?: 0
+    fun purgeDueExclusively(): Int = lock.runExclusively(LOCK_NAME) { drain(AccountPurgeBatch.BATCH_SIZE) } ?: 0
+
+    /** 계정이나 감사가 [batch] 만큼 찬 동안 배치를 다시 부른다. @return 파기한 계정 수의 합 */
+    internal fun drain(batch: Int): Int {
+        var accounts = 0
+        do {
+            val purged = this.batch.purgeDue(batch)
+            accounts += purged.accounts
+        } while (purged.accounts == batch || purged.audits == batch)
+        return accounts
+    }
 
     companion object {
         const val LOCK_NAME = "account-purge"
