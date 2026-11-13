@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.util.UUID
 
 /**
  * 결제 전이 둘(①·③)과 스윕의 경합(`D4` 「스윕과 확정의 경합」). PG 는 여기 없다 — 결과([MockPaymentGateway.Result])를 직접 넣는다.
@@ -48,7 +49,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun approval_confirms_reservation_and_seats() {
-        val paying = transitions.startPaying(accountId, hold(2))
+        val paying = transitions.startPaying(accountId, hold(2), UUID.randomUUID().toString())
         assertThat(paying.amount).isEqualTo(308_000)
         assertThat(reservation(paying.reservationId)).isEqualTo("paying")
 
@@ -64,7 +65,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun expired_hold_cannot_confirm() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         // 타임아웃이 먼저 갈 자리. 승인의 조건부 UPDATE 는 `paying_until >= now()` 라 여기서 0행이다.
         jdbc.sql("update reservation set paying_until = now() - interval '1 second' where reservation_id = :id").param("id", paying.reservationId).update()
 
@@ -80,7 +81,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun decline_returns_to_held_for_retry() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
 
         val settled = transitions.settle(accountId, paying, declined())
 
@@ -89,12 +90,12 @@ class PaymentConfirmTest : PostgresTestBase() {
         assertThat(seatStatuses(paying.reservationId)).containsOnly("held")
         assertThat(paymentRow(settled.paymentId)).isEqualTo("declined" to 154_000)
         // 다른 카드로 다시 — 선점 시간은 그대로다.
-        assertThat(transitions.startPaying(accountId, paying.reservationId).amount).isEqualTo(154_000)
+        assertThat(transitions.startPaying(accountId, paying.reservationId, UUID.randomUUID().toString()).amount).isEqualTo(154_000)
     }
 
     @Test
     fun decline_after_hold_expiry_expires_the_reservation() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", paying.reservationId).update()
 
         val settled = transitions.settle(accountId, paying, declined())
@@ -106,7 +107,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun no_response_is_recorded_as_failed_and_returns_to_held() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
 
         val settled = transitions.settle(accountId = accountId, paying = paying, verdict = null, cardLast4 = "0001")
 
@@ -119,7 +120,7 @@ class PaymentConfirmTest : PostgresTestBase() {
         val reservationId = hold(1)
         cancelPerformanceUnderneath()
 
-        assertThatThrownBy { transitions.startPaying(accountId, reservationId) }
+        assertThatThrownBy { transitions.startPaying(accountId, reservationId, UUID.randomUUID().toString()) }
             .isInstanceOf(TicketException::class.java)
             .extracting("code")
             .isEqualTo(ErrorCode.PERFORMANCE_NOT_OPEN)
@@ -127,7 +128,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun a_cancelled_performance_cannot_confirm() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         cancelPerformanceUnderneath()
 
         // 승인이 와도 예매는 성립하지 않는다 — 늦은 승인이라 환불 스윕(`I11-3`)이 되돌린다.
@@ -141,20 +142,20 @@ class PaymentConfirmTest : PostgresTestBase() {
     fun start_paying_needs_a_live_hold_of_mine() {
         val reservationId = hold(1)
 
-        assertThatThrownBy { transitions.startPaying(fixture.account("stranger@test.local"), reservationId) }
+        assertThatThrownBy { transitions.startPaying(fixture.account("stranger@test.local"), reservationId, UUID.randomUUID().toString()) }
             .isInstanceOf(TicketException::class.java)
             .extracting("code")
             .isEqualTo(ErrorCode.RESERVATION_NOT_FOUND)
 
         jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
-        assertThatThrownBy { transitions.startPaying(accountId, reservationId) }
+        assertThatThrownBy { transitions.startPaying(accountId, reservationId, UUID.randomUUID().toString()) }
             .isInstanceOf(TicketException::class.java)
             .extracting("code")
             .isEqualTo(ErrorCode.HOLD_EXPIRED)
 
         jdbc.sql("update reservation set held_until = now() + interval '5 minutes' where reservation_id = :id").param("id", reservationId).update()
         fixture.reserve(reservationId)
-        assertThatThrownBy { transitions.startPaying(accountId, reservationId) }
+        assertThatThrownBy { transitions.startPaying(accountId, reservationId, UUID.randomUUID().toString()) }
             .isInstanceOf(TicketException::class.java)
             .satisfies({ e ->
                 e as TicketException
@@ -165,7 +166,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun sweeper_does_not_touch_paying() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         // 선점 시간은 지났지만 결제 중이다. 스윕이 여기를 풀면 승인이 T+ε 에 와서 돈은 받고 좌석은 없는 예매가 된다(ADR 0004).
         jdbc.sql("update reservation set held_until = now() - interval '1 second' where reservation_id = :id").param("id", paying.reservationId).update()
 
@@ -175,7 +176,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun paying_timeout_expires_the_reservation() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         jdbc.sql("update reservation set paying_until = now() - interval '1 second' where reservation_id = :id").param("id", paying.reservationId).update()
 
         assertThat(sweeper.sweep()).isEqualTo(1)
@@ -185,7 +186,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun second_approval_for_one_reservation_is_rejected() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         transitions.settle(accountId, paying, approved())
 
         // 멱등키가 앞에서 막고 이 인덱스가 끝에서 한 번 더 막는다(`V9`).
@@ -202,7 +203,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun payment_amount_must_equal_the_reservation_total() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
 
         // 금액을 요청에서 받는 입구가 생기는 날 그 검사를 빠뜨리면 원하는 금액으로 결제된다(`D9`).
         assertThatThrownBy {
@@ -217,7 +218,7 @@ class PaymentConfirmTest : PostgresTestBase() {
 
     @Test
     fun payment_row_cannot_be_updated() {
-        val paying = transitions.startPaying(accountId, hold(1))
+        val paying = transitions.startPaying(accountId, hold(1), UUID.randomUUID().toString())
         val settled = transitions.settle(accountId, paying, approved())
 
         assertThatThrownBy {

@@ -36,8 +36,11 @@ class PaymentTransitionService(
 
     private val log = LoggerFactory.getLogger(PaymentTransitionService::class.java)
 
-    /** ① 이 끝난 예매. 낼 돈은 여기서만 온다 — 클라이언트가 금액을 보내지 않는다 */
-    data class Paying(val reservationId: Long, val amount: Int)
+    /**
+     * ① 이 끝난 예매. 낼 돈은 여기서만 온다 — 클라이언트가 금액을 보내지 않는다.
+     * [gatewayKey] 는 PG 에 넘길 멱등키다. ① 이 같은 트랜잭션에 시도 행(`payment_attempt`)으로 적어 두었다(`I17-1`).
+     */
+    data class Paying(val reservationId: Long, val amount: Int, val gatewayKey: String)
 
     /** ③ 의 결과. [late] 면 승인은 났는데 좌석을 못 줬다 — 감사 `payment.late` 가 남고 환불 행(17b)이 되돌린다 */
     data class Settled(val paymentId: Long, val reservationStatus: String, val late: Boolean)
@@ -52,9 +55,11 @@ class PaymentTransitionService(
      * 선점이 지남 → 409 `hold-expired`, 그 밖의 상태 → 409 `invalid-transition`.
      *
      * **회차가 `open` 인지 같은 문장에서 본다**(`I13-1`). 선점이 회차 행을 잠가 취소·종료가 예매를 놓치는 길은 닫혔다 — 이것은 겹 하나 더다(`psql`·새 입구).
+     *
+     * **PG 를 부르기 전에 시도를 적는다**(`I17-1`). ③ 이 롤백되면 결제 행이 없어 승인이 사라진다 — 이 행이 대사가 PG 에 물을 키를 남긴다.
      */
     @Transactional
-    fun startPaying(accountId: Long, reservationId: Long): Paying {
+    fun startPaying(accountId: Long, reservationId: Long, idempotencyKey: String): Paying {
         val amount = jdbc.sql(
             """
             update reservation
@@ -81,7 +86,19 @@ class PaymentTransitionService(
             actorAccountId = accountId,
             target = AuditLog.Target.of("reservation", reservationId),
         )
-        return Paying(reservationId, amount)
+        val gatewayKey = gatewayKeyOf(reservationId, idempotencyKey)
+        jdbc.sql(
+            """
+            insert into payment_attempt (reservation_id, account_id, gateway_key, amount)
+            values (:reservation, :account, :key, :amount)
+            """,
+        )
+            .param("reservation", reservationId)
+            .param("account", accountId)
+            .param("key", gatewayKey)
+            .param("amount", amount)
+            .update()
+        return Paying(reservationId, amount, gatewayKey)
     }
 
     private fun cannotStart(accountId: Long, reservationId: Long): TicketException {
@@ -133,6 +150,7 @@ class PaymentTransitionService(
             else -> PaymentStatus.DECLINED
         }
         val paymentId = insertPayment(paying = paying, status = status, verdict = verdict, cardLast4 = cardLast4)
+        closeAttempt(paying.gatewayKey)
 
         val reservationStatus = if (status == PaymentStatus.APPROVED) {
             confirm(accountId, paying.reservationId)
@@ -174,6 +192,16 @@ class PaymentTransitionService(
         }
         return Settled(paymentId, reservationStatus, late)
     }
+
+    /**
+     * 시도를 닫는다 — 결과가 우리 표에 닿았다. [settle] 안에서는 결제 행과 같은 트랜잭션이라 같이 커밋되거나 같이 사라진다.
+     * 대사가 PG 가 모르는 키·거절을 닫을 때도 이것 하나다. 이미 닫혔으면 0행이다.
+     */
+    @Transactional
+    fun closeAttempt(gatewayKey: String): Boolean =
+        jdbc.sql("update payment_attempt set settled_at = now() where gateway_key = :key and settled_at is null")
+            .param("key", gatewayKey)
+            .update() == 1
 
     private fun insertPayment(paying: Paying, status: PaymentStatus, verdict: MockPaymentGateway.Result?, cardLast4: String): Long =
         jdbc.sql(
@@ -317,5 +345,11 @@ class PaymentTransitionService(
 
         /** `payment.decline_reason` 에 적는 실패 사유 — 응답이 없었고 PG 도 모른다 */
         const val NO_RESPONSE = "no_response"
+
+        /**
+         * PG 멱등키. **예매에 묶는다**(`I17-2`) — 우리 멱등은 `(계정, 키)` 라 남과 키 값이 겹쳐도 여기까지 온다.
+         * 클라이언트 키를 그대로 넘기면 PG 가 남의 승인을 돌려준다. 예매는 한 계정 것이라 계정까지 같이 묶인다.
+         */
+        fun gatewayKeyOf(reservationId: Long, idempotencyKey: String): String = "$reservationId:$idempotencyKey"
     }
 }

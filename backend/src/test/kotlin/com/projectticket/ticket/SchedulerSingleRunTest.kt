@@ -1,6 +1,7 @@
 package com.projectticket.ticket
 
 import com.projectticket.ticket.notification.NotificationSweeper
+import com.projectticket.ticket.payment.PaymentReconcileScheduler
 import com.projectticket.ticket.payment.RefundSweeper
 import com.projectticket.ticket.queue.AdmissionScheduler
 import com.projectticket.ticket.queue.QueueSweeper
@@ -35,6 +36,7 @@ class SchedulerSingleRunTest : PostgresTestBase() {
     @Autowired lateinit var queueSweeps: QueueSweeper
     @Autowired lateinit var refundSweeps: RefundSweeper
     @Autowired lateinit var notificationSweeps: NotificationSweeper
+    @Autowired lateinit var reconciles: PaymentReconcileScheduler
 
     @Test
     fun only_one_of_three_instances_runs() {
@@ -95,13 +97,14 @@ class SchedulerSingleRunTest : PostgresTestBase() {
     fun every_scheduler_entry_actually_runs_through_the_lock() {
         // **입구를 부르지 않으면 감싼 고리가 도는지 모른다.** 33 의 결함이 실제로 그 자리에 있었다 —
         // 스케줄러 입구가 같은 객체의 `@Transactional` 함수를 자기 호출해서 스케줄러 경로만 트랜잭션 없이 돌았다(`stack.md`).
-        // 여기서는 여섯 입구가 **부를 수 있고 락을 지나는지**를 본다. 몇 건을 처리했나는 다른 테스트가 잰다.
+        // 여기서는 일곱 입구가 **부를 수 있고 락을 지나는지**를 본다. 몇 건을 처리했나는 다른 테스트가 잰다.
         assertThat(holdSweeps.sweepDue()).isNotNegative()
         assertThat(closer.closeDueExclusively()).isNotNegative()
         assertThat(admissions.admitDueExclusively()).isNotNegative()
         assertThat(queueSweeps.sweepDueExclusively()).isNotNegative()
         assertThat(refundSweeps.sweepDue()).isNotNegative()
         assertThat(notificationSweeps.sweepDue()).isNotNegative()
+        assertThat(reconciles.reconcileDue()).isNotNegative()
 
         // 남이 쥐고 있으면 **아무 일도 안 하고 0** 이다 — 그것이 인스턴스 셋에서 한 대만 도는 이유다.
         listOf(
@@ -111,6 +114,7 @@ class SchedulerSingleRunTest : PostgresTestBase() {
             QueueSweeper.LOCK_NAME,
             RefundSweeper.LOCK_NAME,
             NotificationSweeper.LOCK_NAME,
+            PaymentReconcileScheduler.LOCK_NAME,
         ).forEach { redis.opsForValue().set("lock:$it", "남의-토큰") }
 
         assertThat(holdSweeps.sweepDue()).isZero()
@@ -120,6 +124,8 @@ class SchedulerSingleRunTest : PostgresTestBase() {
         // 두 스위퍼는 대수만큼 겹치면 결과가 달라진다(`I17-5`) — 락을 빼면 여기가 빨갛다.
         assertThat(refundSweeps.sweepDue()).isZero()
         assertThat(notificationSweeps.sweepDue()).isZero()
+        // 대사는 PG 를 행마다 부른다 — 대수만큼 겹치면 같은 시도를 여러 번 묻는다(`I17-1`).
+        assertThat(reconciles.reconcileDue()).isZero()
     }
 
     private companion object {

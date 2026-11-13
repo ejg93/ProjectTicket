@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.util.UUID
 
 /**
  * 기획사가 회차를 취소하면 **판 것까지 무른다**(17a, `D3`·`D6`). 자동 종료(16a)가 `reserved` 를 안 건드리는 것과 반대 자리다.
@@ -77,7 +78,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
         val held = seatHold.hold(holder, SeatHoldService.Command(performanceId, seatIds().take(1)))
         val payer = fixture.account("${PREFIX}payer@test.local")
         val paying = seatHold.hold(payer, SeatHoldService.Command(performanceId, seatIds().drop(1).take(1)))
-        payments.startPaying(accountId = payer, reservationId = paying)
+        payments.startPaying(accountId = payer, reservationId = paying, idempotencyKey = UUID.randomUUID().toString())
 
         assertThat(cancelService.cancel(performanceId, actorAccountId = null)).isEqualTo(2)
 
@@ -213,7 +214,7 @@ class PerformanceCancelTest : ConcurrencyTestBase() {
 
     private fun reserve(accountId: Long, seats: Int, from: Int = 0): Long {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds().drop(from).take(seats)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.util.UUID
 
 /**
  * 예매 두 표의 불변식(`D4` 「두 표의 역할」·「합계 불변식」)이 실제로 걸리는가.
@@ -84,7 +85,7 @@ class ReservationSeatConsistencyTest : ConcurrencyTestBase() {
         val expected = seatIds.take(2).toSet()
         assertThat(pointerSet(reservationId)).describedAs("held").isEqualTo(expected)
 
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         assertThat(pointerSet(reservationId)).describedAs("paying").isEqualTo(expected)
 
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))

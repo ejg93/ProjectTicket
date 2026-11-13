@@ -62,8 +62,8 @@ class PaymentService(
         val fingerprint = Fingerprint(command.reservationId, CardNumbers.last4Of(command.cardNumber))
         idempotency.replayIfPresent(accountId = accountId, key = idempotencyKey, request = fingerprint, responseType = Result::class.java)?.let { return it }
 
-        val paying = transitions.startPaying(accountId, command.reservationId)
-        val verdict = askGateway(idempotencyKey, paying, command.cardNumber)
+        val paying = transitions.startPaying(accountId, command.reservationId, idempotencyKey)
+        val verdict = askGateway(paying, command.cardNumber)
         // 응답이 없어도 카드는 안다 — 요청이 들고 있다. 실패 행에도 뒷 4자리를 적는다.
         val cardLast4 = verdict?.cardLast4 ?: fingerprint.cardLast4
 
@@ -87,10 +87,9 @@ class PaymentService(
      *
      * @return null 이면 「응답이 없었고 PG 도 모른다」
      */
-    private fun askGateway(idempotencyKey: String, paying: PaymentTransitionService.Paying, cardNumber: String): MockPaymentGateway.Result? {
-        // **PG 키는 예매에 묶는다**(`I17-2`). 우리 멱등은 `(계정, 키)` 라 남과 키 값이 겹쳐도 여기까지 온다 —
-        // 클라이언트 키를 그대로 넘기면 PG 가 남의 승인을 돌려준다. 예매는 한 계정 것이라 계정까지 같이 묶인다.
-        val gatewayKey = "${paying.reservationId}:$idempotencyKey"
+    private fun askGateway(paying: PaymentTransitionService.Paying, cardNumber: String): MockPaymentGateway.Result? {
+        // PG 키는 ① 이 시도 행에 적은 그 값이다(`PaymentTransitionService.gatewayKeyOf`, `I17-2`) — 대사가 같은 키로 묻는다.
+        val gatewayKey = paying.gatewayKey
         val started = System.nanoTime()
         val verdict = try {
             gateway.approve(MockPaymentGateway.Request(gatewayKey, paying.amount, cardNumber))

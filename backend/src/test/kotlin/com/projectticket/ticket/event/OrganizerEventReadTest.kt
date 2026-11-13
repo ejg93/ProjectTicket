@@ -15,6 +15,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import tools.jackson.databind.ObjectMapper
+import java.util.UUID
 
 /**
  * 기획사가 자기 공연을 읽는가(`45a`, `D5`). **남의 공연은 404** · **오픈 전 회차도 보인다**(공개 목록과 다르다) ·
@@ -70,7 +71,7 @@ class OrganizerEventReadTest : PostgresTestBase() {
         val paid = seatHold.hold(buyer, SeatHoldService.Command(open, listOf(seats[0])))
         payments.settle(
             buyer,
-            payments.startPaying(accountId = buyer, reservationId = paid),
+            payments.startPaying(accountId = buyer, reservationId = paid, idempotencyKey = UUID.randomUUID().toString()),
             MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null),
         )
         seatHold.hold(fixture.account("read-holder@test.local"), SeatHoldService.Command(open, listOf(seats[1])))

@@ -172,6 +172,7 @@ update performance_seat set status = 'available', held_until = null, reservation
 |---|---|---|
 | 지난다 | `hold-sweeper`·`performance-closer`·`admission-scheduler`·`queue-sweeper` | 위 이유 — 겹치면 스캔과 로그가 두 벌이다 |
 | 지난다 | `notification-sweeper` | 겹치면 결과가 달라진다(`I17-5`) — `skip locked` 는 고르기와 함께 풀려 대수만큼 같은 메일이 나갔다 |
+| 지난다 | `payment-reconciler` | 절약이다 — 겹치면 같은 시도를 PG 에 대수만큼 묻고 `settle` 이 겹친다. 승자는 `payment_approved_idx` 가 하나로 만든다(`I17-1`) |
 | 지난다 | `refund-sweeper` | 절약이다 — 늦은 승인 환불 행을 두 대가 같이 만들면 한쪽 회가 끊겼고(지금은 `on conflict`), 같은 행을 두 대가 PG 로 보냈다(`I17-5`) |
 | 안 지난다 | `SettlementSweeper`·`OutboxRelay` | 승자를 하나로 만드는 것이 따로 있다 — 정산은 `skip locked` 와 조건부 UPDATE, 발행은 트랜잭션이 쥔 `skip locked` 와 at-least-once(`D11`) |
 | 안 지난다 | `OutboxCleaner`·`IdempotencyCleaner`·`AccountPurgeBatch` | 두 번 돌아도 지울 것·비울 것이 이미 없다 — 보존 기한 `delete` 와 `email is not null` 조건 |
@@ -194,7 +195,7 @@ update performance_seat set status = 'available', held_until = null, reservation
 | 규칙 | 왜 |
 |---|---|
 | 바깥 호출(모의 PG)은 트랜잭션 **밖**에서 | 안에서 부르면 응답을 기다리는 동안 좌석 행 잠금이 열려 있고, PG 가 늦으면 그 좌석을 보는 모든 요청이 기다린다 |
-| 그래서 결제는 트랜잭션 셋 | ① `held → paying`(짧다) ② PG 호출(트랜잭션 없음) ③ 결과 반영(짧다). ②에서 죽으면 ③이 안 돌고 타임아웃이 `expired` 로 정리한다 |
+| 그래서 결제는 트랜잭션 셋 | ① `held → paying`(짧다) ② PG 호출(트랜잭션 없음) ③ 결과 반영(짧다). ②·③ 에서 죽으면 타임아웃이 `expired` 로 정리하고, ① 이 같이 적은 시도(`payment_attempt`)를 대사(`PaymentReconciler`, 1분)가 같은 PG 키로 묻는다 — 승인이면 `late` 결제 행 → 환불(`I17-1`) |
 | 읽기 모델 갱신은 커밋 **뒤** | `TransactionSynchronization.afterCommit` 에서 Redis 버전을 올린다(`D20`). 커밋 전에 올리면 롤백된 변경을 화면이 본다 |
 
 ## 지금 안 하는 것

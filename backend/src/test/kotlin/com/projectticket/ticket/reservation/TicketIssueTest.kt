@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.UUID
 
 /**
  * 확정이 좌석마다 티켓 하나를 만드는가, 번호가 규칙(identifier-rules)대로인가, 조회가 본인에게만 열리는가.
@@ -121,7 +122,8 @@ class TicketIssueTest : PostgresTestBase() {
 
     private fun reserved(seats: Int): Long {
         val reservationId = hold(seats)
-        payments.settle(buyer.id, payments.startPaying(buyer.id, reservationId), MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
+        val paying = payments.startPaying(buyer.id, reservationId, UUID.randomUUID().toString())
+        payments.settle(buyer.id, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
 

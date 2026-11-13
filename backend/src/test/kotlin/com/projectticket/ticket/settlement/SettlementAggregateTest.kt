@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
+import java.util.UUID
 
 /**
  * 둘째 소비자가 `D21` 대로 도는가 — 회차가 닫히면 예약되고, `settle_at` 뒤에 **항목의 합**으로 정산서가 선다.
@@ -239,7 +240,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
 
     private fun reserve(accountId: Long, seats: Int, from: Int = 0): Long {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds().drop(from).take(seats)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }

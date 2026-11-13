@@ -196,7 +196,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     private fun reserved(startsInDays: Long): Long {
         val performanceId = fixture.performance(eventId, hallId, startsInDays).also { openService.open(it, actorAccountId = null) }
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
