@@ -75,13 +75,83 @@ class OutboxRelayTest : PostgresTestBase() {
         assertThatThrownBy { insertEvent(eventId) }.hasStackTraceContaining("outbox_event_id_key")
     }
 
-    private fun insertEvent(eventId: UUID = UUID.randomUUID()): UUID {
+    @Test
+    fun a_poison_row_does_not_block_other_aggregates() {
+        val poison = insertPoison(aggregateId = 7_001)
+        val other = insertEvent(aggregateId = 7_002)
+
+        // 독 행이 배치 맨 앞에 있어도 뒤의 다른 집합체 사건은 이 회에 나간다(`I17-4`).
+        assertThat(relay.relay()).isEqualTo(1)
+        assertThat(publishedAtIsSet(other)).isTrue()
+
+        val failure = failureOf(poison)
+        assertThat(failure.published).isFalse()
+        assertThat(failure.attempts).isEqualTo(1)
+        assertThat(failure.lastError).describedAs("예외 클래스 이름만 남긴다(D10)").contains("RecordTooLargeException")
+        assertThat(failure.waiting).describedAs("지수 대기 — 다음 시도는 미래다").isTrue()
+    }
+
+    @Test
+    fun a_later_event_of_the_poisoned_aggregate_waits_behind_it() {
+        insertPoison(aggregateId = 7_003)
+        val behind = insertEvent(aggregateId = 7_003)
+
+        relay.relay()
+
+        // 같은 집합체의 사건은 순서를 지킨다(`event-catalog.md`) — 앞이 막히면 뒤도 선다.
+        assertThat(publishedAtIsSet(behind)).isFalse()
+    }
+
+    @Test
+    fun parked_and_waiting_rows_are_not_taken() {
+        val parked = insertEvent(aggregateId = 7_004)
+        val waiting = insertEvent(aggregateId = 7_005)
+        jdbc.sql("update outbox set attempts = 10 where event_id = :id").param("id", parked).update()
+        jdbc.sql("update outbox set attempts = 1, next_attempt_at = now() + interval '1 hour' where event_id = :id").param("id", waiting).update()
+
+        assertThat(relay.relay()).isZero()
+    }
+
+    private fun insertPoison(aggregateId: Long): UUID {
+        val eventId = UUID.randomUUID()
+        // 2MB — 프로듀서 `max.request.size`(1MB)를 넘어 `RecordTooLargeException` 이다. 몇 번을 다시 보내도 같다.
         jdbc.sql(
             """
             insert into outbox (event_id, type, aggregate_type, aggregate_id, payload)
-            values (:id, 'reservation.reserved', 'reservation', 7, '{"reservation_id": 7}'::jsonb)
+            values (:id, 'reservation.reserved', 'reservation', :aggregate,
+                    jsonb_build_object('reservation_id', :aggregate, 'pad', repeat('x', 2000000)))
             """,
-        ).param("id", eventId).update()
+        ).param("id", eventId).param("aggregate", aggregateId).update()
+        return eventId
+    }
+
+    private data class Failure(val published: Boolean, val attempts: Int, val lastError: String?, val waiting: Boolean)
+
+    private fun failureOf(eventId: UUID): Failure =
+        jdbc.sql(
+            """
+            select published_at is not null as published, attempts, last_error, next_attempt_at > now() as waiting
+              from outbox where event_id = :id
+            """,
+        )
+            .param("id", eventId)
+            .query { rs, _ ->
+                Failure(
+                    published = rs.getBoolean("published"),
+                    attempts = rs.getInt("attempts"),
+                    lastError = rs.getString("last_error"),
+                    waiting = rs.getBoolean("waiting"),
+                )
+            }
+            .single()
+
+    private fun insertEvent(eventId: UUID = UUID.randomUUID(), aggregateId: Long = 7): UUID {
+        jdbc.sql(
+            """
+            insert into outbox (event_id, type, aggregate_type, aggregate_id, payload)
+            values (:id, 'reservation.reserved', 'reservation', :aggregate, jsonb_build_object('reservation_id', :aggregate))
+            """,
+        ).param("id", eventId).param("aggregate", aggregateId).update()
         return eventId
     }
 

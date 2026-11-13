@@ -27,7 +27,7 @@ class PendingEvents(
     fun deliver(consume: (OutboxRelay.Envelope) -> Unit): Int {
         val rows = jdbc.sql(
             """
-            select outbox_id, event_id, type, version, occurred_at, aggregate_type, aggregate_id, payload::text as payload
+            select outbox_id, event_id, type, version, occurred_at, aggregate_type, aggregate_id, payload::text as payload, attempts
               from outbox
              where published_at is null
              order by outbox_id

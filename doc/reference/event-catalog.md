@@ -25,7 +25,7 @@
 | `type` | `<집합체>.<과거형>` 소문자 점 표기. 감사 `event_type` 과 같은 이름 |
 | `version` | 페이로드 판. 호환되는 변경은 안 올린다(아래 「버전」) |
 | `occurred_at` | 사건이 일어난 트랜잭션의 DB 시각(`D7`). 발행 시각이 아니다 |
-| `aggregate_type`·`aggregate_id` | 파티션 키(28) — 한 집합체의 사건은 순서를 지킨다 |
+| `aggregate_type`·`aggregate_id` | 파티션 키(28) — 한 집합체의 사건은 순서를 지킨다. 릴레이가 집합체의 맨 앞 미발행 행만 잡는다(`I17-4`) |
 | `payload` | 아래 표. **식별자와 그때의 값**만 든다 |
 
 **CloudEvents 를 안 쓴다.** 소비자가 우리뿐이라 표준 봉투가 사 줄 것이 없다. 다만 위 넷(`event_id`·`type`·`occurred_at`·`aggregate_*`)은 CloudEvents 의 `id`·`type`·`time`·`source` 와 1:1 이라, 밖으로 내보낼 날(웹훅)이 오면 감싸기만 하면 된다.
@@ -81,6 +81,8 @@
 - 릴레이가 `for update skip locked` 로 가져가 발행한다. 인스턴스 셋이 같은 행을 두 번 안 민다
 - **보내고 나서 표시한다.** 표시부터 하면 보내기가 실패했을 때 그 사건이 영영 안 나간다
 - 발행은 **at-least-once** 다. 릴레이가 발행 뒤 표시 전에 죽으면 같은 사건이 다시 나간다 — 그래서 소비자가 `event_id` 로 멱등이어야 한다
+- **독 행은 그 행만 선다**(`I17-4`). 보낼 수 없는 행(봉투를 못 만든다·`RecordTooLargeException`)은 `attempts`·`last_error`(예외 클래스 이름)·`next_attempt_at`(1초부터 두 배, 최대 5분)을 적고 다음 행으로 간다. 브로커 일시 오류(`RetriableException`)는 안 세고 그 회를 멈춘다. 한 회는 10초 안이다
+- **10회 실패면 주차한다**(ERROR 로그). 같은 집합체의 뒤 사건도 같이 선다 — 순서를 지키려는 값이다. 원인을 고친 뒤 사람이 푼다: `update outbox set attempts = 0, next_attempt_at = null where outbox_id = …`. 주차된 행은 `select outbox_id, type, aggregate_id, last_error from outbox where published_at is null and attempts >= 10` 로 찾는다
 
 ## 소비 — 26·27·29
 
