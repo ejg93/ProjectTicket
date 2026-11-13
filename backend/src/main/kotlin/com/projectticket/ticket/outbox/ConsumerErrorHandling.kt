@@ -1,5 +1,6 @@
 package com.projectticket.ticket.outbox
 
+import com.projectticket.ticket.error.hitStatementLimit
 import org.apache.kafka.common.TopicPartition
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
@@ -9,6 +10,7 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.dao.DataAccessResourceFailureException
 import org.springframework.dao.TransientDataAccessException
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.transaction.CannotCreateTransactionException
 import org.springframework.transaction.TransactionException
 import org.springframework.util.backoff.BackOff
 import org.springframework.util.backoff.ExponentialBackOff
@@ -24,7 +26,8 @@ import tools.jackson.core.JacksonException
  * | 무엇 | 값 | 왜 |
  * |---|---|---|
  * | 재시도 | 2초 간격 3회 | 사건 탓으로 보이는 실패. 더 길게 끌면 뒤 사건이 밀린다 |
- * | DB 일시 오류 | 2초부터 두 배, 최대 30초, **횟수 무제한** | DB 가 3회 창보다 오래 죽으면 그동안 소비한 사건이 전부 DLT 로 갔다(`I17-7`). 30초는 `max.poll.interval.ms` 300초 안이다 |
+ * | DB 연결 실패 | 2초부터 두 배, 최대 30초, **횟수 무제한** | DB 가 3회 창보다 오래 죽으면 그동안 소비한 사건이 전부 DLT 로 갔다(`I17-7`). 30초는 `max.poll.interval.ms` 300초 안이다 |
+ * | 그 밖 DB 일시 오류 | 같은 지수, **대기 합 5분**(13회) 뒤 DLT | 문장 상한(`55P03`·`57014`)·교착은 DB 가 살아 있어도 늘 걸릴 수 있다 — 무제한이면 그 파티션이 영영 선다(`I17-12`, 2026-11-13 사용자) |
  * | 깨진 봉투 | 재시도 없이 바로 DLT | JSON 이 깨진 것은 다시 읽어도 깨져 있다(`I17-7`) |
  * | 초과하면 | `<토픽>.DLT` 로 보낸다 | 그 줄이 막히면 **소비자 하나의 결함이 발행자를 멈춘다** — `D11` 이 막으라고 한 것이다 |
  * | 오프셋 | DLT 로 보낸 뒤 넘어간다 | 안 넘기면 같은 사건을 영원히 다시 읽는다 |
@@ -67,18 +70,29 @@ class ConsumerErrorHandling {
         private const val TRANSIENT_MAX_MS = 30_000L
         private const val TRANSIENT_MULTIPLIER = 2.0
 
+        /** 연결 실패가 아닌 일시 오류의 대기 합 상한 — 5분(2026-11-13 사용자, `I17-12`). 시도 자체(문장 10초)는 안 센다 */
+        const val TRANSIENT_MAX_ELAPSED_MS = 300_000L
+
         /**
          * 실패한 기록마다 기다림을 고른다. 원인 사슬로 가른다 — 리스너 예외는 `ListenerExecutionFailedException` 에 싸여 온다.
          * 분류를 이 함수 하나에 둔다(`addNotRetryableExceptions` 를 따로 안 쓴다) — 시험이 고르는 자리를 그대로 잰다.
+         *
+         * 순서가 판정이다: 깨진 봉투 → 문장 상한 → 연결 실패 → 그 밖 일시 오류 → 나머지. 문장 상한을 연결 실패보다 먼저 본다 —
+         * `57` 묶음이 `DataAccessResourceFailureException` 으로 번역되는 판에서도 무제한으로 안 샌다(`I17-12`).
          */
         fun backOffFor(exception: Exception): BackOff {
             val chain = generateSequence<Throwable>(exception) { it.cause }.toList()
             return when {
                 chain.any { it is JacksonException } -> FixedBackOff(0, 0)
-                chain.any { it is TransientDataAccessException || it is DataAccessResourceFailureException || it is TransactionException } ->
-                    ExponentialBackOff(TRANSIENT_INITIAL_MS, TRANSIENT_MULTIPLIER).apply { maxInterval = TRANSIENT_MAX_MS }
+                exception.hitStatementLimit() -> boundedExponential()
+                chain.any { it is DataAccessResourceFailureException || it is CannotCreateTransactionException } -> exponential()
+                chain.any { it is TransientDataAccessException || it is TransactionException } -> boundedExponential()
                 else -> FixedBackOff(RETRY_INTERVAL_MS, RETRY_COUNT)
             }
         }
+
+        private fun exponential() = ExponentialBackOff(TRANSIENT_INITIAL_MS, TRANSIENT_MULTIPLIER).apply { maxInterval = TRANSIENT_MAX_MS }
+
+        private fun boundedExponential() = exponential().apply { maxElapsedTime = TRANSIENT_MAX_ELAPSED_MS }
     }
 }

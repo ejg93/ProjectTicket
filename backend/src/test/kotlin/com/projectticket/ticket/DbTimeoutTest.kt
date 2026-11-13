@@ -5,6 +5,7 @@ import com.projectticket.ticket.auth.TicketUserDetailsService.TicketUser
 import com.projectticket.ticket.event.EventFixture
 import com.projectticket.ticket.event.PerformanceOpenService
 import com.projectticket.ticket.idempotency.IdempotencyService
+import com.projectticket.ticket.outbox.ConsumerErrorHandling
 import com.projectticket.ticket.queue.AdmissionService
 import com.projectticket.ticket.queue.QueueGateFilter
 import com.projectticket.ticket.queue.QueueService
@@ -16,12 +17,14 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.MediaType
+import org.springframework.kafka.listener.ListenerExecutionFailedException
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import org.springframework.util.backoff.ExponentialBackOff
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -106,6 +109,60 @@ class DbTimeoutTest : ConcurrencyTestBase() {
             holding.get(30, TimeUnit.SECONDS)
             holder.shutdown()
         }
+    }
+
+    @Test
+    fun a_real_statement_timeout_gets_a_bounded_consumer_retry() {
+        val thrown = checkNotNull(
+            runCatching {
+                TransactionTemplate(txManager).executeWithoutResult {
+                    jdbc.sql("set local statement_timeout = '100ms'").update()
+                    jdbc.sql("select pg_sleep(1)").query().singleValue()
+                }
+            }.exceptionOrNull(),
+        ) { "문장 상한에 안 걸렸다" }
+
+        assertBoundedRetry(thrown)
+    }
+
+    @Test
+    fun a_real_lock_timeout_gets_a_bounded_consumer_retry() {
+        val accountId = EventFixture(jdbc).account("${PREFIX}db-timeout-${System.nanoTime()}@test.local")
+        val locked = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val holder = Executors.newSingleThreadExecutor()
+        val holding = holder.submit {
+            TransactionTemplate(txManager).executeWithoutResult {
+                jdbc.sql("select 1 from account where account_id = :id for update").param("id", accountId).query(Int::class.java).single()
+                locked.countDown()
+                release.await(10, TimeUnit.SECONDS)
+            }
+        }
+        try {
+            check(locked.await(10, TimeUnit.SECONDS)) { "계정 행을 못 잡았다" }
+            val thrown = checkNotNull(
+                runCatching {
+                    TransactionTemplate(txManager).executeWithoutResult {
+                        jdbc.sql("set local lock_timeout = '100ms'").update()
+                        jdbc.sql("select 1 from account where account_id = :id for update").param("id", accountId).query(Int::class.java).single()
+                    }
+                }.exceptionOrNull(),
+            ) { "잠금 대기 상한에 안 걸렸다" }
+
+            assertBoundedRetry(thrown)
+        } finally {
+            release.countDown()
+            holding.get(30, TimeUnit.SECONDS)
+            holder.shutdown()
+        }
+    }
+
+    /** 드라이버·Spring 이 실제로 던진 예외를 소비자가 받았을 때 — 무제한이 아니라 대기 합 5분 뒤 DLT 다(`I17-12`) */
+    private fun assertBoundedRetry(thrown: Throwable) {
+        val backOff = ConsumerErrorHandling.backOffFor(ListenerExecutionFailedException("리스너가 던졌다", thrown))
+
+        assertThat(backOff).describedAs(thrown.javaClass.name).isInstanceOf(ExponentialBackOff::class.java)
+        assertThat((backOff as ExponentialBackOff).maxElapsedTime).isEqualTo(ConsumerErrorHandling.TRANSIENT_MAX_ELAPSED_MS)
     }
 
     private fun show(name: String): String = jdbc.sql("show $name").query(String::class.java).single()

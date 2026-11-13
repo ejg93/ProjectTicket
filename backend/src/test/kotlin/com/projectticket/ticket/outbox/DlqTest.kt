@@ -18,7 +18,7 @@ import org.springframework.kafka.core.KafkaTemplate
  * 메일도 정산도 그 자리에서 선다 — `D11` 이 「소비자 하나가 발행자를 안 멈춘다」고 정한 바로 그 자리다.
  *
  * 깨진 메시지를 그대로 넣는다. 진짜 소비자 둘이 파싱에서 죽고, **다시 시도하지 않고** `.DLT` 로 간다 —
- * 다시 읽어도 깨져 있다(`I17-7`). 사건 탓의 다른 실패는 2초 × 3회 뒤, DB 일시 오류는 무제한 지수다(`ConsumerErrorHandling`).
+ * 다시 읽어도 깨져 있다(`I17-7`). 사건 탓의 다른 실패는 2초 × 3회 뒤, DB 연결 실패는 무제한 지수, 그 밖 DB 일시 오류는 대기 합 5분 뒤다(`ConsumerErrorHandling`).
  * **가짜 리스너를 안 만든다** — 재는 것이 「우리 소비자가 죽었을 때」라 그 경로 그대로여야 한다.
  */
 @Import(DlqTest.DeadLetterSpy::class)

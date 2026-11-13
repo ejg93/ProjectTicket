@@ -1,9 +1,13 @@
 package com.projectticket.ticket.outbox
 
+import java.sql.SQLException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.dao.DataAccessResourceFailureException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.dao.QueryTimeoutException
 import org.springframework.jdbc.CannotGetJdbcConnectionException
+import org.springframework.jdbc.UncategorizedSQLException
 import org.springframework.kafka.listener.ListenerExecutionFailedException
 import org.springframework.transaction.CannotCreateTransactionException
 import org.springframework.util.backoff.BackOff
@@ -14,7 +18,8 @@ import tools.jackson.databind.ObjectMapper
  * 소비 실패를 일시·사건 탓으로 갈라 재시도하나(`I17-7`). 브로커 없이 고르는 함수만 잰다.
  *
  * DB 가 재시도 창(2초 × 3)보다 오래 죽으면 그동안 소비한 사건이 전부 DLT 로 갔다 — 사람이 아웃박스로 다시 넣어야 끝난다.
- * 일시 오류는 무제한 지수(2초부터 두 배, 최대 30초)로 기다리고, 깨진 봉투는 다시 해도 같아 바로 DLT 다.
+ * 연결 실패는 무제한 지수(2초부터 두 배, 최대 30초)로 기다리고, 깨진 봉투는 다시 해도 같아 바로 DLT 다.
+ * 문장 상한·교착 같은 그 밖의 일시 오류는 같은 지수로 다시 하되 대기 합 5분 뒤 DLT 다(`I17-12`) — 늘 걸리는 사건이 파티션을 영영 막지 않는다.
  */
 class ConsumerBackOffTest {
 
@@ -22,7 +27,6 @@ class ConsumerBackOffTest {
     fun a_dead_database_is_retried_without_limit() {
         listOf(
             CannotGetJdbcConnectionException("풀이 연결을 못 얻었다"),
-            QueryTimeoutException("문장 시간 초과"),
             CannotCreateTransactionException("트랜잭션을 못 열었다"),
         ).forEach { cause ->
             val waits = intervals(ConsumerErrorHandling.backOffFor(ListenerExecutionFailedException("리스너가 던졌다", cause)), limit = 50)
@@ -30,6 +34,24 @@ class ConsumerBackOffTest {
             assertThat(waits).describedAs("${cause.javaClass.simpleName} 은 DLT 로 안 간다").hasSize(50)
             assertThat(waits.take(3)).containsExactly(2_000L, 4_000L, 8_000L)
             assertThat(waits.max()).describedAs("max.poll.interval.ms 300초 안").isEqualTo(30_000L)
+        }
+    }
+
+    @Test
+    fun a_statement_that_keeps_hitting_a_limit_ends_in_the_dead_letter_topic() {
+        listOf(
+            QueryTimeoutException("문장 시간 초과", SQLException("canceling statement due to statement timeout", "57014")),
+            // `55` 묶음은 Spring 이 번역하지 못한다 — 이름이 아니라 SQLSTATE 로 가른다
+            UncategorizedSQLException("잠금 대기 초과", "select … for update", SQLException("canceling statement due to lock timeout", "55P03")),
+            // `57` 이 연결 실패로 번역되는 판이어도 무제한으로 안 샌다
+            DataAccessResourceFailureException("문장 시간 초과", SQLException("canceling statement due to statement timeout", "57014")),
+            PessimisticLockingFailureException("교착"),
+        ).forEach { cause ->
+            val waits = intervals(ConsumerErrorHandling.backOffFor(ListenerExecutionFailedException("리스너가 던졌다", cause)), limit = 50)
+
+            assertThat(waits.take(3)).describedAs(cause.javaClass.simpleName).containsExactly(2_000L, 4_000L, 8_000L)
+            assertThat(waits).describedAs("${cause.javaClass.simpleName} 은 13회 뒤 DLT").hasSize(13)
+            assertThat(waits.sum()).describedAs("대기 합 5분").isEqualTo(300_000L)
         }
     }
 
