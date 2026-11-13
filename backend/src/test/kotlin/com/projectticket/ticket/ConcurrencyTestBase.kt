@@ -81,7 +81,7 @@ abstract class ConcurrencyTestBase {
             jdbc.sql("delete from outbox where aggregate_type = 'performance' and aggregate_id in ($performances)")
                 .param("prefix", "$PREFIX%")
                 .update()
-            // 티켓 → 환불 → 결제 → 예매. 전부 `restrict` 라 자식부터다.
+            // 티켓 → 환불 → 결제·시도 → 예매. 전부 `restrict` 라 자식부터다.
             jdbc.sql("delete from ticket where reservation_seat_id in (select reservation_seat_id from reservation_seat where reservation_id in ($reservations))")
                 .param("prefix", "$PREFIX%")
                 .update()
@@ -89,6 +89,7 @@ abstract class ConcurrencyTestBase {
                 .param("prefix", "$PREFIX%")
                 .update()
             jdbc.sql("delete from payment where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
+            jdbc.sql("delete from payment_attempt where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from reservation where reservation_id in ($reservations)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from performance where performance_id in ($performances)").param("prefix", "$PREFIX%").update()
             jdbc.sql("delete from event where organizer_id in (select organizer_id from organizer where code like :prefix)")

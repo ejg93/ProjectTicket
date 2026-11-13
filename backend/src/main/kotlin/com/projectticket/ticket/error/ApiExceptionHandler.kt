@@ -104,6 +104,13 @@ class ApiExceptionHandler(private val problems: ProblemFactory) : ResponseEntity
                 .header(HttpHeaders.RETRY_AFTER, ProblemWriter.RETRY_AFTER_SECONDS)
                 .body(problems.create(ErrorCode.QUEUE_UNAVAILABLE, null, request))
         }
+        // DB 시간 상한에 걸렸다(`I17-6`). 다시 하면 될 수 있어 503 + `Retry-After` 다. 우리 버그가 아니라 몰림이라 스택 없이 WARN 이다.
+        if (e.isDbBusy()) {
+            log.warn("DB 시간 상한으로 요청을 못 받았다: {} {} {}", request.method, request.requestURI, e.javaClass.simpleName)
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, ProblemWriter.RETRY_AFTER_SECONDS)
+                .body(problems.create(ErrorCode.SERVICE_BUSY, null, request))
+        }
         log.error("처리하지 못한 예외: {} {}", request.method, request.requestURI, e)
         return respond(problems.create(ErrorCode.INTERNAL, null, request))
     }

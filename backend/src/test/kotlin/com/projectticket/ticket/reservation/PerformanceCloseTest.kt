@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.jdbc.core.simple.JdbcClient
+import java.util.UUID
 
 /**
  * 판매 마감이 지나면 회차가 닫히고 **남은 선점만** 풀리는가(16a, `D3` 「자동 전이 셋」).
@@ -102,7 +103,7 @@ class PerformanceCloseTest : PostgresTestBase() {
     fun paying_reservations_expire_too() {
         val accountId = fixture.account("paying-close@test.local")
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId).take(1)))
-        payments.startPaying(accountId, reservationId)
+        payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         passTheDeadline()
 
         closer.closeDue()
@@ -116,7 +117,7 @@ class PerformanceCloseTest : PostgresTestBase() {
     fun reserved_reservations_survive_the_close() {
         val accountId = fixture.account("reserved-close@test.local")
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId).take(1)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         passTheDeadline()
 

@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.post
 import java.math.BigDecimal
+import java.util.UUID
 
 /**
  * 관객 취소가 `D6` 대로 도는가 — 구간표 행에서 율을 고르고, 박제하고, 좌석을 돌려주고, 당일은 막는다.
@@ -225,7 +226,7 @@ class ReservationCancelTest : PostgresTestBase() {
     /** 2석 308,000원을 결제까지 마친 예매 */
     private fun reserved(startsInDays: Long): Long {
         val reservationId = hold(startsInDays)
-        val paying = payments.startPaying(buyer.id, reservationId)
+        val paying = payments.startPaying(buyer.id, reservationId, UUID.randomUUID().toString())
         payments.settle(buyer.id, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }

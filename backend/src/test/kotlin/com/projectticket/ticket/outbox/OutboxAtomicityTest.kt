@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import tools.jackson.databind.ObjectMapper
+import java.util.UUID
 
 /**
  * **확정 없이 사건 없고, 사건 없이 확정 없다**(`D11` 「발행」). Transactional Outbox 가 사는 이유가 이 한 줄이다.
@@ -94,7 +95,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
     @Test
     fun late_approval_makes_no_event() {
         val reservationId = hold(startsInDays = 8)
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         jdbc.sql("update reservation set paying_until = now() - interval '1 second' where reservation_id = :id").param("id", reservationId).update()
 
         val settled = payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
@@ -132,7 +133,7 @@ class OutboxAtomicityTest : ConcurrencyTestBase() {
     /** 2석 308,000원을 결제까지 마친 예매 */
     private fun reserved(startsInDays: Long): Pair<Long, Long> {
         val reservationId = hold(startsInDays)
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         return reservationId to payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null)).paymentId
     }
 

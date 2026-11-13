@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import tools.jackson.databind.ObjectMapper
+import java.util.UUID
 
 /**
  * 환불 미리보기가 **실제 취소와 같은 액수**를 말하는가(`44a`, `D6`).
@@ -125,7 +126,7 @@ class RefundPreviewTest : PostgresTestBase() {
     /** 2석 308,000원을 결제까지 마친 예매 */
     private fun reserved(startsInDays: Long): Long {
         val reservationId = hold(startsInDays)
-        val paying = payments.startPaying(buyer.id, reservationId)
+        val paying = payments.startPaying(buyer.id, reservationId, UUID.randomUUID().toString())
         payments.settle(buyer.id, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }

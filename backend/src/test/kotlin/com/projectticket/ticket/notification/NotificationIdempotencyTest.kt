@@ -142,6 +142,35 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun a_flaky_address_stays_pending_and_waits_before_the_next_try() {
+        val flaky = fixture.account("${PREFIX}busy${MockNotificationSender.FLAKY_DOMAIN}")
+        insertPending(flaky)
+
+        assertThat(sweeper.sweep()).isZero()
+
+        // 일시 실패는 끝 상태가 아니다(`I17-9`) — 바로 `failed` 로 찍으면 `V29` 가 막아 그 메일은 영영 안 나간다.
+        assertThat(retryOf(flaky)).isEqualTo(Retry(status = "pending", attempts = 1, waiting = true))
+        // 대기 중인 행은 다음 회가 안 집는다 — 30초부터 두 배다.
+        sweeper.sweep()
+        assertThat(retryOf(flaky).attempts).isEqualTo(1)
+    }
+
+    @Test
+    fun the_fifth_flaky_failure_is_final() {
+        val flaky = fixture.account("${PREFIX}busy${MockNotificationSender.FLAKY_DOMAIN}")
+        insertPending(flaky)
+        jdbc.sql("update notification set attempts = 4 where account_id = :id").param("id", flaky).update()
+
+        sweeper.sweep()
+
+        val row = jdbc.sql("select status, failure_reason from notification where account_id = :id")
+            .param("id", flaky)
+            .query { rs, _ -> rs.getString("status") to rs.getString("failure_reason") }
+            .single()
+        assertThat(row).isEqualTo("failed" to MockNotificationSender.TRANSIENT_REASON)
+    }
+
+    @Test
     fun a_withdrawn_account_is_skipped_not_failed() {
         val leaving = fixture.account("${PREFIX}leaving@test.local")
         try {
@@ -196,7 +225,7 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
     private fun reserved(startsInDays: Long): Long {
         val performanceId = fixture.performance(eventId, hallId, startsInDays).also { openService.open(it, actorAccountId = null) }
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }
@@ -215,6 +244,14 @@ class NotificationIdempotencyTest : ConcurrencyTestBase() {
         val payload = ObjectMapper().readValue(row.third, Map::class.java) as Map<String, Any?>
         return OutboxRelay.Envelope(eventId = row.first, type = type, version = 1, occurredAt = row.second, aggregateType = AggregateType.RESERVATION, aggregateId = reservationId, payload = payload)
     }
+
+    private data class Retry(val status: String, val attempts: Int, val waiting: Boolean)
+
+    private fun retryOf(account: Long): Retry =
+        jdbc.sql("select status, attempts, next_attempt_at > now() as waiting from notification where account_id = :id")
+            .param("id", account)
+            .query { rs, _ -> Retry(status = rs.getString("status"), attempts = rs.getInt("attempts"), waiting = rs.getBoolean("waiting")) }
+            .single()
 
     private fun insertPending(account: Long) =
         jdbc.sql(

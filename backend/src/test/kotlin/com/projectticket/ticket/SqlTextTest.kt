@@ -272,8 +272,9 @@ class SqlTextTest {
             "PerformanceCloser.kt" to listOf("open"),
             // `notification_pending_idx`(V15). 결제의 `approved` 는 `payment_reservation_idx` 로도 풀려 짝이 아니다(`I9-6`)
             "NotificationStore.kt" to listOf("pending"),
-            // `settlement_scheduled_idx`(V16). `reserved` 는 인덱스가 아니라 **계층**이다 — 정산이 `ReservationStatus` 를 못 본다(`ArchitectureTest`)
-            "SettlementStore.kt" to listOf("reserved", "scheduled"),
+            // `settlement_scheduled_idx`(V16). `reserved` 는 인덱스가 아니라 **계층**이다 — 정산이 `ReservationStatus` 를 못 본다(`ArchitectureTest`).
+            // `closed`·`cancelled` 도 같다 — 잃은 정산 스윕(`I17-7`)이 `PerformanceStatus` 를 못 본다
+            "SettlementStore.kt" to listOf("cancelled", "closed", "reserved", "scheduled"),
             // `on conflict … where` — `reservation_live_hold_idx`(V8)와 글자로 같아야 한다
             "SeatHoldService.kt" to listOf("held", "paying"),
             // `reservation_held_until_idx` · `reservation_paying_until_idx`(V7)

@@ -197,14 +197,17 @@ class NotificationStore(private val jdbc: JdbcClient) {
      *
      * **탈퇴했으면 이메일을 안 넘긴다**(`D11` 「받는 사람」, `I11-4`). 탈퇴는 `deleted_at` 만 찍고 이메일은 30일 뒤 파기가 비워서,
      * 이메일만 보면 그 30일 동안 메일이 나갔다. 비워 넘기면 스윕의 「탈퇴 — 건너뜀」 길을 그대로 탄다.
+     *
+     * 일시 실패로 미뤄 둔 행은 `next_attempt_at` 이 지나야 고른다(`I17-9`).
      */
     @Transactional
     fun takePending(batchSize: Int): List<Pending> =
         jdbc.sql(
             """
-            select n.notification_id, n.subject, n.body, case when a.deleted_at is null then a.email end as email
+            select n.notification_id, n.subject, n.body, case when a.deleted_at is null then a.email end as email, n.attempts
               from notification n join account a on a.account_id = n.account_id
              where n.status = 'pending'
+               and (n.next_attempt_at is null or n.next_attempt_at <= now())
              order by n.notification_id
              limit :batch
                for update of n skip locked
@@ -229,6 +232,25 @@ class NotificationStore(private val jdbc: JdbcClient) {
             .param("id", notificationId)
             .update()
 
+    /**
+     * 일시 실패 — `pending` 에 둔 채 시도를 세고 다음 시도를 `30 × 2^attempts` 초 뒤로 미룬다(`I17-9`).
+     * 끝 상태가 아니라서 `V29` 의 전이 검사에 안 걸린다. 조건부라 남이 먼저 표시했으면 0행이다.
+     */
+    @Transactional
+    fun markRetry(notificationId: Long) =
+        jdbc.sql(
+            """
+            update notification
+               set attempts = attempts + 1,
+                   next_attempt_at = now() + make_interval(secs => :base * power(2, attempts))
+             where notification_id = :id and status = :pending
+            """,
+        )
+            .param("base", RETRY_BASE_SECONDS)
+            .param("pending", NotificationStatus.PENDING.code)
+            .param("id", notificationId)
+            .update()
+
     @Transactional
     fun markSkipped(notificationId: Long, reason: String) =
         jdbc.sql("update notification set status = :skipped, failure_reason = :reason where notification_id = :id and status = :pending")
@@ -238,8 +260,16 @@ class NotificationStore(private val jdbc: JdbcClient) {
             .param("id", notificationId)
             .update()
 
-    /** [email] 은 탈퇴한 계정이면 null 이다 — 파기 전이면 [takePending] 이 비우고, 파기 뒤면 컬럼이 비어 있다 */
-    data class Pending(val notificationId: Long, val subject: String, val body: String, val email: String?)
+    /**
+     * [email] 은 탈퇴한 계정이면 null 이다 — 파기 전이면 [takePending] 이 비우고, 파기 뒤면 컬럼이 비어 있다.
+     * [attempts] 는 지금까지의 일시 실패 수다.
+     */
+    data class Pending(val notificationId: Long, val subject: String, val body: String, val email: String?, val attempts: Int)
+
+    companion object {
+        /** 일시 실패 뒤 첫 대기(초). 실패마다 두 배다 — 30·60·120·240초 */
+        const val RETRY_BASE_SECONDS = 30
+    }
 
     data class Line(val title: String, val startsAt: OffsetDateTime)
 }

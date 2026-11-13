@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
+import java.util.UUID
 
 /**
  * 둘째 소비자가 `D21` 대로 도는가 — 회차가 닫히면 예약되고, `settle_at` 뒤에 **항목의 합**으로 정산서가 선다.
@@ -224,6 +225,49 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
         }.hasStackTraceContaining("정산서 금액이 항목의 합과 다르다")
     }
 
+    @Test
+    fun a_settlement_whose_event_was_lost_is_scheduled_by_the_sweep() {
+        closeWithoutDelivery()
+        // 사건이 DLT 로 갔고 보존 7일이 지나 사라졌다 — 소비자는 다시 안 온다(`I17-7`).
+        dropEvents()
+
+        sweeper.sweep()
+
+        assertThat(settlementRow().status).isEqualTo("scheduled")
+        // 사건 시각이 없어 지금과 관람 중 늦은 쪽이다 — 늦어질 뿐 빨라지지 않는다.
+        assertThat(settleAfterShow()).isEqualTo("7 days")
+    }
+
+    @Test
+    fun a_fresh_event_is_left_to_the_consumer() {
+        closeWithoutDelivery()
+
+        sweeper.sweep()
+
+        // 사건이 방금 나갔다 — 소비자가 먼저다. 스윕이 끼면 사건 시각이 아니라 지금으로 박제된다.
+        assertThat(settlementCount()).isZero()
+    }
+
+    @Test
+    fun sweeping_a_lost_settlement_twice_makes_one() {
+        closeWithoutDelivery()
+        dropEvents()
+
+        sweeper.sweep()
+        sweeper.sweep()
+
+        assertThat(settlementCount()).isOne()
+    }
+
+    private fun closeWithoutDelivery() {
+        jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id").param("id", performanceId).update()
+        closer.closeDue()
+    }
+
+    private fun dropEvents() {
+        jdbc.sql("delete from outbox where aggregate_type = 'performance' and aggregate_id = :id").param("id", performanceId).update()
+    }
+
     /** 회차를 닫고 그 사건을 발행한다 — 소비자가 예약을 만든다 */
     private fun closeWithEvent() {
         jdbc.sql("update performance set sales_close_at = now() - interval '1 second' where performance_id = :id").param("id", performanceId).update()
@@ -239,7 +283,7 @@ class SettlementAggregateTest : ConcurrencyTestBase() {
 
     private fun reserve(accountId: Long, seats: Int, from: Int = 0): Long {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, seatIds().drop(from).take(seats)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return reservationId
     }

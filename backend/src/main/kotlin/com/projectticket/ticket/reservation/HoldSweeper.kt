@@ -34,21 +34,39 @@ class HoldSweeper(
      * 타임아웃(`paying_until < now()`)은 결제 승인의 조건부 UPDATE(`where paying_until >= now()`)와 같은 행을 두고 다투지만
      * 둘 다 조건부라 한쪽만 이긴다 — 승인이 지면 `payment_late` 다(`D4`).
      *
+     * **남이 쥔 예매는 건너뛴다**(`I17-8`, `D4` 「여러 행을 잠글 때」). 만료된 예매를 `order by reservation_id … skip locked` 로 먼저 잡는다 —
+     * 회차 취소·종료는 회차 행을 잡은 뒤 예매를 `order by reservation_id for update` 로 잠가서, 스윕이 임의 순서로 기다리면 `40P01` 이 났다.
+     * 안 기다리는 쪽은 교착 고리에 못 든다. 남이 쥔 행은 그쪽(취소·종료·확정)이 끝내고, [batch] 를 넘는 나머지는 다음 회(30초)다.
+     *
      * @return 만료시킨 예매 수
      */
     @Transactional
-    fun sweep(): Int {
+    fun sweep(batch: Int = BATCH_SIZE): Int {
         // 상태를 **리터럴로 박는다** — 부분 인덱스(`reservation_held_until_idx`·`reservation_paying_until_idx`)의 조건과 글자로 같아야
         // generic plan 에서도 그 인덱스를 쓴다. 바인딩하면 Seq Scan 이다(`coding-rules.md` 「SQL」, `I9-4` 실측).
+        // 바깥 UPDATE 도 같은 조건을 다시 건다 — 고른 뒤 바뀐 행을 옮기지 않는 조건부 UPDATE 다(`D4`). 여기는 PK 로 붙어 인덱스와 상관없어 바인딩한다.
         val expired = jdbc.sql(
             """
-            update reservation
+            with due as (
+                select reservation_id from reservation
+                 where status = 'held' and held_until < now()
+                    or status = 'paying' and paying_until < now()
+                 order by reservation_id
+                 limit :batch
+                   for update skip locked
+            )
+            update reservation r
                set status = :expired, expired_at = now(), paying_until = null, cancelled_by = :by
-             where status = 'held' and held_until < now()
-                or status = 'paying' and paying_until < now()
-            returning reservation_id
+              from due
+             where r.reservation_id = due.reservation_id
+               and (r.status = :held and r.held_until < now()
+                 or r.status = :paying and r.paying_until < now())
+            returning r.reservation_id
             """,
         )
+            .param("batch", batch)
+            .param("held", ReservationStatus.HELD.code)
+            .param("paying", ReservationStatus.PAYING.code)
             .param("expired", ReservationStatus.EXPIRED.code)
             .param("by", CancelledBy.EXPIRED.code)
             .query(Long::class.java)
@@ -95,5 +113,8 @@ class HoldSweeper(
     companion object {
         /** ADR 0003 — 30초. 「5분 선점이 5분 30초까지 남을 수 있다」는 뜻이고 화면의 카운트다운이 덮는다(`D7`) */
         const val SWEEP_INTERVAL = "PT30S"
+
+        /** 한 회 상한. 넘는 나머지는 다음 회다 — 한 트랜잭션이 잡는 행 수를 묶는다 */
+        const val BATCH_SIZE = 500
     }
 }

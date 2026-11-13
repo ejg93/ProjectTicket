@@ -82,6 +82,24 @@ class SeatChangesTest : ConcurrencyTestBase() {
     }
 
     @Test
+    fun a_repaired_version_sends_the_screen_back_to_the_snapshot() {
+        val before = seatQuery.version(performanceId)
+        hold(seatIds.first())
+        val afterHold = seatQuery.version(performanceId)
+        // 올리기가 Redis 장애로 빠졌다(`bumpQuietly` 의 catch 가 하는 일). 놓친 좌석은 로그 어디에도 없다.
+        seatVersions.markDirty(performanceId)
+
+        assertThat(seatVersions.repairDirty()).isPositive()
+
+        // 로그를 비우고 판을 올렸다 — 옛 `since` 는 410 을 받아 전체를 다시 읽는다(`I17-9`).
+        assertThat(seatQuery.version(performanceId)).isGreaterThan(afterHold)
+        assertThatThrownBy { seatQuery.changes(performanceId, since = before) }
+            .isInstanceOfSatisfying(TicketException::class.java) { thrown ->
+                assertThat(thrown.code.slug).isEqualTo("seat-changes-expired")
+            }
+    }
+
+    @Test
     fun a_since_outside_the_log_is_gone() {
         hold(seatIds.first())
 

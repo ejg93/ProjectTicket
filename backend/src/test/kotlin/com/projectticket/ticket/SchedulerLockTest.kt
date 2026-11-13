@@ -1,5 +1,6 @@
 package com.projectticket.ticket
 
+import io.lettuce.core.RedisCommandExecutionException
 import io.lettuce.core.RedisCommandTimeoutException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -11,6 +12,7 @@ import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 import org.springframework.dao.QueryTimeoutException
 import org.springframework.data.redis.RedisConnectionFailureException
+import org.springframework.data.redis.RedisSystemException
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.core.script.RedisScript
@@ -66,6 +68,17 @@ class SchedulerLockTest {
         `when`(redis.execute(any<RedisScript<Long>>(), anyList(), any())).thenThrow(QueryTimeoutException("Redis 명령 시간 초과", RedisCommandTimeoutException("2초")))
 
         assertThat(SchedulerLock(redis).runExclusively("hold-sweeper") { WORK_RESULT }).isEqualTo(WORK_RESULT)
+    }
+
+    @Test
+    fun a_server_error_on_release_is_not_swallowed() {
+        // 서버가 오류로 답한 것은 장애가 아니라 우리 버그다(스크립트 오류 — `I17-10`). 삼키면 락이 안 풀리는 버그가 TTL 뒤로 숨는다.
+        `when`(redis.opsForValue()).thenReturn(values)
+        `when`(values.setIfAbsent(anyString(), anyString(), any(Duration::class.java))).thenReturn(true)
+        `when`(redis.execute(any<RedisScript<Long>>(), anyList(), any()))
+            .thenThrow(RedisSystemException("스크립트 오류", RedisCommandExecutionException("ERR Error running script")))
+
+        assertThatThrownBy { SchedulerLock(redis).runExclusively("hold-sweeper") { WORK_RESULT } }.isInstanceOf(RedisSystemException::class.java)
     }
 
     private companion object {

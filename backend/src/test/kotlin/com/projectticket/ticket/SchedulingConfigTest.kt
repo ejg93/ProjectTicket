@@ -1,15 +1,23 @@
 package com.projectticket.ticket
 
+import com.projectticket.ticket.outbox.OutboxRelay
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean
+import org.springframework.boot.autoconfigure.AutoConfigurations
+import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration
 import org.springframework.boot.autoconfigure.task.TaskSchedulingProperties
 import org.springframework.boot.context.properties.bind.Bindable
 import org.springframework.boot.context.properties.bind.Binder
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource
 import org.springframework.boot.convert.DurationStyle
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.ClassPathResource
+import org.springframework.scheduling.annotation.EnableScheduling
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 
 /**
  * 아웃박스 릴레이가 Kafka 를 기다리는 동안 **다른 스케줄러가 멈추지 않나**(`I17-3`).
@@ -40,6 +48,24 @@ class SchedulingConfigTest {
     }
 
     @Test
+    fun the_boot_wired_scheduler_has_four_threads() {
+        // 속성 클래스에 묶어도 스케줄러 빈이 그 값을 안 쓰면 초록이다 — 자동 설정이 세운 빈의 코어 수를 본다(`I17-10`).
+        ApplicationContextRunner()
+            .withInitializer(ConfigDataApplicationContextInitializer())
+            .withUserConfiguration(Scheduling::class.java)
+            .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration::class.java))
+            .run { context ->
+                val scheduler = context.getBean(ThreadPoolTaskScheduler::class.java)
+                assertThat(scheduler.scheduledThreadPoolExecutor.corePoolSize).isEqualTo(4)
+            }
+    }
+
+    /** 자동 설정은 `@EnableScheduling` 이 있을 때만 스케줄러를 세운다 */
+    @Configuration(proxyBeanMethods = false)
+    @EnableScheduling
+    class Scheduling
+
+    @Test
     fun producer_settings_are_real_kafka_names() {
         assertThat(producer.keys).isNotEmpty().allMatch { it in ProducerConfig.configNames() }
     }
@@ -60,6 +86,21 @@ class SchedulingConfigTest {
             checkNotNull(binder.bind("spring.lifecycle.timeout-per-shutdown-phase", String::class.java).orElse(null)) { "종료 단계 상한이 없다" },
         )
         assertThat(delivery).isLessThan(shutdownPhase.toMillis())
+    }
+
+    @Test
+    fun a_relay_round_fits_inside_the_idle_transaction_limit() {
+        // 릴레이는 한 트랜잭션에서 고른 뒤 끝 UPDATE 까지 문장이 없다. 예산은 행 사이에서만 보므로 최악은
+        // 예산 + 한 건의 `max.block.ms` + `delivery.timeout.ms` 다 — 이것이 유휴 상한에 닿으면 서버가 연결을 끊고 회 전체가 롤백된다(마무리 36차 I1).
+        val options = checkNotNull(binder.bind("spring.datasource.hikari.data-source-properties.options", String::class.java).orElse(null)) {
+            "드라이버 속성 options 가 없다(I17-6)"
+        }
+        val idle = checkNotNull(Regex("""idle_in_transaction_session_timeout=(\d+)""").find(options)) { "유휴 상한이 없다" }.groupValues[1].toLong()
+        val worst = OutboxRelay.ROUND_BUDGET.toMillis() +
+            producerMillis(ProducerConfig.MAX_BLOCK_MS_CONFIG) +
+            producerMillis(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG)
+
+        assertThat(worst).isLessThan(idle)
     }
 
     private companion object {

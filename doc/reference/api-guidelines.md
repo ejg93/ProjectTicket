@@ -155,6 +155,7 @@
 | **`queue-closed`** | 410 | 회차가 닫혀 대기열이 없다 — 닫힌·취소된 회차만. 판매 시작 전은 409 `performance-not-open` 이다 | | 21·I16-3 |
 | **`not-in-queue`** | 404 | 순번을 물었는데 줄에 없다 | | 21 |
 | **`queue-unavailable`** | 503 | Redis 가 죽어 관문이 닫혔다. 세션 필터·컨트롤러에서 드러난 Redis 연결 실패도 이것이다(`ProblemFallbackFilter`·`ApiExceptionHandler`) | `Retry-After` 헤더 | 23·I16-4 |
+| **`service-busy`** | 503 | DB 시간 상한에 걸렸다 — 잠금 대기 3초(`55P03`)·문장 10초(`57014`)·풀 대기 3초. 요청 탓이 아니라 다시 하면 될 수 있다(`isDbBusy`) | `Retry-After` 헤더 | I17-6 |
 | **`seat-changes-expired`** | 410 | `since` 가 변경 로그 밖이다. 전체를 다시 받아라 | `version` | 10a |
 | **`idempotency-in-progress`** | 409 | 같은 키가 처리 중 | | 13 |
 | **`idempotency-key-reused`** | 422 | 같은 키인데 본문이 다르다 | | 13 |

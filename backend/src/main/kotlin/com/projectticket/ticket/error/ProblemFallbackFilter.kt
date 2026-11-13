@@ -45,6 +45,15 @@ class ProblemFallbackFilter(private val problems: ProblemWriter) : OncePerReques
                     code = ErrorCode.QUEUE_UNAVAILABLE,
                     headers = mapOf("Retry-After" to ProblemWriter.RETRY_AFTER_SECONDS),
                 )
+            } else if (e.isDbBusy()) {
+                // DB 시간 상한(`I17-6`) — 마지막 그물과 같은 답이다.
+                log.warn("DB 시간 상한으로 요청을 못 받았다: {} {} {}", request.method, request.requestURI, e.javaClass.simpleName)
+                problems.write(
+                    request = request,
+                    response = response,
+                    code = ErrorCode.SERVICE_BUSY,
+                    headers = mapOf("Retry-After" to ProblemWriter.RETRY_AFTER_SECONDS),
+                )
             } else {
                 log.error("필터에서 처리하지 못한 예외: {} {}", request.method, request.requestURI, e)
                 problems.write(request, response, ErrorCode.INTERNAL)

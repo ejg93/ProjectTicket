@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
  * 한 주면 「어제 그 알림이 왜 안 갔나」를 사람이 물어보는 기간을 덮는다. 감사(3년)와 다른 표라 규정과 무관하다.
  *
  * **안 나간 봉투는 안 건드린다.** `published_at is null` 은 릴레이가 아직 할 일이 있는 것이고,
- * 그것을 지우면 사건이 조용히 사라진다 — 계속 실패하는 봉투를 치우는 자리는 DLQ(29)다.
+ * 그것을 지우면 사건이 조용히 사라진다 — 계속 실패하는 봉투는 릴레이가 10회 뒤 주차하고 사람이 푼다(`I17-4`, `event-catalog.md` 「발행」).
  */
 @Component
 class OutboxCleaner(private val jdbc: JdbcClient) {

@@ -25,7 +25,7 @@
 | `type` | `<집합체>.<과거형>` 소문자 점 표기. 감사 `event_type` 과 같은 이름 |
 | `version` | 페이로드 판. 호환되는 변경은 안 올린다(아래 「버전」) |
 | `occurred_at` | 사건이 일어난 트랜잭션의 DB 시각(`D7`). 발행 시각이 아니다 |
-| `aggregate_type`·`aggregate_id` | 파티션 키(28) — 한 집합체의 사건은 순서를 지킨다 |
+| `aggregate_type`·`aggregate_id` | 파티션 키(28) — 한 집합체의 사건은 순서를 지킨다. 릴레이가 집합체의 맨 앞 미발행 행만 잡는다(`I17-4`) |
 | `payload` | 아래 표. **식별자와 그때의 값**만 든다 |
 
 **CloudEvents 를 안 쓴다.** 소비자가 우리뿐이라 표준 봉투가 사 줄 것이 없다. 다만 위 넷(`event_id`·`type`·`occurred_at`·`aggregate_*`)은 CloudEvents 의 `id`·`type`·`time`·`source` 와 1:1 이라, 밖으로 내보낼 날(웹훅)이 오면 감싸기만 하면 된다.
@@ -81,6 +81,8 @@
 - 릴레이가 `for update skip locked` 로 가져가 발행한다. 인스턴스 셋이 같은 행을 두 번 안 민다
 - **보내고 나서 표시한다.** 표시부터 하면 보내기가 실패했을 때 그 사건이 영영 안 나간다
 - 발행은 **at-least-once** 다. 릴레이가 발행 뒤 표시 전에 죽으면 같은 사건이 다시 나간다 — 그래서 소비자가 `event_id` 로 멱등이어야 한다
+- **독 행은 그 행만 선다**(`I17-4`). 보낼 수 없는 행(봉투를 못 만든다·`RecordTooLargeException`)은 `attempts`·`last_error`(예외 클래스 이름)·`next_attempt_at`(1초부터 두 배, 최대 5분)을 적고 다음 행으로 간다. 브로커 일시 오류(`RetriableException`)는 안 세고 그 회를 멈춘다. 한 회 예산은 5초다(최악 25초 — `concurrency-rules.md` 시간 상한 표)
+- **10회 실패면 주차한다**(ERROR 로그). 같은 집합체의 뒤 사건도 같이 선다 — 순서를 지키려는 값이다. 원인을 고친 뒤 사람이 푼다: `update outbox set attempts = 0, next_attempt_at = null where outbox_id = …`. 주차된 행은 `select outbox_id, type, aggregate_id, last_error from outbox where published_at is null and attempts >= 10` 로 찾는다. 한꺼번에 풀 때는 같은 조건으로 `update outbox set attempts = 0, next_attempt_at = null where published_at is null and attempts >= 10`. **원인을 못 고치는 행**(페이로드가 커서 — 보존 트리거가 페이로드를 못 고치게 막는다)은 보내지 않고 건너뛴다: `update outbox set published_at = now() where outbox_id = …` — 소비자가 그 사건을 영영 못 받으므로 그 사실(알림·정산)을 사람이 맞춘다. 주차 신호는 ERROR 로그 한 줄이다
 
 ## 소비 — 26·27·29
 
@@ -89,6 +91,9 @@
 | 소비자마다 **두 번 받아도 하나**를 제약으로 든다 — 알림은 `(event_id, account_id)` 유일(한 사건에 수신자가 여럿일 수 있다), 정산은 `performance_id` 유일(회차당 정산서가 하나라 그것이 같은 일을 한다) | 멱등을 앱 검증이 아니라 제약으로. 두 번 온 사건은 유일 위반의 `on conflict do nothing` 0행으로 끝난다. **`event_id` 를 소비자마다 들 필요는 없다** — 그 소비자에게 「같은 결과가 둘이 될 수 없는 열」이 이미 있으면 그것을 쓴다 |
 | 소비자는 페이로드의 식별자로 **표를 다시 읽는다** | 사건은 「무슨 일이 났나」고 지금 상태는 표가 안다. 취소 메일이 나갈 때 예매가 이미 다른 상태면 표가 이긴다 |
 | 처리 실패는 **2초 간격 3회 재시도, 그래도 안 되면 `<토픽>.DLT`**(29) | 소비자 하나의 결함이 발행자를 멈추지 않는다. 오프셋은 DLT 로 보낸 뒤 넘어간다 — 안 넘기면 그 사건을 영원히 다시 읽는다 |
+| **DB 일시 오류는 DLT 로 안 간다**(`I17-7`) — 원인 사슬에 `TransientDataAccessException`·`DataAccessResourceFailureException`·`TransactionException` 이면 2초부터 두 배(최대 30초) 횟수 무제한 | DB 가 3회 창보다 오래 죽으면 그동안 소비한 사건이 전부 DLT 로 갔다. 그 파티션은 DB 가 돌아올 때까지 선다 |
+| **깨진 봉투는 바로 DLT 다**(`I17-7`) — `JacksonException` 은 재시도하지 않는다 | 다시 읽어도 깨져 있다. 재시도 3회는 뒤 사건을 6초 미룰 뿐이다 |
+| **잃은 정산은 스윕이 세운다**(`I17-7`) — `SettlementSweeper` 가 닫혔거나 취소됐는데 정산서도 한 시간 안의 회차 사건도 없는 회차에 정산서를 세운다(`settle_at` 은 지금과 관람 중 늦은 쪽 + 지급 지연) | 회차 사건이 DLT 로 가고 보존 7일이 지나면 그 회차는 영영 정산서가 없었다 |
 | **소비자는 예외를 삼키지 않는다**(29 부터) | 삼키면 재시도도 DLT 도 안 돈다 — 그 사건이 조용히 사라진다. 28 까지는 삼키는 것이 맞았다(재시도할 자리가 없었다) |
 | DLT 에 쌓인 것을 다시 넣는 길은 **아웃박스다** | 사건 행이 DB 에 남아 있는 동안(보존 7일, `OutboxCleaner`) `published_at` 을 비우면 릴레이가 다시 보낸다. 사람이 쓰는 손잡이라 API 를 안 만든다 |
 | 한 사건에 소비자가 둘이면 서로 모른다 | 알림이 죽어도 정산은 간다 |
@@ -102,6 +107,7 @@
 | 무엇을 | `reservation.reserved` → 확정(좌석·금액·티켓 번호), `reservation.cancelled` → 취소(환불 금액·일수), `performance.cancelled` → 회차 취소(예매자 전원, 전액 환불) |
 | 받는 사람 | 사건의 `account_id` 로 **보낼 때** 표에서 읽는다. 탈퇴(`deleted_at`)면 안 보낸다 |
 | 멱등 | `(event_id, account_id)` 유일 — 회차 취소는 사건 하나에 수신자 여럿이라 계정이 키에 든다 |
+| 재시도 | 일시 실패(실물 SMTP 4xx·발송기가 던짐)는 `pending` 에 둔 채 `attempts + 1`·`next_attempt_at`(30초부터 두 배), 5회째가 `failed`(`temporary_failure`). 반송(`unknown_recipient`)은 바로 `failed`. 끝 상태에서 나가는 길은 없다(`V29`) — `I17-9` |
 | 문구 | 존댓말, 화면 규약(`D17`)과 같은 문체. 본문은 이력이라 고치지 않는다 |
 | 안 하는 것 | 선점·만료 알림(화면의 카운트다운이 그 자리다), 마케팅(동의 항목은 있으나 보낼 것이 없다) |
 

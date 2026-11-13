@@ -65,7 +65,7 @@ class ConsumerIdempotencyTest : ConcurrencyTestBase() {
         val accountId = fixture.account("${PREFIX}consumer-idem-${System.nanoTime()}@test.local")
         val seatId = fixture.performanceSeatIds(performanceId).first()
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, listOf(seatId)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null))
         return Reserved(accountId, reservationId, performanceId)
     }

@@ -1,5 +1,6 @@
 package com.projectticket.ticket.error
 
+import io.lettuce.core.RedisCommandExecutionException
 import io.lettuce.core.RedisCommandTimeoutException
 import io.micrometer.tracing.Tracer
 import jakarta.servlet.FilterChain
@@ -8,6 +9,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.dao.QueryTimeoutException
 import org.springframework.data.redis.RedisConnectionFailureException
+import org.springframework.data.redis.RedisSystemException
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -55,6 +57,14 @@ class ProblemFallbackFilterTest {
     fun a_database_query_timeout_is_still_500() {
         // 같은 `QueryTimeoutException` 이라도 Redis 가 원인이 아니면 `queue-unavailable` 이 아니다
         val response = run(FilterChain { _, _ -> throw QueryTimeoutException("jdbc") })
+
+        assertThat(response.status).isEqualTo(500)
+    }
+
+    @Test
+    fun a_redis_server_error_is_500_not_503() {
+        // Redis 가 오류로 답했다 — 죽은 것이 아니라 우리 스크립트·자료형 버그다(`I17-10`). 503 은 「다시 하면 된다」라 거짓말이다.
+        val response = run(FilterChain { _, _ -> throw RedisSystemException("WRONGTYPE", RedisCommandExecutionException("WRONGTYPE Operation against a key")) })
 
         assertThat(response.status).isEqualTo(500)
     }

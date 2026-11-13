@@ -2,7 +2,6 @@ package com.projectticket.ticket.account
 
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -20,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional
  *
  * **이 배치만 `ticket_purge` 역할로 돈다**(4a). 앱이 입는 역할에는 `audit_log` 를 지울 권한이 없다 —
  * 트리거는 표 주인이 끌 수 있어서 권한으로 한 겹 더 내렸다(`D9`).
+ *
+ * 스케줄러 입구는 [AccountPurgeScheduler] 다 — 락과 첫 회 지연을 거기서 든다(`I17-9`).
  */
 @Component
 class AccountPurgeBatch(private val jdbc: JdbcClient) {
@@ -35,7 +36,6 @@ class AccountPurgeBatch(private val jdbc: JdbcClient) {
      * 풀을 따로 두지 않는다. `DataSource` 빈을 하나 더 만들면 Boot 의 기본 자동설정이 통째로 꺼져서
      * **앱 전체가 그 연결을 쓰게 된다** — 실제로 그렇게 됐다가 되돌렸다(`stack.md`).
      */
-    @Scheduled(fixedDelayString = PURGE_INTERVAL)
     @Transactional
     fun purgeDue(): Int {
         // 기준 시각은 DB 다(`D7`). 이미 비운 계정은 `email is not null` 이 걸러서 두 번 돌아도 같은 결과다.

@@ -34,7 +34,7 @@ class NotificationSweeper(
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
     fun sweepDue(): Int = lock.runExclusively(LOCK_NAME, onOutage = SchedulerLock.OnOutage.SKIP) { sweep() } ?: 0
 
-    /** @return 보낸 수(실패·건너뜀 제외) */
+    /** @return 보낸 수(실패·재시도·건너뜀 제외) */
     fun sweep(): Int {
         val pending = store.takePending(BATCH_SIZE)
         if (pending.isEmpty()) {
@@ -42,32 +42,51 @@ class NotificationSweeper(
             return 0
         }
 
-        var sent = 0
-        var failed = 0
-        var skipped = 0
-        for (row in pending) {
-            val email = row.email
-            if (email == null) {
-                // 탈퇴하면 이메일이 null 이다(`V2` 파기가 비우거나, 그 전이면 `takePending` 이 비운다). 다시 해도 같으니 재시도가 아니라 건너뛴다.
-                store.markSkipped(row.notificationId, MockNotificationSender.WITHDRAWN_REASON)
-                skipped++
-                continue
-            }
+        // **행마다 격리한다**(`I17-9`). 발송이 던져도 그 행만 일시 실패로 세고 다음 행으로 간다 — 던지면 그 회의 나머지가 `pending` 으로 남았다.
+        val outcomes = pending.map(::deliver).groupingBy { it }.eachCount()
+        log.info(
+            "알림 발송 성공={}건 실패={}건 재시도={}건 건너뜀={}건",
+            outcomes[Outcome.SENT] ?: 0,
+            outcomes[Outcome.FAILED] ?: 0,
+            outcomes[Outcome.RETRY] ?: 0,
+            outcomes[Outcome.SKIPPED] ?: 0,
+        )
+        return outcomes[Outcome.SENT] ?: 0
+    }
 
-            val result = sender.send(address = email, subject = row.subject, body = row.body)
-            if (result.succeeded) {
-                store.markSent(row.notificationId)
-                sent++
-            } else {
-                // 재시도·DLQ 는 29 가 든다.
-                val reason = checkNotNull(result.failureReason) { "실패면 사유가 늘 있다 — `Result.failed` 가 그렇게 만든다" }
-                store.markFailed(row.notificationId, reason)
-                failed++
-            }
+    private enum class Outcome { SENT, FAILED, RETRY, SKIPPED }
+
+    private fun deliver(row: NotificationStore.Pending): Outcome {
+        val email = row.email
+        if (email == null) {
+            // 탈퇴하면 이메일이 null 이다(`V2` 파기가 비우거나, 그 전이면 `takePending` 이 비운다). 다시 해도 같으니 재시도가 아니라 건너뛴다.
+            store.markSkipped(row.notificationId, MockNotificationSender.WITHDRAWN_REASON)
+            return Outcome.SKIPPED
         }
 
-        log.info("알림 발송 성공={}건 실패={}건 건너뜀={}건", sent, failed, skipped)
-        return sent
+        val result = try {
+            sender.send(address = email, subject = row.subject, body = row.body)
+        } catch (e: RuntimeException) {
+            // 발송기가 던진 것도 일시 실패로 센다 — 주소·본문은 안 찍는다(`D10`).
+            log.warn("알림 발송이 던졌다 notification_id={} 이유={}", row.notificationId, e.javaClass.simpleName)
+            MockNotificationSender.Result.failedForNow(MockNotificationSender.TRANSIENT_REASON)
+        }
+        val reason = { checkNotNull(result.failureReason) { "실패면 사유가 늘 있다 — `Result.failed` 가 그렇게 만든다" } }
+        return when {
+            result.succeeded -> {
+                store.markSent(row.notificationId)
+                Outcome.SENT
+            }
+            // 일시 실패는 끝 상태로 안 보낸다 — `V29` 가 `failed` 에서 나가는 길을 막아 그 메일이 영영 안 나간다(`I17-9`).
+            result.transient && row.attempts + 1 < MAX_ATTEMPTS -> {
+                store.markRetry(row.notificationId)
+                Outcome.RETRY
+            }
+            else -> {
+                store.markFailed(row.notificationId, reason())
+                Outcome.FAILED
+            }
+        }
     }
 
     companion object {
@@ -78,5 +97,8 @@ class NotificationSweeper(
         const val LOCK_NAME = "notification-sweeper"
 
         const val BATCH_SIZE = 100
+
+        /** 일시 실패를 이만큼 하면 `failed` 다. 30초부터 두 배라 넷째 대기까지 7분 30초다 */
+        const val MAX_ATTEMPTS = 5
     }
 }

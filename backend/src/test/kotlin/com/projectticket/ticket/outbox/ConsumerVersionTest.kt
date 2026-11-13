@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import tools.jackson.databind.ObjectMapper
+import java.util.UUID
 
 /**
  * 소비자가 봉투의 판과 계정을 `D11` 대로 다루나 — **아는 판만 처리하고**(「버전」 — 두 판을 같이 내는 동안 모르는 판은 건너뛴다),
@@ -139,7 +140,7 @@ class ConsumerVersionTest : ConcurrencyTestBase() {
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
         payments.settle(
             accountId,
-            payments.startPaying(accountId, reservationId),
+            payments.startPaying(accountId, reservationId, UUID.randomUUID().toString()),
             MockPaymentGateway.Result(approvalNumber = "V-${System.nanoTime()}", cardLast4 = "4242", declineReason = null),
         )
         val envelopes = mutableListOf<OutboxRelay.Envelope>()

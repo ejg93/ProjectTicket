@@ -256,6 +256,7 @@ class AppDbConstraintTest {
             "seat_row_label_format_check" to "좌석은 `DemoSeeder` 가 넣는다 — 공연장 등록 입구가 생기면 위 표로",
             "idempotency_key_length_check" to "형식 check(`idempotency_key_format_check`, 위 표)가 36자로 묶는다. 1..255 는 그 아래 그물이다",
             "idempotency_key_hash_check" to "SHA-256 hex 를 서버가 잰다. 입구에 없다",
+            "payment_attempt_gateway_key_length_check" to "서버가 만든다(`gatewayKeyOf`) — 예매 id 와 형식 check 를 지난 36자 멱등키라 입구에 없다(`I17-1`)",
         )
 
         val PRICE_RANGE = Regex("""price\s+between\s+(\d+)\s+and\s+(\d+)""")

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.util.UUID
 
 /**
  * 환불 등식(`D6`) `fee + refund = payment.amount` 이 커밋 때 실제로 걸리는가. 지연 제약 트리거라 커밋 레인이다(`stack.md`).
@@ -44,7 +45,7 @@ class RefundInvariantTest : ConcurrencyTestBase() {
     private fun reserved(startsInDays: Long): Pair<Long, Long> {
         val performanceId = fixture.performance(eventId, hallId, startsInDays).also { openService.open(it, actorAccountId = null) }
         val reservationId = seatHold.hold(accountId, SeatHoldService.Command(performanceId, fixture.performanceSeatIds(performanceId)))
-        val paying = payments.startPaying(accountId, reservationId)
+        val paying = payments.startPaying(accountId, reservationId, UUID.randomUUID().toString())
         return reservationId to payments.settle(accountId, paying, MockPaymentGateway.Result(approvalNumber = "M-${System.nanoTime()}", cardLast4 = "4242", declineReason = null)).paymentId
     }
 
