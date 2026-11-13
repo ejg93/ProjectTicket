@@ -48,7 +48,8 @@ class RedisTimeoutTest {
             }
             try {
                 val started = System.nanoTime()
-                // 연결 인사(HELLO)에서 먼저 막힐 수도, PING 에서 막힐 수도 있다 — 둘 다 같은 시간 상한을 받는다.
+                // **명령 상한(2초)을 따로 재지 못한다**(마무리 35차 독립 리뷰 I3) — 말 없는 소켓 앞에서 Lettuce 는 연결 단계에서 먼저 막히고,
+                // RESP2 로 붙어도 같았다. 여기서 가르는 것은 「기본값 60초가 아니다」뿐이다. 명령 상한과 Boot 배선은 `I17-10` 이 잰다.
                 assertThatThrownBy { client.connect().use { it.sync().ping() } }.isInstanceOf(RedisException::class.java)
                 assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(UPPER_BOUND)
             } finally {

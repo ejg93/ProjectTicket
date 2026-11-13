@@ -166,12 +166,13 @@ update performance_seat set status = 'available', held_until = null, reservation
 같은 행을 두 번 스캔하는 비용이 있고, 로그가 두 벌 남으면 「몇 개를 만료시켰나」를 세는 사람이 헷갈린다.
 락을 못 잡으면 그 회차는 건너뛴다. 기다리지 않는다. **락은 겹침만 막고 횟수는 안 막는다** — 일이 끝나면 놓아서 대마다 제 주기로 돈다.
 횟수가 뜻을 갖는 입장은 속도를 락이 아니라 입장 스크립트의 예산 창(`queue:{id}:admit_window`)이 지킨다(`35f`, `D12`).
-**Redis 가 죽으면 락 없이 돈다**(`I17-5`) — 락은 절약이라 겹쳐도 결과가 같고, 던지면 DB 만 쓰는 선점 만료·회차 종료가 Redis 장애 내내 선다.
+**Redis 가 죽으면 락 없이 돈다**(`I17-5`) — 던지면 DB 만 쓰는 선점 만료·회차 종료가 Redis 장애 내내 선다. **알림만 건너뛴다**(`OnOutage.SKIP`, 마무리 35차 사용자) — 겹치면 같은 메일이 대수만큼 나가서, Redis 가 돌아온 뒤 보낸다. 환불은 겹쳐도 `on conflict`·조건부 `complete`·환불 id 키로 한 번만 닫혀 락 없이 돈다.
 
 | 락을 지나나 | 스케줄러 | 왜 |
 |---|---|---|
 | 지난다 | `hold-sweeper`·`performance-closer`·`admission-scheduler`·`queue-sweeper` | 위 이유 — 겹치면 스캔과 로그가 두 벌이다 |
-| 지난다 | `refund-sweeper`·`notification-sweeper` | 겹치면 결과가 달라진다(`I17-5`) — 알림의 `skip locked` 는 고르기와 함께 풀려 대수만큼 같은 메일이 나갔고, 늦은 승인 환불 행을 두 대가 같이 만들면 한쪽 회가 끊겼다 |
+| 지난다 | `notification-sweeper` | 겹치면 결과가 달라진다(`I17-5`) — `skip locked` 는 고르기와 함께 풀려 대수만큼 같은 메일이 나갔다 |
+| 지난다 | `refund-sweeper` | 절약이다 — 늦은 승인 환불 행을 두 대가 같이 만들면 한쪽 회가 끊겼고(지금은 `on conflict`), 같은 행을 두 대가 PG 로 보냈다(`I17-5`) |
 | 안 지난다 | `SettlementSweeper`·`OutboxRelay` | 승자를 하나로 만드는 것이 따로 있다 — 정산은 `skip locked` 와 조건부 UPDATE, 발행은 트랜잭션이 쥔 `skip locked` 와 at-least-once(`D11`) |
 | 안 지난다 | `OutboxCleaner`·`IdempotencyCleaner`·`AccountPurgeBatch` | 두 번 돌아도 지울 것·비울 것이 이미 없다 — 보존 기한 `delete` 와 `email is not null` 조건 |
 

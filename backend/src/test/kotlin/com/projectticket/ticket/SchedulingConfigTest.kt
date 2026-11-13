@@ -45,7 +45,7 @@ class SchedulingConfigTest {
     }
 
     @Test
-    fun the_relay_cannot_block_past_the_shutdown_phase() {
+    fun delivery_timeout_fits_inside_the_shutdown_phase() {
         assertThat(producerMillis(ProducerConfig.MAX_BLOCK_MS_CONFIG)).isEqualTo(5_000)
         assertThat(producerMillis(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG)).isEqualTo(5_000)
         val delivery = producerMillis(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG)

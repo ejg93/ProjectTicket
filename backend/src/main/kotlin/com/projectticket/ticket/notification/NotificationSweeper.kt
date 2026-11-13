@@ -18,7 +18,8 @@ import org.springframework.stereotype.Component
  * 한 번만 보내려면 보내기 전에 `sending` 으로 옮겨야 하고, 그러면 그 상태에서 죽은 행을 되살리는 자리가 또 필요하다.
  *
  * **대수만큼 겹치지는 않는다**(`I17-5`). `takePending` 의 `skip locked` 는 반환과 함께 풀려 파드 N 대가 같은 행을 N 번 보냈다 —
- * 스케줄러 입구([sweepDue])가 락을 든다. [sweep] 은 테스트가 직접 부르는 자리라 락을 안 든다.
+ * 스케줄러 입구([sweepDue])가 락을 든다. [sweep] 은 테스트가 직접 부르는 자리라 락을 안 든다. Redis 가 죽으면 락 없이 돌지 않고 건너뛴다 —
+ * 그러면 겹침이 돌아온다. 락의 TTL(30초) 안에 배치 하나가 끝난다는 전제다 — 모의 발송은 즉시다. 실물 SMTP 면 TTL 을 배치에 맞춘다.
  */
 @Component
 class NotificationSweeper(
@@ -31,7 +32,7 @@ class NotificationSweeper(
 
     /** @return 보낸 수. 락을 남이 쥐고 있으면 0 */
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
-    fun sweepDue(): Int = lock.runExclusively(LOCK_NAME) { sweep() } ?: 0
+    fun sweepDue(): Int = lock.runExclusively(LOCK_NAME, onOutage = SchedulerLock.OnOutage.SKIP) { sweep() } ?: 0
 
     /** @return 보낸 수(실패·건너뜀 제외) */
     fun sweep(): Int {

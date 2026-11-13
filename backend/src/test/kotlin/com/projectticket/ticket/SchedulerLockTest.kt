@@ -1,15 +1,19 @@
 package com.projectticket.ticket
 
+import io.lettuce.core.RedisCommandTimeoutException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyList
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import org.mockito.Mockito.mock
+import org.springframework.dao.QueryTimeoutException
 import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.ValueOperations
+import org.springframework.data.redis.core.script.RedisScript
 import java.time.Duration
 
 /**
@@ -41,6 +45,27 @@ class SchedulerLockTest {
         `when`(values.setIfAbsent(anyString(), anyString(), any(Duration::class.java))).thenThrow(IllegalStateException("직렬화가 깨졌다"))
 
         assertThatThrownBy { SchedulerLock(redis).runExclusively("hold-sweeper") { WORK_RESULT } }.isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
+    fun a_skipping_job_does_nothing_during_an_outage() {
+        // 알림은 겹치면 같은 메일이 대수만큼 나간다 — 장애 동안은 건너뛰고 Redis 가 돌아오면 보낸다(`I17-5`, 독립 리뷰 I1).
+        `when`(redis.opsForValue()).thenReturn(values)
+        `when`(values.setIfAbsent(anyString(), anyString(), any(Duration::class.java))).thenThrow(RedisConnectionFailureException("Redis 가 안 받는다"))
+        var ran = false
+
+        assertThat(SchedulerLock(redis).runExclusively("notification-sweeper", onOutage = SchedulerLock.OnOutage.SKIP) { ran = true }).isNull()
+        assertThat(ran).isFalse()
+    }
+
+    @Test
+    fun a_failed_release_does_not_hide_the_result() {
+        // 일하는 사이 Redis 가 죽으면 놓기도 던진다. 그것이 일의 결과를 덮으면 스윕이 실패로 보인다 — 락은 TTL 이 지운다.
+        `when`(redis.opsForValue()).thenReturn(values)
+        `when`(values.setIfAbsent(anyString(), anyString(), any(Duration::class.java))).thenReturn(true)
+        `when`(redis.execute(any<RedisScript<Long>>(), anyList(), any())).thenThrow(QueryTimeoutException("Redis 명령 시간 초과", RedisCommandTimeoutException("2초")))
+
+        assertThat(SchedulerLock(redis).runExclusively("hold-sweeper") { WORK_RESULT }).isEqualTo(WORK_RESULT)
     }
 
     private companion object {
