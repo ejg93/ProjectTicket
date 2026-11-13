@@ -1,5 +1,6 @@
 package com.projectticket.ticket.payment
 
+import com.projectticket.ticket.SchedulerLock
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.scheduling.annotation.Scheduled
@@ -18,18 +19,25 @@ import org.springframework.stereotype.Component
  *
  * **트랜잭션은 [RefundTransitionService.complete] 에만 있다.** 여기 붙여도 자기 호출이라 프록시를 안 지난다(`stack.md`) —
  * 그래서 고르기는 트랜잭션 밖 한 문장이고, 「둘이 같은 행을 집었나」를 막는 것은 `complete` 의 조건부 UPDATE 다(`D4`).
+ *
+ * **스케줄러 입구([sweepDue])가 락을 든다**(`I17-5`). 정확성은 위 조건부 UPDATE 와 PG 키가 들지만, 두 대가 같은 늦은 승인으로
+ * 환불 행을 동시에 만들면 한쪽 회가 통째로 끊겼고 같은 행을 두 대가 PG 로 보냈다. [sweep] 은 테스트가 직접 부르는 자리라 락을 안 든다.
  */
 @Component
 class RefundSweeper(
     private val jdbc: JdbcClient,
     private val gateway: MockPaymentGateway,
     private val transitions: RefundTransitionService,
+    private val lock: SchedulerLock,
 ) {
 
     private val log = LoggerFactory.getLogger(RefundSweeper::class.java)
 
-    /** @return 내보낸 환불 수 */
+    /** @return 내보낸 환불 수. 락을 남이 쥐고 있으면 0 */
     @Scheduled(fixedDelayString = SWEEP_INTERVAL)
+    fun sweepDue(): Int = lock.runExclusively(LOCK_NAME) { sweep() } ?: 0
+
+    /** @return 내보낸 환불 수 */
     fun sweep(): Int {
         // 행을 먼저 만든다. 만들기와 보내기가 한 회에 있으면 늦은 승인이 다음 회를 기다리지 않는다.
         val queued = transitions.queueLatePayments()
@@ -82,6 +90,9 @@ class RefundSweeper(
     companion object {
         /** 돈이 걸린 자리라 짧다. 관객이 취소 화면에서 「환불 처리됨」을 기다리는 것은 아니지만(응답은 이미 갔다) 늦을 이유도 없다 */
         const val SWEEP_INTERVAL = "PT10S"
+
+        /** 락 이름. 인스턴스가 여럿이어도 이 이름 하나를 두고 다툰다(`I17-5`) */
+        const val LOCK_NAME = "refund-sweeper"
 
         const val BATCH_SIZE = 100
     }

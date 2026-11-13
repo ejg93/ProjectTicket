@@ -36,6 +36,8 @@ class PaymentFlowTest : PostgresTestBase() {
 
     private lateinit var fixture: EventFixture
     private lateinit var buyer: TicketUser
+    private var eventId: Long = 0
+    private var hallId: Long = 0
     private var performanceId: Long = 0
     private var reservationId: Long = 0
 
@@ -43,8 +45,8 @@ class PaymentFlowTest : PostgresTestBase() {
     fun setUp() {
         fixture = EventFixture(jdbc)
         buyer = principal("payer@test.local")
-        val eventId = fixture.event(fixture.organizer())
-        val hallId = fixture.hall()
+        eventId = fixture.event(fixture.organizer())
+        hallId = fixture.hall()
         fixture.seats(hallId, "F1-A", 2)
         fixture.mapSection(eventId, "F1-A", fixture.grade(eventId, "VIP", 154_000))
         performanceId = fixture.performance(eventId, hallId)
@@ -142,6 +144,25 @@ class PaymentFlowTest : PostgresTestBase() {
     }
 
     @Test
+    fun another_accounts_reservation_with_the_same_key_gets_its_own_approval() {
+        // 우리 멱등은 계정마다다 — 남의 키 값과 겹쳐도 둘 다 지난다. PG 키가 예약에 안 묶이면 PG 가 앞 계정의 승인을 돌려준다(`I17-2`).
+        val key = UUID.randomUUID().toString()
+        val other = principal("other-payer@test.local")
+        val otherPerformance = fixture.performance(eventId, hallId)
+        openService.open(otherPerformance, actorAccountId = null)
+        val otherReservation = seatHold.hold(other.id, SeatHoldService.Command(otherPerformance, fixture.performanceSeatIds(otherPerformance).take(1)))
+
+        val first = pay("4242 4242 4242 4242", key).andExpect { status { isCreated() } }.andReturn().response.contentAsString
+        val second = pay(cardNumber = "4242 4242 4242 4242", key = key, principal = other, reservation = otherReservation).andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("approved") }
+            jsonPath("$.amount") { value(154_000) }
+        }.andReturn().response.contentAsString
+
+        assertThat(json.readTree(second)["approval_number"]).isNotEqualTo(json.readTree(first)["approval_number"])
+    }
+
+    @Test
     fun paying_an_already_reserved_reservation_is_an_invalid_transition() {
         pay("4242 4242 4242 4242").andExpect { status { isCreated() } }
 
@@ -188,8 +209,13 @@ class PaymentFlowTest : PostgresTestBase() {
         }
     }
 
-    private fun pay(cardNumber: String, key: String? = UUID.randomUUID().toString(), principal: TicketUser = buyer): ResultActionsDsl =
-        mvc.post("/api/reservations/$reservationId/payments") {
+    private fun pay(
+        cardNumber: String,
+        key: String? = UUID.randomUUID().toString(),
+        principal: TicketUser = buyer,
+        reservation: Long = reservationId,
+    ): ResultActionsDsl =
+        mvc.post("/api/reservations/$reservation/payments") {
             with(user(principal))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
