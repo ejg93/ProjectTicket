@@ -135,6 +135,18 @@ nginx(33)도 시간 초과에 재시도한다. **선점이 두 번 되면 같은
 같은 키인데 본문이 다르다 → 422 `idempotency-key-reused`
 ```
 
+**DB 쪽 시간 상한이 모든 앱 연결에 걸린다**(`I17-6`). 넘으면 503 `service-busy` + `Retry-After` 다 — 기다리는 요청이 연결을 쥐고 풀 10 을 채우지 않게 한다.
+
+| 상한 | 값 | 거는 자리 |
+|---|---|---|
+| `lock_timeout` | 3초 | 드라이버 속성 `options`(시작 옵션). 키 insert 의 2초는 그 위에 `set local` 로 덮고 `= default` 로 3초에 돌아온다 |
+| `statement_timeout` | 10초 | 같은 `options` |
+| `idle_in_transaction_session_timeout` | 30초 | 같은 `options`. 릴레이 한 회 10초 예산이 이 안에 든다 |
+| 풀 대기(Hikari `connection-timeout`) | 3초 | `spring.datasource.hikari.connection-timeout` |
+
+`connection-init-sql` 의 `set` 으로 걸지 않는다 — 세션 값이라 `= default` 가 무제한으로 되돌린다. `alter role ticket_app set` 도 안 된다 — `set role` 로는 안 실린다(`stack.md`).
+선점의 교착 재시도에 `55P03` 을 안 넣는다 — 기다림이 두 배가 된다.
+
 본문 비교는 요청 본문의 해시로 한다. 본문 전체를 보관하지 않는다.
 
 **키 선점·처리·응답 저장을 한 트랜잭션에 둔다.** 갈라 두면 「예매는 커밋됐는데 키 기록은 진행중」인 구간이 생기고,

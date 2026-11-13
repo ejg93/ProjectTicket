@@ -25,10 +25,16 @@ spring:
       # 풀 크기 손잡이(`57`). 기본은 Hikari 기본값 10 그대로 — k8s HPA 최대 6 대 × 20 = 120 이 PG `max_connections` 100 을 넘는다.
       # 풀 20 한 판(`load-10`)은 못 갈랐다 — 올리는 것은 새 판이 가른 뒤 PG 설정과 같이 한다.
       maximum-pool-size: ${HIKARI_MAX_POOL:10}
+      # 풀 대기 상한(`I17-6`). 기본 30초면 풀이 찬 동안 요청 스레드가 30초씩 선다 — 3초 뒤 503 `service-busy` 로 돌려보낸다.
+      connection-timeout: 3000
       # PG 의 DETAIL(`Failing row contains (…)`)을 예외 메시지에 안 붙인다(`I13-4`). 붙이면 마지막 그물이 행의 이메일·해시를 로그에 남긴다(`D10`).
       # URL 파라미터가 아니라 드라이버 속성이다 — 시험의 `@ServiceConnection` 이 URL 을 갈아 끼워도 같이 걸린다. 제약 이름은 본문에 남는다.
       data-source-properties:
         logServerErrorDetail: false
+        # **DB 쪽 시간 상한 셋**(`I17-6`) — 잠금 대기 3초·문장 10초·트랜잭션 안 유휴 30초. 넘으면 503 `service-busy` 다.
+        # 시작 옵션(`-c`)이라 세션 기본값이 된다. `connection-init-sql` 의 `set` 으로 걸면 `IdempotencyService` 의
+        # `set local lock_timeout = default` 가 무제한으로 되돌린다(`stack.md`). Flyway 는 자기 연결이라 이 값을 안 탄다.
+        options: "-c lock_timeout=3000 -c statement_timeout=10000 -c idle_in_transaction_session_timeout=30000"
   flyway:
     locations: classpath:db/migration
     # 마이그레이션은 **주인으로** 돈다. 위 역할을 입은 연결로는 DDL 을 못 해서 자기 연결을 따로 연다.

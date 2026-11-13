@@ -196,6 +196,13 @@ commit                 ← 앞의 예약분이 null 로 터진다
 정리를 `TransactionTemplate` 하나로 묶고, **`restrict` 외래키를 거슬러 자식부터** 지운다(`ConcurrencyTestBase.purgePrefixedRows` — 티켓 → 환불 → 결제 → 예매 → 회차 → 공연 → 기획사 → 공연장 → 계정).
 **앞뒤로 한 번씩** 한다 — 앞선 실행이 죽으면 재사용 컨테이너에 데이터가 남아서, 안 지우면 다음 실행의 뒤 테스트가 유일 제약에서 연쇄로 빨개진다(17 에서 18개가 그렇게 빨개졌다).
 
+### `set local … = default` 는 세션 `set` 이 아니라 시작 옵션으로 돌아간다 — 시간 상한은 `options` 로 건다
+
+`SET … TO DEFAULT` 는 「세션에서 `set` 을 안 했을 때의 값」(reset 값)으로 돌린다. reset 값은 서버 설정·역할 설정·**연결 시작 옵션**(`-c`)이 정한다 —
+`connection-init-sql` 의 `set lock_timeout = '3s'` 는 세션 값이라 reset 값이 아니다. 그래서 `IdempotencyService` 가 키 insert 뒤 `set local lock_timeout = default` 로
+되돌리면 그 트랜잭션의 나머지가 무제한이 된다. 드라이버 속성 `options`(`-c lock_timeout=3000 …`)로 걸면 reset 값이 3초라 3초로 돌아온다(`I17-6`, `DbTimeoutTest`).
+`alter role ticket_app set …` 도 안 된다 — 역할 설정은 **로그인 역할**에만 실린다. 앱은 `ticket` 으로 붙고 `set role ticket_app` 을 입어서 그 값이 안 실린다.
+
 ### Postgres 의 데드락은 `DeadlockLoserDataAccessException` 이 아니다
 
 `40P01` 이 **`PessimisticLockingFailureException`** 으로 온다. Spring 은 SQLSTATE 앞 두 자리(`40` = 트랜잭션 롤백)로 번역해 상위 타입에 멈춘다.
