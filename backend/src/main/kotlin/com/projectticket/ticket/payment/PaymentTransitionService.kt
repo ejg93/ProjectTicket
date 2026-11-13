@@ -251,7 +251,7 @@ class PaymentTransitionService(
             log.warn("이미 다른 승인이 적힌 예매다 reservation_id={} payment_id={}", reservationId, paymentId)
         }
         val reservationStatus = statusOf(reservationId)
-        return Settled(paymentId, reservationStatus, late = reservationStatus != ReservationStatus.RESERVED.code, alreadyRecorded = true)
+        return Settled(paymentId = paymentId, reservationStatus = reservationStatus, late = reservationStatus != ReservationStatus.RESERVED.code, alreadyRecorded = true)
     }
 
     /**

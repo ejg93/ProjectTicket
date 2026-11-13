@@ -142,7 +142,7 @@ class DbTimeoutTest : ConcurrencyTestBase() {
         val buyer = TicketUser(id = fixture.account(email), email = email, role = AccountRole.AUDIENCE, passwordHash = null, active = true)
         queue.enter(performanceId, buyer.id)
         val token = checkNotNull(admission.tokenFor(performanceId, buyer.id)) { "진입했는데 토큰이 없다" }
-        return Hold(performanceId, seatId, buyer, token)
+        return Hold(performanceId = performanceId, seatId = seatId, buyer = buyer, token = token)
     }
 
     private inner class Hold(val performanceId: Long, val seatId: Long, val buyer: TicketUser, val token: String) {
